@@ -25,7 +25,7 @@ ogwu/
 
 - Node.js >= 18
 - npm >= 9
-- Expo CLI (`npm install -g expo-cli`)
+- Expo CLI (use the project-bundled CLI via `npx expo ...`)
 - Supabase CLI (`npm install -g supabase`)
 - A [Supabase](https://supabase.com) project
 
@@ -56,10 +56,43 @@ npm install
 npx expo start
 ```
 
-### 4. Set up Supabase (local development)
+### 4. Set up Supabase (cloud)
+
+1) Create a Supabase project (Dashboard → New project)
+
+2) Copy credentials (Dashboard → Project Settings → API)
+- Project URL
+- `anon` public key
+- `service_role` key (server-only)
+
+3) Fill in env files
+- Backend: `backend/.env`
+	- `SUPABASE_URL`
+	- `SUPABASE_SERVICE_ROLE_KEY`
+- Mobile: `mobile/.env`
+	- `EXPO_PUBLIC_SUPABASE_URL`
+	- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+	- `EXPO_PUBLIC_API_URL`
+		- If testing on a physical device, use your computer LAN IP (not `localhost`).
+		- Example: if Expo shows `exp://192.168.12.220:8081`, set `EXPO_PUBLIC_API_URL=http://192.168.12.220:3000`.
+
+4) Push the database migration to Supabase Cloud
+
+This repo includes a migration at `supabase/migrations/001_initial_schema.sql`.
+
+Option A (recommended, via CLI):
+```bash
+supabase login
+supabase link --project-ref <your-project-ref>
+supabase db push
+```
+
+Option B (via Dashboard):
+- SQL Editor → paste the contents of `supabase/migrations/001_initial_schema.sql` → Run
+
+### 5. (Optional) Supabase local development
 
 ```bash
-supabase init   # if not already done
 supabase start
 supabase db push
 ```
@@ -104,11 +137,18 @@ supabase db push
 
 ```bash
 cd mobile
-npx expo build:android
-npx expo build:ios
 # or using EAS Build:
 npx eas build
 ```
+
+## MVP Notes
+
+The MVP spec is in `ogwu_mvp.md`. This repository currently contains:
+- `mobile/`: Patient mobile app (Expo)
+- `backend/`: Express API
+- `supabase/`: Schema/migrations
+
+The Doctor dashboard described in the MVP doc is planned work and is not yet implemented in this repo.
 
 ## License
 
