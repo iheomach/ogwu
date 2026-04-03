@@ -44,12 +44,13 @@ If this loop works end-to-end and people pay for it, the MVP has succeeded.
 
 **Auth**
 - Sign up / log in with phone number + OTP (Supabase Auth)
-- Basic profile: name, age, sex, known conditions
+- Basic profile: name, age, sex, known conditions, allergies
 
 **AI Symptom Checker (Triage Agent)**
 - Conversational symptom intake (text-based, chat UI)
-- Claude API powers the conversation
-- Collects: main complaint, duration, severity, relevant history
+- OpenAI API powers the conversation
+- Patient's sex, known conditions, and allergies are passed as context from their profile — the agent never re-asks these
+- Collects: main complaint, duration, severity, location, associated symptoms
 - Outputs a structured summary that gets attached to the consultation
 - Clear disclaimer: "This is not a diagnosis. A doctor will review your case."
 - Two outcomes: Book a consult → or → "Your symptoms suggest you go to an emergency room immediately" (hard stop, no consult booked)
@@ -120,7 +121,7 @@ If this loop works end-to-end and people pay for it, the MVP has succeeded.
 | Backend | Node.js + Express.js | JavaScript across the full stack, pairs naturally with Supabase JS SDK |
 | Database | Supabase (Postgres) | Hosted DB + auth + storage, minimal DevOps |
 | File storage | Supabase Storage | Prescription PDFs, voice notes |
-| AI | Anthropic Claude API | Powers the triage agent |
+| AI | OpenAI API | Powers the triage agent |
 | Payments | Paystack | Best Nigerian payment gateway |
 | Video | Google Meet API (or manual link generation) | Zero infra, doctors/patients already have it |
 | Hosting (backend) | Railway | One-click Django deploys, free tier for MVP |
@@ -137,7 +138,7 @@ ogwu/
 │   └── dashboard/       # Next.js (doctor web app)
 ├── packages/
 │   ├── api/             # Node.js + Express backend
-│   ├── agents/          # Claude triage agent logic
+│   ├── agents/          # OpenAI triage agent logic
 │   └── shared/          # Shared TypeScript types & constants
 ├── turbo.json
 └── package.json
@@ -187,11 +188,12 @@ Keep it simple for MVP. This is a **single-turn structured conversation**, not a
 
 **Flow:**
 1. Patient opens "New Consultation"
-2. Chat UI launches — Claude is the assistant
-3. System prompt instructs Claude to:
+2. Chat UI launches — the AI assistant (GPT-4o) handles the conversation
+3. Patient's profile data (sex, known conditions, allergies) is injected into the system prompt as context — not collected conversationally
+4. System prompt instructs the model to:
    - Greet the patient warmly
    - Ask about their main complaint
-   - Ask 4–6 targeted follow-up questions (duration, severity, location, associated symptoms, relevant history)
+   - Ask 4–6 targeted follow-up questions (duration, severity, location, associated symptoms) — never re-ask sex, conditions, or allergies
    - NOT diagnose
    - At the end, output a structured JSON summary:
      ```json
@@ -200,14 +202,16 @@ Keep it simple for MVP. This is a **single-turn structured conversation**, not a
        "duration": "...",
        "severity": "mild | moderate | severe",
        "associated_symptoms": ["..."],
-       "relevant_history": "...",
+       "sex": "...",
+       "allergies": ["..."],
+       "known_conditions": ["..."],
        "red_flags": true | false,
-       "red_flag_reason": "..." 
+       "red_flag_reason": "..."
      }
      ```
-4. If `red_flags: true` → show emergency message, block consult booking
-5. If `red_flags: false` → show summary to patient, prompt to book consult
-6. Summary attached to the consultation record
+5. If `red_flags: true` → show emergency message, block consult booking
+6. If `red_flags: false` → show summary to patient, prompt to book consult
+7. Summary attached to the consultation record
 
 **That's it for MVP.** No memory, no follow-up agent, no results interpreter yet.
 
@@ -272,7 +276,7 @@ If you hit these, you've validated the core loop and have a green light for Stag
 - [ ] Paystack webhook handler
 
 **Week 5–6: Triage Agent**
-- [ ] Claude API integration in `packages/agents`
+- [ ] OpenAI API integration in `packages/agents`
 - [ ] Triage conversation flow + system prompt
 - [ ] Structured JSON output parsing
 - [ ] Red flag detection logic
@@ -315,6 +319,6 @@ Just so it's in view:
 
 ---
 
-*Document version: 0.1*
+*Document version: 0.2*
 *Stage: MVP / Pre-launch*
-*Last updated: March 2026*
+*Last updated: April 2026*

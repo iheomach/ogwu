@@ -76,25 +76,46 @@ ogwu/
 
 ```bash
 cd backend
-cp .env.example .env
 npm install
 npm run dev
 ```
+
+Backend config comes from environment variables.
+
+- **Production (Railway):** set env vars in Railway (recommended)
+- **Local dev (no `backend/.env`):** export vars in your shell, or use `railway run` to inject your Railway env vars locally
+
+Required backend env vars:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only)
+- `OPENAI_API_KEY` (required for AI triage)
+- `OPENAI_MODEL` (optional; defaults to `gpt-4o-mini`)
 
 ### 2) Mobile
 
 ```bash
 cd mobile
-cp .env.example .env
 npm install
 npx expo start
 ```
 
-If testing on a physical phone, set `EXPO_PUBLIC_API_URL` in `mobile/.env` to your computer’s LAN IP (not `localhost`).
+Mobile config is also read from environment variables.
+
+- **Production builds (EAS):** set `EXPO_PUBLIC_*` variables in EAS/Expo (recommended)
+- **Local dev (no `mobile/.env`):** export `EXPO_PUBLIC_*` variables in your shell before running `npx expo start`
+
+Required mobile env vars:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_API_URL` (your backend base URL)
+
+If your backend is running locally and you test on a physical phone, `EXPO_PUBLIC_API_URL` must use your computer’s LAN IP (not `localhost`).
 
 ### 3) Supabase (Cloud)
 
-This repo includes a migration at [supabase/migrations/001_initial_schema.sql](supabase/migrations/001_initial_schema.sql).
+This repo includes migrations under [supabase/migrations](supabase/migrations).
 
 ```bash
 supabase login

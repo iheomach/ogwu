@@ -20,7 +20,7 @@ router.post('/signup', async (req, res) => {
     const { data, error } = await supabase.auth.admin.createUser({
       email,
       password,
-      user_metadata: { full_name: fullName },
+      ...(fullName ? { user_metadata: { name: fullName } } : {}),
     });
     if (error) return res.status(400).json({ error: error.message });
     res.status(201).json({ user: data.user });

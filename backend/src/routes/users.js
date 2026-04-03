@@ -4,7 +4,17 @@ const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
 
 // Allowed fields a user may update on their own profile
-const UPDATABLE_FIELDS = ['full_name', 'avatar_url', 'phone'];
+const UPDATABLE_FIELDS = [
+  'first_name',
+  'middle_name',
+  'last_name',
+  'dob',
+  'biological_sex',
+  'allergies',
+  'avatar_url',
+  'phone',
+  'known_conditions',
+];
 
 // Get user profile (authenticated)
 router.get('/:id', authenticate, async (req, res) => {

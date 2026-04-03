@@ -8,7 +8,7 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
     'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY. ' +
-      'Copy mobile/.env.example to mobile/.env and fill in your Supabase credentials.'
+      'Set these as environment variables (e.g. via EAS/Expo env for builds, or via your shell for local dev).'
   );
 }
 
