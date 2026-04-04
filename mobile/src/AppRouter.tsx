@@ -184,7 +184,7 @@ export function AppRouter() {
             // Non-fatal
           }
           if (!isMounted) return;
-          setScreen('home');
+          setScreen('triageResults');
           return;
         }
 
@@ -343,7 +343,7 @@ export function AppRouter() {
           Alert.alert(t('triage.safetyTitle'), saved.safety_note);
         }
         resetTriage();
-        setScreen('home');
+        setScreen('triageResults');
         return;
       }
 

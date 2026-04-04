@@ -140,6 +140,28 @@ function safeLocale(locale) {
   return 'en';
 }
 
+function toUserDirectedSafetyNote(localeSafe, note) {
+  const raw = typeof note === 'string' ? note.trim() : '';
+  if (!raw) return null;
+
+  // Only a minimal rewrite for common English third-person phrasing.
+  // If the model already returns second-person language, keep it.
+  if (localeSafe !== 'en') return raw;
+
+  let out = raw;
+
+  out = out.replace(/^\s*the patient should\b/i, 'You should');
+  out = out.replace(/^\s*patient should\b/i, 'You should');
+  out = out.replace(/\bthe patient\b/gi, 'you');
+  out = out.replace(/\bpatient\b/gi, 'you');
+  out = out.replace(/\btheir\b/gi, 'your');
+
+  // Normalize capitalization if we created a leading "you".
+  out = out.replace(/^you\b/, 'You');
+
+  return out;
+}
+
 async function openaiChat({ locale, messages }) {
   const apiKey = requireEnv('OPENAI_API_KEY');
   const res = await fetchImpl('https://api.openai.com/v1/chat/completions', {
@@ -230,6 +252,17 @@ router.post('/complete', authenticate, async (req, res) => {
         a: typeof x.a === 'string' ? String(x.a).slice(0, 2000) : '',
       }));
 
+    const localeSafe = safeLocale(locale);
+    const languageMap = {
+      en: 'English',
+      es: 'Spanish',
+      fr: 'French',
+      ig: 'Igbo',
+      yo: 'Yoruba',
+      ha: 'Hausa',
+    };
+    const languageName = languageMap[localeSafe] || 'English';
+
     // Ask the model for a short summary (still no advice)
     const messages = [
       {
@@ -238,7 +271,10 @@ router.post('/complete', authenticate, async (req, res) => {
           `Summarize the following patient intake in 4-6 bullets. ` +
           `No diagnosis, no treatment advice. ` +
           `If emergency symptoms are present, include a first bullet saying they should seek urgent care. ` +
-          `Return ONLY JSON: { "summary": string, "safety_note": string|null }.`,
+          `Return ONLY JSON: { "summary": string, "safety_note": string|null }. ` +
+          `Write in ${languageName}. ` +
+          `If you include a safety_note, address the user directly in second person ("you"), e.g. ` +
+          `"It is recommended that you ... due to your symptoms" (do not say "the patient").`,
       },
       {
         role: 'user',
@@ -251,7 +287,7 @@ router.post('/complete', authenticate, async (req, res) => {
     try {
       const parsed = await openaiChat({ locale, messages });
       summary = typeof parsed?.summary === 'string' ? parsed.summary : null;
-      safety_note = typeof parsed?.safety_note === 'string' ? parsed.safety_note : null;
+      safety_note = toUserDirectedSafetyNote(localeSafe, parsed?.safety_note);
     } catch {
       // Non-fatal: we can still save answers.
     }
