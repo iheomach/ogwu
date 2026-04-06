@@ -17,6 +17,7 @@ export type CompleteResponse = {
     urgency: UrgencyTier;
     answers: TriageQA[];
     summary: string | null;
+    safety_note?: string | null;
     created_at: string;
     updated_at: string;
   };
@@ -33,6 +34,7 @@ export type TriageIntake = {
   urgency: UrgencyTier;
   answers: TriageQA[];
   summary: string | null;
+  safety_note?: string | null;
   created_at: string;
   updated_at: string;
 };

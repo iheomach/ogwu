@@ -13,6 +13,20 @@ import type { TriageIntake, TriageResultsScreenProps } from '../types';
 import { styles, colors } from '../ui/styles';
 import { t } from '../i18n';
 import { triageGetIntake } from '../lib/triage';
+import { encountersCreateShare } from '../lib/encounters';
+
+function urgencyColors(urgency: TriageIntake['urgency']) {
+  switch (urgency) {
+    case 'emergency':
+      return { bg: colors.errorLight, fg: colors.error };
+    case 'urgent':
+      return { bg: colors.urgentLight, fg: colors.urgent };
+    case 'soon':
+      return { bg: colors.warningLight, fg: colors.warning };
+    default:
+      return { bg: colors.successLight, fg: colors.success };
+  }
+}
 
 export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) {
   const [loading, setLoading] = useState(true);
@@ -33,6 +47,12 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
       parts.push(`${t('triageResults.summary')}:`);
       parts.push(intake.summary);
     }
+
+    if (intake.safety_note) {
+      parts.push('');
+      parts.push(`${t('triageResults.safetyNote')}:`);
+      parts.push(intake.safety_note);
+    }
     parts.push('');
     parts.push(`${t('triageResults.answers')}:`);
     intake.answers.forEach((qa, idx) => {
@@ -44,7 +64,14 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
     const message = parts.join('\n').trim();
 
     try {
-      await Share.share({ message, title: t('triageResults.shareTitle') });
+      const res = await Share.share({ message, title: t('triageResults.shareTitle') });
+      if ((res as any)?.action === Share.sharedAction) {
+        try {
+          await encountersCreateShare({ doctor_id: null });
+        } catch (e: any) {
+          Alert.alert(t('records.title'), e?.message ?? t('common.error'));
+        }
+      }
     } catch (e: any) {
       Alert.alert(t('triageResults.shareErrorTitle'), e?.message ?? t('triageResults.shareErrorBody'));
     }
@@ -123,9 +150,11 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
           <>
             <Text style={[styles.label, { marginBottom: 12 }]}>{t('triageResults.urgency')}</Text>
             <View style={styles.card}>
-              <Text style={[styles.value, { marginTop: 0 }]}>
-                {t(`triageResults.urgency_${(intake.urgency ?? 'routine') as any}`)}
-              </Text>
+              <View style={[styles.pill, { backgroundColor: urgencyColors(intake.urgency ?? 'routine').bg }]}>
+                <Text style={[styles.pillText, { color: urgencyColors(intake.urgency ?? 'routine').fg }]}>
+                  {t(`triageResults.urgency_${(intake.urgency ?? 'routine') as any}`)}
+                </Text>
+              </View>
             </View>
             <View style={styles.mt16} />
 

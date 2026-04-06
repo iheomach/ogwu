@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Linking,
   ScrollView,
   Share,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -13,9 +15,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { NewConsultScreenProps } from '../types';
 import { apiGet } from '../lib/api';
+import { encountersCreateShare } from '../lib/encounters';
+import { providersLookup } from '../lib/providers';
+import { threadsCreate } from '../lib/threads';
 import { triageGetIntake, type TriageIntake } from '../lib/triage';
 import { colors, styles } from '../ui/styles';
 import { t } from '../i18n';
+
+function urgencyColors(urgency: TriageIntake['urgency']) {
+  switch (urgency) {
+    case 'emergency':
+      return { bg: colors.errorLight, fg: colors.error };
+    case 'urgent':
+      return { bg: colors.urgentLight, fg: colors.urgent };
+    case 'soon':
+      return { bg: colors.warningLight, fg: colors.warning };
+    default:
+      return { bg: colors.successLight, fg: colors.success };
+  }
+}
 
 type Doctor = {
   id: string;
@@ -68,6 +86,12 @@ function buildClinicShareText(intake: TriageIntake): string {
     parts.push(`${t('triageResults.summary')}:`);
     parts.push(intake.summary);
   }
+
+  if (intake.safety_note) {
+    parts.push('');
+    parts.push(`${t('triageResults.safetyNote')}:`);
+    parts.push(intake.safety_note);
+  }
   parts.push('');
   parts.push(`${t('triageResults.answers')}:`);
   intake.answers.forEach((qa, idx) => {
@@ -79,12 +103,18 @@ function buildClinicShareText(intake: TriageIntake): string {
   return parts.join('\n').trim();
 }
 
-export function NewConsultScreen({ busy, onViewIntake }: NewConsultScreenProps) {
+export function NewConsultScreen({ busy, onViewIntake, onOpenThread }: NewConsultScreenProps) {
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [doctorsLoading, setDoctorsLoading] = useState(true);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [intakeLoading, setIntakeLoading] = useState(true);
   const [intake, setIntake] = useState<TriageIntake | null>(null);
+
+  const [externalQuery, setExternalQuery] = useState('');
+  const [externalLoading, setExternalLoading] = useState(false);
+  const [externalNotice, setExternalNotice] = useState<string | null>(null);
+  const [externalProviders, setExternalProviders] = useState<any[]>([]);
+  const [externalSuggested, setExternalSuggested] = useState<string[]>([]);
 
   const selectedDoctor = useMemo(
     () => doctors.find((d) => d.id === selectedDoctorId) ?? null,
@@ -139,7 +169,17 @@ export function NewConsultScreen({ busy, onViewIntake }: NewConsultScreenProps) 
     if (!intake) return;
     try {
       const message = buildClinicShareText(intake);
-      await Share.share({ message, title: t('triageResults.shareTitle') });
+      const res = await Share.share({ message, title: t('triageResults.shareTitle') });
+
+      // Only record an encounter if the user actually shared.
+      if ((res as any)?.action === Share.sharedAction) {
+        try {
+          // Server snapshots the latest intake; no PHI is posted from the client.
+          await encountersCreateShare({ doctor_id: null });
+        } catch (e: any) {
+          Alert.alert(t('records.title'), e?.message ?? t('common.error'));
+        }
+      }
     } catch (e: any) {
       Alert.alert(t('triageResults.shareErrorTitle'), e?.message ?? t('triageResults.shareErrorBody'));
     }
@@ -166,6 +206,59 @@ export function NewConsultScreen({ busy, onViewIntake }: NewConsultScreenProps) 
   const urgencyLabel = intake
     ? t(`triageResults.urgency_${(intake.urgency ?? 'routine') as any}`)
     : t('common.dash');
+
+  const urgencyStyle = intake ? urgencyColors(intake.urgency ?? 'routine') : null;
+
+  const onStartAsyncConsult = async (doctorId: string) => {
+    try {
+      const res = await threadsCreate({ doctor_id: doctorId });
+      const threadId = res?.thread?.id;
+      if (!threadId) throw new Error(t('common.error'));
+      onOpenThread(threadId);
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+    }
+  };
+
+  const onLookupExternal = async () => {
+    const q = externalQuery.trim();
+    if (!q) return;
+    try {
+      setExternalLoading(true);
+      setExternalNotice(null);
+      setExternalProviders([]);
+      setExternalSuggested([]);
+      const res = await providersLookup(q);
+      setExternalNotice(res.notice ?? null);
+      setExternalProviders(Array.isArray((res as any)?.providers) ? (res as any).providers : []);
+      setExternalSuggested(Array.isArray((res as any)?.suggested_queries) ? (res as any).suggested_queries : []);
+    } catch (e: any) {
+      setExternalNotice(e?.message ?? t('common.error'));
+      setExternalProviders([]);
+      setExternalSuggested([]);
+    } finally {
+      setExternalLoading(false);
+    }
+  };
+
+  const buildExternalMessage = () => {
+    if (intake) return buildClinicShareText(intake);
+    return t('consult.externalDefaultMessage');
+  };
+
+  const openSms = async (phone: string) => {
+    const message = buildExternalMessage();
+    const sep = Platform.OS === 'ios' ? '&' : '?';
+    const url = `sms:${phone}${sep}body=${encodeURIComponent(message)}`;
+    await Linking.openURL(url);
+  };
+
+  const openEmail = async (email: string) => {
+    const body = buildExternalMessage();
+    const subject = encodeURIComponent(t('consult.externalEmailSubject'));
+    const url = `mailto:${email}?subject=${subject}&body=${encodeURIComponent(body)}`;
+    await Linking.openURL(url);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -200,8 +293,15 @@ export function NewConsultScreen({ busy, onViewIntake }: NewConsultScreenProps) 
                       <Text style={[styles.helper, { marginBottom: 0, marginLeft: 10 }]}>{t('triage.loading')}</Text>
                     </View>
                   ) : (
-                    <View style={[styles.pill, { marginTop: 8 }]}>
-                      <Text style={styles.pillText}>{urgencyLabel}</Text>
+                    <View
+                      style={[
+                        styles.pill,
+                        { marginTop: 8, backgroundColor: urgencyStyle?.bg ?? colors.purpleLight },
+                      ]}
+                    >
+                      <Text style={[styles.pillText, { color: urgencyStyle?.fg ?? colors.purple }]}>
+                        {urgencyLabel}
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -210,7 +310,6 @@ export function NewConsultScreen({ busy, onViewIntake }: NewConsultScreenProps) 
               {intake && intake.urgency === 'emergency' && (
                 <View style={[styles.mt16, { backgroundColor: colors.errorLight, borderRadius: 12, padding: 12 }]}
                 >
-                  <Text style={[styles.value, { color: colors.error }]}>{t('consult.emergencyTitle')}</Text>
                   <Text style={[styles.helper, { marginBottom: 0, color: colors.grey900 }]}>
                     {t('consult.emergencyBody')}
                   </Text>
@@ -284,6 +383,116 @@ export function NewConsultScreen({ busy, onViewIntake }: NewConsultScreenProps) 
                 </View>
               </TouchableOpacity>
             ))}
+
+            <View style={styles.mt24} />
+            <Text style={[styles.label, { marginBottom: 12 }]}>{t('consult.externalProviders')}</Text>
+            <View style={styles.card}>
+              <Text style={[styles.helper, { marginBottom: 12 }]}>{t('consult.externalProvidersBody')}</Text>
+
+              <Text style={styles.inputLabel}>{t('consult.externalSearchLabel')}</Text>
+              <TextInput
+                value={externalQuery}
+                onChangeText={setExternalQuery}
+                placeholder={t('consult.externalSearchPlaceholder')}
+                placeholderTextColor={colors.grey300}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.input}
+                editable={!busy && !externalLoading}
+              />
+
+              <TouchableOpacity
+                style={[styles.btnPrimary, (busy || externalLoading || externalQuery.trim().length === 0) && styles.btnPrimaryDisabled]}
+                onPress={onLookupExternal}
+                disabled={busy || externalLoading || externalQuery.trim().length === 0}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.btnPrimaryText}>
+                  {externalLoading ? t('triage.loading') : t('consult.externalSearchCta')}
+                </Text>
+              </TouchableOpacity>
+
+              {!!externalNotice && (
+                <Text style={[styles.helper, { marginBottom: 0, marginTop: 10 }]}>{externalNotice}</Text>
+              )}
+
+              {!externalLoading && externalSuggested.length > 0 && (
+                <View style={styles.mt16}>
+                  <Text style={[styles.helper, { marginBottom: 0 }]}>{t('consult.externalSuggested')}</Text>
+                  {externalSuggested.slice(0, 3).map((s) => (
+                    <Text key={s} style={[styles.helper, { marginBottom: 0, marginTop: 6 }]}>
+                      • {s}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {externalProviders.length > 0 && (
+                <View style={styles.mt16}>
+                  {externalProviders.map((p: any, i: number) => (
+                    <View key={`${p?.source_url || p?.website || p?.phone || 'p'}:${i}`} style={[styles.card, i > 0 && styles.mt16]}>
+                      <Text style={styles.value}>{String(p?.name || t('consult.externalProvider'))}</Text>
+                      {!!p?.address && (
+                        <Text style={[styles.helper, { marginBottom: 0, marginTop: 6 }]}>{String(p.address)}</Text>
+                      )}
+
+                      {!!p?.phone && (
+                        <Text style={[styles.helper, { marginBottom: 0, marginTop: 6 }]}>
+                          {t('consult.phone')}: {String(p.phone)}
+                        </Text>
+                      )}
+                      {!!p?.email && (
+                        <Text style={[styles.helper, { marginBottom: 0, marginTop: 6 }]}>
+                          {t('consult.email')}: {String(p.email)}
+                        </Text>
+                      )}
+
+                      <View style={[styles.row, { marginTop: 12, flexWrap: 'wrap' }]}>
+                        {!!p?.phone && (
+                          <TouchableOpacity
+                            style={[styles.btnGhost, { marginRight: 10, marginTop: 0 }]}
+                            onPress={() => Linking.openURL(`tel:${String(p.phone)}`)}
+                            disabled={busy}
+                          >
+                            <Text style={styles.btnGhostText}>{t('consult.call')}</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {!!p?.phone && (
+                          <TouchableOpacity
+                            style={[styles.btnGhost, { marginRight: 10, marginTop: 0 }]}
+                            onPress={() => openSms(String(p.phone))}
+                            disabled={busy}
+                          >
+                            <Text style={styles.btnGhostText}>{t('consult.text')}</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {!!p?.email && (
+                          <TouchableOpacity
+                            style={[styles.btnGhost, { marginRight: 10, marginTop: 0 }]}
+                            onPress={() => openEmail(String(p.email))}
+                            disabled={busy}
+                          >
+                            <Text style={styles.btnGhostText}>{t('consult.email')}</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {!!p?.booking_url && (
+                          <TouchableOpacity
+                            style={[styles.btnGhost, { marginTop: 0 }]}
+                            onPress={() => Linking.openURL(String(p.booking_url))}
+                            disabled={busy}
+                          >
+                            <Text style={styles.btnGhostText}>{t('consult.openBooking')}</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
           </>
         )}
 
@@ -341,6 +550,14 @@ export function NewConsultScreen({ busy, onViewIntake }: NewConsultScreenProps) 
               disabled={busy}
             >
               <Text style={styles.btnPrimaryText}>{t('consult.contactHospital')}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.btnPrimary, busy ? styles.btnPrimaryDisabled : null]}
+              onPress={() => onStartAsyncConsult(selectedDoctor.id)}
+              disabled={busy}
+            >
+              <Text style={styles.btnPrimaryText}>{t('consult.startAsyncConsult')}</Text>
             </TouchableOpacity>
           </>
         )}

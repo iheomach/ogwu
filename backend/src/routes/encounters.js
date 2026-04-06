@@ -1,0 +1,100 @@
+const express = require('express');
+const router = express.Router();
+
+const supabase = require('../lib/supabase');
+const authenticate = require('../middleware/auth');
+
+// List encounters for the signed-in patient
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const baseSelect = [
+      'id',
+      'patient_id',
+      'doctor_id',
+      'source',
+      'status',
+      'locale',
+      'urgency',
+      'summary',
+      'safety_note',
+      'created_at',
+    ];
+
+    // Prefer embedding doctor info when possible.
+    let { data, error } = await supabase
+      .from('encounters')
+      .select([...baseSelect, 'doctor:doctors(id,name,primary_specialty,hospital_name,location)'].join(','))
+      .eq('patient_id', req.user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      // Fallback: return encounters without embedded doctor info.
+      const retry = await supabase
+        .from('encounters')
+        .select(baseSelect.join(','))
+        .eq('patient_id', req.user.id)
+        .order('created_at', { ascending: false });
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error) return res.status(400).json({ error: error.message });
+    return res.json({ encounters: data || [] });
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'Failed to load encounters' });
+  }
+});
+
+// Create an encounter by snapshotting the latest saved intake
+router.post('/share', authenticate, async (req, res) => {
+  try {
+    const doctor_id = typeof req.body?.doctor_id === 'string' ? req.body.doctor_id : null;
+
+    const { data: intake, error: intakeErr } = await supabase
+      .from('triage_intakes')
+      .select('locale, urgency, summary, safety_note, answers')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (intakeErr) return res.status(400).json({ error: intakeErr.message });
+    if (!intake) return res.status(400).json({ error: 'No intake found to share' });
+
+    const payload = {
+      patient_id: req.user.id,
+      doctor_id,
+      source: 'share',
+      status: 'shared',
+      locale: intake.locale,
+      urgency: intake.urgency,
+      summary: intake.summary,
+      safety_note: intake.safety_note,
+      answers: intake.answers,
+    };
+
+    const { data, error } = await supabase
+      .from('encounters')
+      .insert(payload)
+      .select(
+        [
+          'id',
+          'patient_id',
+          'doctor_id',
+          'source',
+          'status',
+          'locale',
+          'urgency',
+          'summary',
+          'safety_note',
+          'created_at',
+        ].join(',')
+      )
+      .single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    return res.json({ encounter: data });
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'Failed to create encounter' });
+  }
+});
+
+module.exports = router;

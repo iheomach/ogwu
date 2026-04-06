@@ -20,6 +20,15 @@ export const colors = {
 
   error: '#EF4444',
   errorLight: '#FEF2F2',
+
+  warning: '#F59E0B',
+  warningLight: '#FFFBEB',
+
+  urgent: '#F97316',
+  urgentLight: '#FFEDD5',
+
+  success: '#16A34A',
+  successLight: '#DCFCE7',
 };
 
 export const font = {

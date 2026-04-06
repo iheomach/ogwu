@@ -20,6 +20,7 @@ import { TriageResultsScreen } from './screens/TriageResultsScreen';
 import { NewConsultScreen } from './screens/NewConsultScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { ThreadScreen } from './screens/ThreadScreen';
 import { initI18n, setLocale as persistLocale, t } from './i18n';
 import type { SupportedLocale } from './i18n/translations';
 import type { TriageQA } from './types';
@@ -33,6 +34,7 @@ export function AppRouter() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [screen, setScreen] = useState<AppScreen>('phone');
   const [locale, setLocale] = useState<SupportedLocale>('en');
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
   const [triageQa, setTriageQa] = useState<TriageQA[]>([]);
   const [triageQuestion, setTriageQuestion] = useState('');
@@ -488,13 +490,33 @@ export function AppRouter() {
           <NewConsultScreen
             busy={busy}
             onViewIntake={() => setScreen('triageResults')}
+            onOpenThread={(threadId) => {
+              setActiveThreadId(threadId);
+              setScreen('thread');
+            }}
           />
         </TabScaffold>
       )}
 
+      {screen === 'thread' && activeThreadId && (
+        <ThreadScreen
+          busy={busy}
+          threadId={activeThreadId}
+          onBack={() => {
+            setScreen('records');
+          }}
+        />
+      )}
+
       {screen === 'records' && (
         <TabScaffold activeTab="records" onNavigate={goTab}>
-          <RecordsScreen busy={busy} />
+          <RecordsScreen
+            busy={busy}
+            onOpenThread={(threadId) => {
+              setActiveThreadId(threadId);
+              setScreen('thread');
+            }}
+          />
         </TabScaffold>
       )}
 

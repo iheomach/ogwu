@@ -345,10 +345,11 @@ router.post('/complete', authenticate, async (req, res) => {
           answers: trimmed,
           urgency,
           summary,
+          safety_note,
         },
         { onConflict: 'user_id' }
       )
-      .select('user_id, locale, answers, urgency, summary, created_at, updated_at')
+      .select('user_id, locale, answers, urgency, summary, safety_note, created_at, updated_at')
       .single();
 
     if (error) return res.status(400).json({ error: error.message });
@@ -379,7 +380,7 @@ router.get('/intake', authenticate, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('triage_intakes')
-      .select('user_id, locale, answers, urgency, summary, created_at, updated_at')
+      .select('user_id, locale, answers, urgency, summary, safety_note, created_at, updated_at')
       .eq('user_id', req.user.id)
       .maybeSingle();
 

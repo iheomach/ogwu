@@ -18,6 +18,9 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/triage', require('./routes/triage'));
 app.use('/api/doctors', require('./routes/doctors'));
+app.use('/api/encounters', require('./routes/encounters'));
+app.use('/api/threads', require('./routes/threads'));
+app.use('/api/providers', require('./routes/providers'));
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

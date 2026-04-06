@@ -23,6 +23,7 @@ export type AppScreen =
   | 'triageResults'
   | 'home'
   | 'newConsult'
+  | 'thread'
   | 'records'
   | 'profile';
 
@@ -72,9 +73,12 @@ export type HomeScreenProps = ScreenPropsBase & {
 
 export type NewConsultScreenProps = ScreenPropsBase & {
   onViewIntake: () => void;
+  onOpenThread: (threadId: string) => void;
 };
 
-export type RecordsScreenProps = ScreenPropsBase;
+export type RecordsScreenProps = ScreenPropsBase & {
+  onOpenThread: (threadId: string) => void;
+};
 
 export type ProfileScreenProps = ScreenPropsBase & {
   phoneLabel: string;
@@ -92,8 +96,73 @@ export type TriageIntake = {
   urgency: UrgencyTier;
   answers: TriageQA[];
   summary: string | null;
+  safety_note?: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type Encounter = {
+  id: string;
+  patient_id: string;
+  doctor_id: string | null;
+  source: 'share' | 'contact' | 'clinic';
+  status: 'shared' | 'started' | 'completed';
+  locale: string | null;
+  urgency: UrgencyTier;
+  summary: string | null;
+  safety_note: string | null;
+  created_at: string;
+  doctor?: {
+    id: string;
+    name: string;
+    primary_specialty: string;
+    hospital_name: string;
+    location: string;
+  } | null;
+};
+
+export type ExternalProvider = {
+  name: string;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  booking_url: string | null;
+  address: string | null;
+  source_url: string | null;
+};
+
+export type ExternalProviderResult = {
+  providers: ExternalProvider[];
+  notice: string | null;
+  suggested_queries?: string[];
+};
+
+export type ConsultThread = {
+  id: string;
+  patient_id: string;
+  provider_type: 'onboarded' | 'external';
+  doctor_id: string | null;
+  external_provider: ExternalProvider | null;
+  locale: string | null;
+  urgency: UrgencyTier;
+  status: 'open' | 'closed';
+  created_at: string;
+  updated_at: string;
+  doctor?: {
+    id: string;
+    name: string;
+    primary_specialty: string;
+    hospital_name: string;
+    location: string;
+  } | null;
+};
+
+export type ConsultMessage = {
+  id: string;
+  thread_id: string;
+  sender_role: 'patient' | 'provider' | 'system';
+  body: string;
+  created_at: string;
 };
 
 export type TriageResultsScreenProps = ScreenPropsBase & {
