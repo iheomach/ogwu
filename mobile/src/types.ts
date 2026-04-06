@@ -13,6 +13,8 @@ export type Profile = {
   known_conditions: string | null;
 };
 
+export type UrgencyTier = 'routine' | 'soon' | 'urgent' | 'emergency';
+
 export type AppScreen =
   | 'phone'
   | 'otp'
@@ -68,7 +70,9 @@ export type HomeScreenProps = ScreenPropsBase & {
   onGoProfile: () => void;
 };
 
-export type NewConsultScreenProps = ScreenPropsBase;
+export type NewConsultScreenProps = ScreenPropsBase & {
+  onViewIntake: () => void;
+};
 
 export type RecordsScreenProps = ScreenPropsBase;
 
@@ -85,6 +89,7 @@ export type ProfileScreenProps = ScreenPropsBase & {
 export type TriageIntake = {
   user_id: string;
   locale: string | null;
+  urgency: UrgencyTier;
   answers: TriageQA[];
   summary: string | null;
   created_at: string;
@@ -110,5 +115,6 @@ export type TriageScreenProps = ScreenPropsBase & {
   question: string;
   answer: string;
   setAnswer: (value: string) => void;
+  onBack: () => void;
   onNext: () => void;
 };

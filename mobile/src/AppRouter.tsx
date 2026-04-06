@@ -458,6 +458,7 @@ export function AppRouter() {
           question={triageQuestion || t('triage.loadingQuestion')}
           answer={triageAnswer}
           setAnswer={setTriageAnswer}
+          onBack={() => setScreen('profile')}
           onNext={onTriageNext}
         />
       )}
@@ -484,7 +485,10 @@ export function AppRouter() {
 
       {screen === 'newConsult' && (
         <TabScaffold activeTab="newConsult" onNavigate={goTab}>
-          <NewConsultScreen busy={busy} />
+          <NewConsultScreen
+            busy={busy}
+            onViewIntake={() => setScreen('triageResults')}
+          />
         </TabScaffold>
       )}
 

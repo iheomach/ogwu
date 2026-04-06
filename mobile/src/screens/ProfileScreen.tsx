@@ -1,9 +1,10 @@
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Picker } from '@react-native-picker/picker';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import type { ProfileScreenProps } from '../types';
-import { styles } from '../ui/styles';
+import { colors, styles } from '../ui/styles';
 import { languageLabels, t } from '../i18n';
 import { SUPPORTED_LOCALES, type SupportedLocale } from '../i18n/translations';
 
@@ -34,6 +35,32 @@ export function ProfileScreen({
   onViewTriageResults,
   onLogout,
 }: ProfileScreenProps) {
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const [languageMenuVisible, setLanguageMenuVisible] = useState(false);
+
+  const menuAnim = useRef(new Animated.Value(0)).current;
+  const menuMaxHeight = useMemo(() => SUPPORTED_LOCALES.length * 48, []);
+
+  useEffect(() => {
+    if (languageOpen) {
+      setLanguageMenuVisible(true);
+      menuAnim.stopAnimation();
+      Animated.timing(menuAnim, {
+        toValue: 1,
+        duration: 160,
+        useNativeDriver: false,
+      }).start();
+    } else {
+      menuAnim.stopAnimation();
+      Animated.timing(menuAnim, {
+        toValue: 0,
+        duration: 140,
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished) setLanguageMenuVisible(false);
+      });
+    }
+  }, [languageOpen, menuAnim]);
   const displayFullName = [profile?.first_name, profile?.middle_name, profile?.last_name]
     .filter((p) => (p ?? '').trim().length > 0)
     .join(' ');
@@ -59,17 +86,59 @@ export function ProfileScreen({
         </View>
 
         <Text style={[styles.label, { marginBottom: 12 }]}>{t('home.language')}</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={locale}
-            onValueChange={(v) => onChangeLocale(String(v) as SupportedLocale)}
-            enabled={!busy}
-            style={styles.picker}
+        <View style={styles.dropdownContainer}>
+          <TouchableOpacity
+            style={styles.dropdownButton}
+            onPress={() => setLanguageOpen((v) => !v)}
+            disabled={busy}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.language')}
           >
-            {SUPPORTED_LOCALES.map((code) => (
-              <Picker.Item key={code} label={languageLabels[code]} value={code} />
-            ))}
-          </Picker>
+            <Text style={styles.dropdownButtonText}>{languageLabels[locale]}</Text>
+            <MaterialIcons
+              name={languageOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+              size={20}
+              color={colors.grey700}
+            />
+          </TouchableOpacity>
+
+          {languageMenuVisible && (
+            <Animated.View
+              style={[
+                styles.dropdownMenu,
+                {
+                  height: menuAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, menuMaxHeight],
+                  }),
+                  opacity: menuAnim,
+                },
+              ]}
+            >
+              {SUPPORTED_LOCALES.map((code) => {
+                const active = code === locale;
+                return (
+                  <TouchableOpacity
+                    key={code}
+                    style={[styles.dropdownItem, active && styles.dropdownItemActive]}
+                    onPress={() => {
+                      onChangeLocale(code as SupportedLocale);
+                      setLanguageOpen(false);
+                    }}
+                    disabled={busy}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>
+                      {languageLabels[code]}
+                    </Text>
+                    {active && <MaterialIcons name="check" size={18} color={colors.purple} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </Animated.View>
+          )}
         </View>
 
         <Text style={[styles.label, { marginBottom: 12 }]}>{t('profile.intake')}</Text>

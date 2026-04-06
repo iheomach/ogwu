@@ -21,6 +21,7 @@ export function TriageScreen({
   question,
   answer,
   setAnswer,
+  onBack,
   onNext,
 }: TriageScreenProps) {
   const [focused, setFocused] = useState(false);
@@ -33,6 +34,10 @@ export function TriageScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <TouchableOpacity style={styles.btnGhost} onPress={onBack} disabled={busy}>
+            <Text style={styles.btnGhostText}>{t('common.back')}</Text>
+          </TouchableOpacity>
+
           {/* Brand */}
           <View style={styles.brandRow}>
             <View style={styles.brandDot} />

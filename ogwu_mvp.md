@@ -1,324 +1,92 @@
-# 🏥 Ogwu — MVP Specification (Stage 1)
+# Ogwu — MVP Specification (Clinic Co-Pilot)
 
-> **Goal:** Validate that patients in Nigeria will pay for and use an async telehealth consultation product.
-> **Timeline:** 8–12 weeks to launch
-> **Team:** Solo developer
+## Goal
 
----
+Validate a simple loop for Nigeria (and similar markets): patients can complete a short intake, get a clinic-ready summary, and share it with a clinician to speed up triage and reduce back-and-forth.
 
-## What We Are NOT Building in MVP
+## MVP Scope (what we are building)
 
-Before listing what's in scope, here's what's explicitly deferred to Stage 2+:
+### Patient (Mobile app — Expo)
 
-- ❌ Native video calling (using Google Meet links instead)
-- ❌ Lab test booking
-- ❌ Medication delivery
-- ❌ Chronic disease management agent
-- ❌ Medication adherence agent
-- ❌ FHIR compliance
-- ❌ Multi-language support (English only for now)
-- ❌ USSD / SMS fallback
-- ❌ iOS App Store / Google Play launch (TestFlight + APK direct install for beta)
-- ❌ Redis caching
-- ❌ Native file storage (use Supabase storage)
+- Phone OTP sign in (Supabase Auth)
+- Profile onboarding
+  - First/middle/last name
+  - Date of birth
+  - Biological sex
+  - Optional: known conditions + allergies
+- Multi-language UI: en/es/fr/ig/yo/ha
+- Quick intake (triage)
+  - Up to 5 questions (rule-based selection)
+  - Emergency signal detection (basic keyword heuristics)
+  - Completion produces:
+    - AI-generated summary + user-directed safety note (OpenAI)
+    - Urgency tier: `routine | soon | urgent | emergency`
+- Intake results screen
+  - Displays urgency + summary + Q/A
+  - One-tap “Share for clinic” text
 
----
+### Clinician workflow (out of product)
 
-## MVP Scope
+For MVP: the clinician receives the shared intake text via WhatsApp/SMS/email and uses it to triage faster.
 
-### The Core Loop (Everything Else Is Secondary)
+## Explicitly NOT in MVP (yet)
 
-```
-Patient signs up → AI triage → Books consult → Pays → 
-Doctor reviews → Consult happens (async or Meet) → 
-Doctor sends response + prescription → Patient receives it
-```
+- Doctor web dashboard
+- Consultation booking, payments (Paystack), and consult messaging
+- Medication delivery, lab booking, imaging
+- Full medical device-grade decision support
+- Offline-first / USSD / SMS-only patient flows
 
-If this loop works end-to-end and people pay for it, the MVP has succeeded.
+## Product Flow
 
----
+1. Patient signs in with phone OTP
+2. Patient completes profile onboarding
+3. Patient completes quick intake (max 5 Qs)
+4. App shows Intake Results:
+   - Urgency tier
+   - Summary
+   - Questions + answers
+5. Patient taps “Share for clinic” and sends to a clinician
 
-## Features In Scope
+## Urgency Tiers (MVP definition)
 
-### Patient Side (Mobile App — Expo)
+- `routine`: mild symptoms, stable course, no red flags detected
+- `soon`: moderate symptoms or “getting worse” signals; needs timely review
+- `urgent`: severe symptom signals (e.g. high severity, concerning keywords)
+- `emergency`: high-risk red flags detected; app should advise emergency care
 
-**Auth**
-- Sign up / log in with phone number + OTP (Supabase Auth)
-- Basic profile: name, age, sex, known conditions, allergies
-
-**AI Symptom Checker (Triage Agent)**
-- Conversational symptom intake (text-based, chat UI)
-- OpenAI API powers the conversation
-- Patient's sex, known conditions, and allergies are passed as context from their profile — the agent never re-asks these
-- Collects: main complaint, duration, severity, location, associated symptoms
-- Outputs a structured summary that gets attached to the consultation
-- Clear disclaimer: "This is not a diagnosis. A doctor will review your case."
-- Two outcomes: Book a consult → or → "Your symptoms suggest you go to an emergency room immediately" (hard stop, no consult booked)
-
-**Consultation Booking**
-- Browse available doctors (name, specialty, price, availability)
-- Two consultation types:
-  - **Async** — patient submits symptoms + voice note/text, doctor responds within 6 hours (cheaper)
-  - **Live (Google Meet)** — app generates a Meet link for a scheduled time slot
-- Select a time slot (live) or just submit (async)
-
-**Payments**
-- Paystack integration
-- Pay before consult is confirmed
-- Simple pricing: flat fee per consult type
-- Receipt stored in app
-
-**Consultation View**
-- Async: chat-style thread between patient and doctor
-- Live: shows Meet link + countdown to appointment time
-- Doctor can attach: text response, prescription (PDF), follow-up recommendation
-
-**Basic Health Records**
-- List of past consultations
-- View consultation notes + prescriptions
-- No exports in MVP
-
----
-
-### Doctor Side (Web Dashboard — Next.js)
-
-> Doctors use a web app, not mobile, for MVP. Simpler to build and doctors are likely on a laptop anyway.
-
-**Auth**
-- Email + password login (Supabase Auth)
-- Manual onboarding by admin (no self-serve doctor sign-up in MVP — you vet them yourself)
-
-**Queue / Inbox**
-- List of pending consultations (async) with patient symptom summary pre-filled by AI
-- Upcoming live consultations with Meet link
-- Status tags: Pending → In Progress → Completed
-
-**Consultation Workspace**
-- View AI-generated symptom summary
-- Read patient's submitted voice note / text
-- Write response (rich text)
-- Upload prescription as PDF (or type it in)
-- Mark consultation complete
-- Flag for follow-up
-
-**Availability**
-- Set available time slots for live consultations
-- Toggle availability on/off
-
-**Earnings**
-- Total earned (current month)
-- Per-consultation breakdown
-- Payout requested manually via mobile money in MVP (no automated payout yet)
-
----
-
-## Tech Stack (MVP)
-
-| Layer | Choice | Why |
-|---|---|---|
-| Mobile | Expo (React Native) | Fastest solo mobile dev, no native config |
-| Web (Doctor dashboard) | Next.js | Simple, fast to build, good auth story |
-| Backend | Node.js + Express.js | JavaScript across the full stack, pairs naturally with Supabase JS SDK |
-| Database | Supabase (Postgres) | Hosted DB + auth + storage, minimal DevOps |
-| File storage | Supabase Storage | Prescription PDFs, voice notes |
-| AI | OpenAI API | Powers the triage agent |
-| Payments | Paystack | Best Nigerian payment gateway |
-| Video | Google Meet API (or manual link generation) | Zero infra, doctors/patients already have it |
-| Hosting (backend) | Railway | One-click Django deploys, free tier for MVP |
-| Hosting (dashboard) | Vercel | Free Next.js hosting |
-
----
+Note: this is a **heuristic classification** to help route attention, not a diagnosis.
 
 ## Repo Structure
 
 ```
 ogwu/
-├── apps/
-│   ├── mobile/          # Expo React Native (patient app)
-│   └── dashboard/       # Next.js (doctor web app)
-├── packages/
-│   ├── api/             # Node.js + Express backend
-│   ├── agents/          # OpenAI triage agent logic
-│   └── shared/          # Shared TypeScript types & constants
-├── turbo.json
-└── package.json
+├── mobile/          # Expo React Native app
+├── backend/         # Node/Express API
+└── supabase/        # Supabase migrations & config
 ```
 
----
+## Data Model (MVP)
 
-## Data Models (Core Only)
+### `profiles`
 
-```
-User
-- id, phone, name, age, sex, created_at
-- role: patient | doctor | admin
+Stores patient profile fields used during intake.
 
-DoctorProfile
-- user_id, specialty, bio, consultation_fee_async, consultation_fee_live, is_available
+### `triage_intakes`
 
-Consultation
-- id, patient_id, doctor_id
-- type: async | live
-- status: pending | confirmed | in_progress | completed | cancelled
-- meet_link (nullable)
-- scheduled_at (nullable, for live)
-- ai_summary (text — triage agent output)
-- patient_note (text or voice note URL)
-- doctor_response (text)
-- prescription_url (nullable)
-- amount_paid
-- created_at, updated_at
+Stores one “latest” intake per user (updated on completion):
 
-Payment
-- id, consultation_id, patient_id
-- amount, currency
-- paystack_reference
-- status: pending | success | failed
-- created_at
+- `user_id`
+- `locale`
+- `answers` (JSON array of `{ q, a }`)
+- `summary` (text)
+- `safety_note` (text)
+- `urgency` (`routine | soon | urgent | emergency`)
+- timestamps
 
-TimeSlot
-- id, doctor_id, start_time, end_time, is_booked
-```
+## Success Metrics (early)
 
----
-
-## The Triage Agent (MVP Version)
-
-Keep it simple for MVP. This is a **single-turn structured conversation**, not a complex multi-agent system.
-
-**Flow:**
-1. Patient opens "New Consultation"
-2. Chat UI launches — the AI assistant (GPT-4o) handles the conversation
-3. Patient's profile data (sex, known conditions, allergies) is injected into the system prompt as context — not collected conversationally
-4. System prompt instructs the model to:
-   - Greet the patient warmly
-   - Ask about their main complaint
-   - Ask 4–6 targeted follow-up questions (duration, severity, location, associated symptoms) — never re-ask sex, conditions, or allergies
-   - NOT diagnose
-   - At the end, output a structured JSON summary:
-     ```json
-     {
-       "chief_complaint": "...",
-       "duration": "...",
-       "severity": "mild | moderate | severe",
-       "associated_symptoms": ["..."],
-       "sex": "...",
-       "allergies": ["..."],
-       "known_conditions": ["..."],
-       "red_flags": true | false,
-       "red_flag_reason": "..."
-     }
-     ```
-5. If `red_flags: true` → show emergency message, block consult booking
-6. If `red_flags: false` → show summary to patient, prompt to book consult
-7. Summary attached to the consultation record
-
-**That's it for MVP.** No memory, no follow-up agent, no results interpreter yet.
-
----
-
-## Google Meet Integration (MVP)
-
-No API needed for MVP. Keep it dead simple:
-
-1. Doctor sets a time slot as available
-2. Patient books a live slot → payment goes through
-3. **Doctor manually creates a Meet link** and pastes it into the dashboard
-4. App shows patient the link + appointment time
-5. Both parties join at the scheduled time
-
-Automate Meet link generation (Google Calendar API) in Stage 2 when this becomes tedious at volume.
-
----
-
-## Paystack Integration
-
-- Patient hits "Book Consult" → Paystack popup opens in-app (Paystack React Native SDK)
-- On success → consultation status moves to `confirmed`
-- On failure → consultation stays `pending`, patient prompted to retry
-- Webhook from Paystack confirms payment server-side (don't trust client-only)
-- Doctor payouts: manual bank transfer / mobile money in MVP. Automate in Stage 2.
-
----
-
-## MVP Success Metrics
-
-These are the only numbers that matter at this stage:
-
-| Metric | Target (Month 1 post-launch) |
-|---|---|
-| Beta users signed up | 100 |
-| Consultations completed | 30 |
-| Paying patients (conversion) | >50% of signups |
-| Patient satisfaction (post-consult survey) | >4/5 |
-| Doctor response time (async) | <6 hours average |
-| Critical bugs reported | <5 |
-
-If you hit these, you've validated the core loop and have a green light for Stage 2.
-
----
-
-## MVP Launch Plan
-
-**Week 1–2: Setup**
-- [ ] Initialise monorepo (Turborepo)
-- [ ] Supabase project setup (DB schema, auth)
-- [ ] Django project scaffold + DRF
-- [ ] Expo project scaffold
-- [ ] Next.js dashboard scaffold
-- [ ] Railway + Vercel deployment pipelines
-
-**Week 3–4: Core Backend**
-- [ ] Auth endpoints (OTP for patients, email for doctors) via Supabase Auth
-- [ ] Doctor and patient profile routes + controllers
-- [ ] Consultation CRUD endpoints
-- [ ] Time slot management endpoints
-- [ ] Paystack webhook handler
-
-**Week 5–6: Triage Agent**
-- [ ] OpenAI API integration in `packages/agents`
-- [ ] Triage conversation flow + system prompt
-- [ ] Structured JSON output parsing
-- [ ] Red flag detection logic
-
-**Week 7–8: Mobile App (Patient)**
-- [ ] Onboarding + auth screens
-- [ ] Triage chat UI
-- [ ] Doctor browse + booking flow
-- [ ] Paystack payment flow
-- [ ] Consultation view (async thread + Meet link)
-- [ ] Past consultations list
-
-**Week 9–10: Doctor Dashboard**
-- [ ] Auth + onboarding
-- [ ] Consultation queue + workspace
-- [ ] Availability / slot management
-- [ ] Response + prescription upload
-
-**Week 11–12: Testing & Beta**
-- [ ] End-to-end testing of full consult loop
-- [ ] Onboard 5–10 pilot doctors
-- [ ] Invite 20–30 beta patients (friends, family, network)
-- [ ] Fix critical bugs
-- [ ] Collect feedback, iterate
-
----
-
-## What Stage 2 Looks Like (Don't Build Yet)
-
-Just so it's in view:
-
-- Lab test booking (partner with Synlab / Lancet)
-- Medication delivery (partner pharmacy)
-- Automated Google Meet link generation
-- Automated doctor payouts
-- Results interpreter agent
-- Medication adherence agent
-- Multi-language support (Yoruba, Hausa, Pidgin)
-- App Store / Play Store public launch
-
----
-
-*Document version: 0.2*
-*Stage: MVP / Pre-launch*
-*Last updated: April 2026*
+- % of signed-in users who complete intake
+- % of completed intakes shared to a clinician
+- Clinician feedback: “was this useful?” (qualitative)
+- Time-to-triage reduction (self-reported initially)

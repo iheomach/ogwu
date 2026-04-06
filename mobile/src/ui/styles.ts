@@ -159,6 +159,53 @@ export const styles = StyleSheet.create({
     paddingTop: 13,
   },
 
+  // ─── Dropdown ──────────────────────────────────────────────────────────
+  dropdownContainer: {
+    marginBottom: spacing.md,
+  },
+  dropdownButton: {
+    borderWidth: 1.5,
+    borderColor: colors.grey300,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 13,
+    backgroundColor: colors.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownButtonText: {
+    fontSize: 16,
+    color: colors.grey700,
+    fontWeight: '500',
+  },
+  dropdownMenu: {
+    marginTop: spacing.xs,
+    borderWidth: 1.5,
+    borderColor: colors.grey300,
+    borderRadius: radius.md,
+    backgroundColor: colors.white,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownItemActive: {
+    backgroundColor: colors.purpleLight,
+  },
+  dropdownItemText: {
+    fontSize: 15,
+    color: colors.grey900,
+    fontWeight: '500',
+  },
+  dropdownItemTextActive: {
+    color: colors.purple,
+  },
+
   // ─── Buttons ────────────────────────────────────────────────────────────
   btnPrimary: {
     backgroundColor: colors.purple,
@@ -264,18 +311,21 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
+    paddingTop: 6,
+    paddingBottom: 6,
     backgroundColor: colors.purpleDark,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: spacing.sm,
+    paddingVertical: 6,
     alignItems: 'center',
+  },
+  tabButtonIcon: {
+    marginBottom: 1,
   },
   tabButtonText: {
     color: colors.purpleMid,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.2,
   },

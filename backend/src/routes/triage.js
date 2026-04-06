@@ -121,6 +121,48 @@ function pickBranchKey(mainComplaintText) {
   return 'other';
 }
 
+function computeUrgency(answers) {
+  const text = Array.isArray(answers)
+    ? answers
+        .map((x) => `${x?.q || ''} ${x?.a || ''}`)
+        .join(' ')
+    : '';
+
+  if (hasEmergencySignals(text)) return 'emergency';
+
+  const t = normalizeText(text);
+
+  // Urgent-ish signals (non-exhaustive). Keep it conservative.
+  const urgentNeedles = [
+    'blood in urine',
+    'blood in stool',
+    'vomiting blood',
+    'throwing up blood',
+    'black stool',
+    'severe pain',
+    'worst pain',
+    'severe headache',
+    'stiff neck',
+    'high fever',
+    'fever 39',
+    'fever 40',
+    'temperature 39',
+    'temperature 40',
+  ];
+  if (urgentNeedles.some((n) => t.includes(n))) return 'urgent';
+
+  // Numeric pain/severity shortcuts (e.g. 9/10, 10/10).
+  if (/\b(9|10)\s*\/\s*10\b/.test(t)) return 'urgent';
+
+  // “Soon” signals: moderate severity, fever mention, persistent symptoms.
+  const soonNeedles = ['fever', 'chills', 'dizzy', 'dizziness', 'dehydr', 'worse', 'getting worse'];
+  if (soonNeedles.some((n) => t.includes(n))) return 'soon';
+
+  if (/\b(6|7|8)\s*\/\s*10\b/.test(t)) return 'soon';
+
+  return 'routine';
+}
+
 function requireEnv(name) {
   const value = process.env[name];
   if (!value || value.trim().length === 0) {
@@ -252,6 +294,8 @@ router.post('/complete', authenticate, async (req, res) => {
         a: typeof x.a === 'string' ? String(x.a).slice(0, 2000) : '',
       }));
 
+    const urgency = computeUrgency(trimmed);
+
     const localeSafe = safeLocale(locale);
     const languageMap = {
       en: 'English',
@@ -299,11 +343,12 @@ router.post('/complete', authenticate, async (req, res) => {
           user_id: req.user.id,
           locale,
           answers: trimmed,
+          urgency,
           summary,
         },
         { onConflict: 'user_id' }
       )
-      .select('user_id, locale, answers, summary, created_at, updated_at')
+      .select('user_id, locale, answers, urgency, summary, created_at, updated_at')
       .single();
 
     if (error) return res.status(400).json({ error: error.message });
@@ -334,7 +379,7 @@ router.get('/intake', authenticate, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('triage_intakes')
-      .select('user_id, locale, answers, summary, created_at, updated_at')
+      .select('user_id, locale, answers, urgency, summary, created_at, updated_at')
       .eq('user_id', req.user.id)
       .maybeSingle();
 

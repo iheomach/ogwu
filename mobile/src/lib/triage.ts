@@ -1,4 +1,4 @@
-import type { Profile, TriageQA } from '../types';
+import type { Profile, TriageQA, UrgencyTier } from '../types';
 import type { SupportedLocale } from '../i18n/translations';
 
 import { apiGet, apiPost } from './api';
@@ -14,6 +14,7 @@ export type CompleteResponse = {
   intake: {
     user_id: string;
     locale: string | null;
+    urgency: UrgencyTier;
     answers: TriageQA[];
     summary: string | null;
     created_at: string;
@@ -29,6 +30,7 @@ export type TriageStatusResponse = {
 export type TriageIntake = {
   user_id: string;
   locale: string | null;
+  urgency: UrgencyTier;
   answers: TriageQA[];
   summary: string | null;
   created_at: string;

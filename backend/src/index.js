@@ -17,6 +17,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/triage', require('./routes/triage'));
+app.use('/api/doctors', require('./routes/doctors'));
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

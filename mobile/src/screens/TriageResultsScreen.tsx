@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
+  Share,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import type { TriageIntake, TriageResultsScreenProps } from '../types';
 import { styles, colors } from '../ui/styles';
 import { t } from '../i18n';
@@ -18,6 +19,36 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
   const [error, setError] = useState<string | null>(null);
   const [intake, setIntake] = useState<TriageIntake | null>(null);
 
+  const onShare = async () => {
+    if (!intake) return;
+
+    const urgencyKey = `triageResults.urgency_${(intake.urgency ?? 'routine') as any}`;
+    const urgencyLabel = t(urgencyKey);
+
+    const parts: string[] = [];
+    parts.push(t('triageResults.shareHeader'));
+    parts.push(`${t('triageResults.urgency')}: ${urgencyLabel}`);
+    if (intake.summary) {
+      parts.push('');
+      parts.push(`${t('triageResults.summary')}:`);
+      parts.push(intake.summary);
+    }
+    parts.push('');
+    parts.push(`${t('triageResults.answers')}:`);
+    intake.answers.forEach((qa, idx) => {
+      parts.push(`${idx + 1}. ${qa.q}`);
+      parts.push(`${qa.a || t('common.dash')}`);
+      parts.push('');
+    });
+
+    const message = parts.join('\n').trim();
+
+    try {
+      await Share.share({ message, title: t('triageResults.shareTitle') });
+    } catch (e: any) {
+      Alert.alert(t('triageResults.shareErrorTitle'), e?.message ?? t('triageResults.shareErrorBody'));
+    }
+  };
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -59,6 +90,14 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
         <Text style={styles.title}>{t('triageResults.title')}</Text>
         <Text style={styles.helper}>{t('triageResults.helper')}</Text>
 
+        <TouchableOpacity
+          style={[styles.btnPrimary, busy || loading || !intake ? styles.btnPrimaryDisabled : null]}
+          onPress={onShare}
+          disabled={busy || loading || !intake}
+        >
+          <Text style={styles.btnPrimaryText}>{t('triageResults.share')}</Text>
+        </TouchableOpacity>
+
         {loading && (
           <View style={[styles.center, { paddingHorizontal: 0, paddingVertical: 24 }]}
           >
@@ -82,6 +121,14 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
 
         {!loading && !error && intake && (
           <>
+            <Text style={[styles.label, { marginBottom: 12 }]}>{t('triageResults.urgency')}</Text>
+            <View style={styles.card}>
+              <Text style={[styles.value, { marginTop: 0 }]}>
+                {t(`triageResults.urgency_${(intake.urgency ?? 'routine') as any}`)}
+              </Text>
+            </View>
+            <View style={styles.mt16} />
+
             {intake.summary && (
               <>
                 <Text style={[styles.label, { marginBottom: 12 }]}>{t('triageResults.summary')}</Text>

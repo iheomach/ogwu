@@ -2,23 +2,24 @@
 
 > Telehealth MVP for Nigeria: async consultations first.
 
-Ogwu is a telehealth product focused on validating one loop: patients can describe symptoms, book a consult, pay, and get a doctor response.
+Ogwu is a telehealth MVP focused on a simple **clinic co-pilot** loop: patients complete a quick intake and can share a clinic-ready summary (including an urgency tier) with a clinician.
 
 ## Current Status
 
-This repository is currently **early scaffolding**:
+This repository includes a working end-to-end flow:
 
-- Supabase Cloud schema migration for `profiles` (+ RLS + auth trigger)
-- Express API with basic auth + profile endpoints
-- Expo mobile app skeleton + Supabase client wiring
-
-The consultation flow, AI triage, payments, and the doctor dashboard are planned next (see MVP spec).
+- Phone OTP auth (Supabase Auth)
+- Patient profile onboarding (name/DOB/sex + optional conditions/allergies)
+- Multi-language UI (en/es/fr/ig/yo/ha)
+- Quick intake (triage): up to 5 questions (rule-based)
+- AI summary + safety note at completion (OpenAI)
+- Saved intake results screen with an **urgency tier** and a **Share for clinic** action
 
 ## MVP (Stage 1)
 
 **Goal:** Validate that patients in Nigeria will pay for and use an async telehealth consultation product.
 
-**Core loop:** Patient signs up → AI triage → Books consult → Pays → Doctor reviews → Response + prescription → Patient receives it.
+**Core loop:** Patient signs up → Quick intake → Urgency tier + summary → Share with clinic.
 
 For the full Stage 1 spec, see [ogwu_mvp.md](ogwu_mvp.md).
 
@@ -28,7 +29,9 @@ This is the **product scope** for Stage 1 (not all of it is implemented yet).
 
 - Patient app (Expo)
   - Auth + basic profile
-  - AI symptom intake (triage) that outputs a structured summary + disclaimer
+  - Quick intake + AI summary/safety note
+  - Urgency tiering (routine/soon/urgent/emergency)
+  - Clinic-ready share text
   - Consultation booking (async + live via Google Meet link)
   - Payments (Paystack)
   - Consultation thread + basic record/history
@@ -89,7 +92,7 @@ Required backend env vars:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
-- `OPENAI_API_KEY` (required for AI triage)
+- `OPENAI_API_KEY` (required for `/api/triage/complete` summary/safety note)
 - `OPENAI_MODEL` (optional; defaults to `gpt-4o-mini`)
 
 ### 2) Mobile
