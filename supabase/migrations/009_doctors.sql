@@ -3,7 +3,7 @@
 create extension if not exists pgcrypto;
 
 create table if not exists public.doctors (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   title text,
   primary_specialty text not null,
@@ -54,7 +54,7 @@ insert into public.doctors (
   'Dr. Amina Yusuf',
   'MBBS',
   'Family Medicine',
-  array['Women's Health','Hypertension'],
+  array['Women''s Health','Hypertension'],
   array['English','Hausa'],
   'CityCare Hospital',
   'Abuja',
@@ -65,7 +65,7 @@ insert into public.doctors (
     jsonb_build_object('label','Consultation (typical)','range','₦10,000–₦25,000'),
     jsonb_build_object('label','Basic labs (typical)','range','₦5,000–₦20,000')
   ),
-  crypt('change-me', gen_salt('bf')),
+  null,
   10
 ),
 (
@@ -82,7 +82,7 @@ insert into public.doctors (
   jsonb_build_array(
     jsonb_build_object('label','Consultation (typical)','range','₦15,000–₦35,000')
   ),
-  crypt('change-me', gen_salt('bf')),
+  null,
   20
 ),
 (
@@ -97,7 +97,7 @@ insert into public.doctors (
   '+2348000000000',
   null,
   '[]'::jsonb,
-  crypt('change-me', gen_salt('bf')),
+  null,
   30
 )
 on conflict do nothing;
