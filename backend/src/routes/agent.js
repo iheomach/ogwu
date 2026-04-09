@@ -208,34 +208,45 @@ router.post('/chat', authenticate, async (req, res) => {
             'Returns hospitals with is_onboarded flag — use that to decide next steps.',
           inputSchema: searchHospitalsSchema,
           execute: async ({ state, specialty, has_emergency }) => {
-            let q = supabase
-              .from('hospitals_directory')
-              .select('id,name,city,state,type,tier,specialties,phone,website,has_emergency,is_onboarded')
-              .eq('is_active', true)
-              .ilike('state', `%${String(state)}%`);
+            try {
+              const stateClean = String(state || '').trim();
+              if (!stateClean) {
+                return { error: 'no_location', message: 'Location is required. Ask the patient for their city or state before searching.' };
+              }
 
-            if (has_emergency) q = q.eq('has_emergency', true);
-
-            // Soft specialty filter: try ilike match on the specialties text representation.
-            // We do NOT use .contains() here — it requires exact enum values which are brittle.
-            if (specialty) {
-              q = q.ilike('specialties::text', `%${String(specialty)}%`);
-            }
-
-            const { data, error } = await q.limit(5);
-            if (error) return { error: error.message };
-            if (!data || data.length === 0) {
-              // Retry without specialty filter so the agent always gets something back.
-              const { data: fallback, error: fbErr } = await supabase
+              let q = supabase
                 .from('hospitals_directory')
                 .select('id,name,city,state,type,tier,specialties,phone,website,has_emergency,is_onboarded')
                 .eq('is_active', true)
-                .ilike('state', `%${String(state)}%`)
-                .limit(5);
-              if (fbErr) return { error: fbErr.message };
-              return { hospitals: fallback || [], note: 'No exact specialty match — showing all hospitals in the area.' };
+                .ilike('state', `%${stateClean}%`);
+
+              if (has_emergency) q = q.eq('has_emergency', true);
+
+              if (specialty) {
+                q = q.ilike('specialties::text', `%${String(specialty)}%`);
+              }
+
+              const { data, error } = await q.limit(5);
+              if (error) return { error: 'db_error', message: error.message };
+
+              if (!data || data.length === 0) {
+                // Retry without specialty filter.
+                const { data: fallback, error: fbErr } = await supabase
+                  .from('hospitals_directory')
+                  .select('id,name,city,state,type,tier,specialties,phone,website,has_emergency,is_onboarded')
+                  .eq('is_active', true)
+                  .ilike('state', `%${stateClean}%`)
+                  .limit(5);
+                if (fbErr) return { error: 'db_error', message: fbErr.message };
+                if (!fallback || fallback.length === 0) {
+                  return { error: 'no_hospitals', message: `No hospitals found in "${stateClean}". Tell the patient no results were found and advise them to call emergency services (199 or 112) or search Google Maps for nearby clinics.` };
+                }
+                return { hospitals: fallback, note: 'No exact specialty match — showing all hospitals in the area.' };
+              }
+              return { hospitals: data };
+            } catch (e) {
+              return { error: 'unexpected', message: String(e?.message ?? e) };
             }
-            return { hospitals: data };
           },
         }),
 
@@ -250,33 +261,34 @@ router.post('/chat', authenticate, async (req, res) => {
             hospital_id, hospital_name, hospital_phone,
             is_onboarded, complaint, urgency, symptoms, recommended_specialty,
           }) => {
-            if (is_onboarded) {
-              const slots = await fetchAvailableSlots(7, 'Africa/Lagos');
-              if (slots.length === 0) {
+            try {
+              if (is_onboarded) {
+                const slots = await fetchAvailableSlots(7, 'Africa/Lagos');
+                if (slots.length === 0) {
+                  return {
+                    type: 'onboarded_no_slots',
+                    message: 'No available slots in the next 7 days. Tell the patient to call directly.',
+                    phone: hospital_phone,
+                  };
+                }
                 return {
-                  type: 'onboarded_no_slots',
-                  message: 'No available slots in the next 7 days. Ask the patient to call directly.',
-                  phone: hospital_phone,
+                  type: 'onboarded',
+                  hospital_id,
+                  hospital_name,
+                  available_slots: slots,
+                  instructions: 'Present these slots to the patient and ask which they prefer. Then call bookAppointment.',
                 };
               }
-              return {
-                type: 'onboarded',
-                hospital_id,
-                hospital_name,
-                available_slots: slots,
-                instructions: 'Present these slots to the patient and ask which they prefer. Then call bookAppointment.',
-              };
-            }
 
-            // Not onboarded — generate phone script.
-            const patientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'the patient';
-            const urgencyLine = urgency === 'emergency'
-              ? 'This is an EMERGENCY. I need to be seen immediately.'
-              : urgency === 'urgent'
-              ? 'My situation is urgent and I need to be seen within 24–48 hours.'
-              : 'I would like to schedule an appointment as soon as possible.';
+              // Not onboarded — generate phone script.
+              const patientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'the patient';
+              const urgencyLine = urgency === 'emergency'
+                ? 'This is an EMERGENCY. I need to be seen immediately.'
+                : urgency === 'urgent'
+                ? 'My situation is urgent and I need to be seen within 24–48 hours.'
+                : 'I would like to schedule an appointment as soon as possible.';
 
-            const script = `Hello, my name is ${patientName}. I am calling to book an appointment.
+              const script = `Hello, my name is ${patientName}. I am calling to book an appointment.
 
 ${urgencyLine}
 
@@ -286,13 +298,16 @@ Could you please let me know the earliest available appointment? I would also ap
 
 Thank you.`;
 
-            return {
-              type: 'not_onboarded',
-              hospital_name,
-              phone: hospital_phone,
-              call_script: script,
-              instructions: 'Show the patient the phone number and this script to guide their call.',
-            };
+              return {
+                type: 'not_onboarded',
+                hospital_name,
+                phone: hospital_phone,
+                call_script: script,
+                instructions: 'Show the patient the phone number and this script to guide their call.',
+              };
+            } catch (e) {
+              return { error: 'unexpected', message: String(e?.message ?? e) };
+            }
           },
         }),
 
@@ -303,8 +318,9 @@ Thank you.`;
             'Only call this after the patient confirms a specific slot from getHospitalBookingInfo.',
           inputSchema: bookAppointmentSchema,
           execute: async ({ hospital_id, starts_at_local, time_zone, reason }) => {
+            try {
             const auth = await getClinicCalendarAuth();
-            if (!auth) return { error: 'Calendar not configured — cannot book online. Please call the hospital directly.' };
+            if (!auth) return { error: 'calendar_not_configured', message: 'Online booking is not available right now. Tell the patient to call the hospital directly to book their appointment.' };
 
             const { oauth2Client, calendarId } = auth;
 
@@ -315,12 +331,12 @@ Thank you.`;
               .maybeSingle();
 
             if (!hospital?.is_onboarded) {
-              return { error: 'Hospital is not onboarded for online booking.' };
+              return { error: 'not_onboarded', message: 'This hospital does not support online booking. Tell the patient to call directly.' };
             }
 
             const tz = time_zone || 'Africa/Lagos';
             const startDt = DateTime.fromISO(String(starts_at_local), { zone: tz });
-            if (!startDt.isValid) return { error: 'Invalid start time.' };
+            if (!startDt.isValid) return { error: 'invalid_slot', message: 'The selected time slot is invalid. Ask the patient to pick a different slot.' };
             const endDt = startDt.plus({ minutes: 30 });
 
             const cal = google.calendar({ version: 'v3', auth: oauth2Client });
@@ -376,7 +392,7 @@ Thank you.`;
               if (created?.id) {
                 try { await cal.events.delete({ calendarId, eventId: created.id }); } catch {}
               }
-              return { error: apptErr.message };
+              return { error: 'db_error', message: apptErr.message };
             }
 
             return {
@@ -388,6 +404,9 @@ Thank you.`;
                 ? `Appointment booked! Google Meet link: ${meetingUrl}`
                 : 'Appointment booked. A Meet link will be sent shortly.',
             };
+            } catch (e) {
+              return { error: 'unexpected', message: String(e?.message ?? e) };
+            }
           },
         }),
 
@@ -396,27 +415,31 @@ Thank you.`;
           description: 'Save a structured consult record once triage is complete. Call automatically.',
           inputSchema: createConsultSchema,
           execute: async (params) => {
-            const payload = {
-              patient_id: profile.id,
-              complaint: safeText(params.complaint, 400),
-              urgency: normalizeUrgency(params.urgency),
-              symptoms: Array.isArray(params.symptoms) ? params.symptoms.map((s) => safeText(s, 80)).filter(Boolean) : [],
-              recommended_specialty: params.recommended_specialty ? safeText(params.recommended_specialty, 80) : null,
-              care_pathway: safeText(params.care_pathway, 4000),
-              recommended_hospital_ids: Array.isArray(params.recommended_hospital_ids)
-                ? params.recommended_hospital_ids.map(String)
-                : null,
-              is_emergency_flagged: !!params.is_emergency_flagged,
-            };
+            try {
+              const payload = {
+                patient_id: profile.id,
+                complaint: safeText(params.complaint, 400),
+                urgency: normalizeUrgency(params.urgency),
+                symptoms: Array.isArray(params.symptoms) ? params.symptoms.map((s) => safeText(s, 80)).filter(Boolean) : [],
+                recommended_specialty: params.recommended_specialty ? safeText(params.recommended_specialty, 80) : null,
+                care_pathway: safeText(params.care_pathway, 4000),
+                recommended_hospital_ids: Array.isArray(params.recommended_hospital_ids)
+                  ? params.recommended_hospital_ids.map(String)
+                  : null,
+                is_emergency_flagged: !!params.is_emergency_flagged,
+              };
 
-            const { data, error } = await supabase
-              .from('consults')
-              .insert(payload)
-              .select('id')
-              .single();
+              const { data, error } = await supabase
+                .from('consults')
+                .insert(payload)
+                .select('id')
+                .single();
 
-            if (error) return { success: false, error: error.message };
-            return { success: true, consult_id: data.id };
+              if (error) return { success: false, error: error.message };
+              return { success: true, consult_id: data.id };
+            } catch (e) {
+              return { success: false, error: String(e?.message ?? e) };
+            }
           },
         }),
 
@@ -436,15 +459,19 @@ Thank you.`;
           description: "Retrieve the patient's recent consult history.",
           inputSchema: getPatientHistorySchema,
           execute: async ({ limit }) => {
-            const lim = Math.max(1, Math.min(10, Number(limit || 5)));
-            const { data, error } = await supabase
-              .from('consults')
-              .select('id,complaint,urgency,care_pathway,created_at')
-              .eq('patient_id', profile.id)
-              .order('created_at', { ascending: false })
-              .limit(lim);
-            if (error) return { error: error.message };
-            return { history: data || [] };
+            try {
+              const lim = Math.max(1, Math.min(10, Number(limit || 5)));
+              const { data, error } = await supabase
+                .from('consults')
+                .select('id,complaint,urgency,care_pathway,created_at')
+                .eq('patient_id', profile.id)
+                .order('created_at', { ascending: false })
+                .limit(lim);
+              if (error) return { error: error.message };
+              return { history: data || [] };
+            } catch (e) {
+              return { error: String(e?.message ?? e) };
+            }
           },
         }),
 
@@ -478,10 +505,16 @@ Thank you.`;
       res.write(`${code}:${JSON.stringify(value)}\n`);
     }
 
+    let hasText = false;
+    let finishPart = null;
+
     try {
       for await (const part of result.fullStream) {
         switch (part.type) {
-          case 'text-delta':    writePart('0', part.text); break;
+          case 'text-delta':
+            hasText = true;
+            writePart('0', part.text);
+            break;
           case 'tool-input-start': writePart('b', { toolCallId: part.id, toolName: part.toolName }); break;
           case 'tool-input-delta': writePart('c', { toolCallId: part.id, argsTextDelta: part.delta }); break;
           case 'tool-call':    writePart('9', { toolCallId: part.toolCallId, toolName: part.toolName, args: part.input }); break;
@@ -495,10 +528,7 @@ Thank you.`;
             });
             break;
           case 'finish':
-            writePart('d', {
-              finishReason: part.finishReason,
-              usage: { promptTokens: part.totalUsage?.promptTokens ?? 0, completionTokens: part.totalUsage?.completionTokens ?? 0 },
-            });
+            finishPart = part;
             break;
           case 'error':
             writePart('3', String(part.error?.message ?? part.error ?? 'Unknown error'));
@@ -508,6 +538,20 @@ Thank you.`;
     } catch (streamErr) {
       writePart('3', String(streamErr?.message ?? 'Stream error'));
     }
+
+    // If the model finished without emitting any text (e.g. maxSteps hit mid-tool-chain),
+    // inject a visible fallback so the client never shows a blank response.
+    if (!hasText) {
+      writePart('0', "I'm sorry, something went wrong on my end. Please try sending your message again.");
+    }
+
+    writePart('d', {
+      finishReason: finishPart?.finishReason ?? 'stop',
+      usage: {
+        promptTokens: finishPart?.totalUsage?.promptTokens ?? 0,
+        completionTokens: finishPart?.totalUsage?.completionTokens ?? 0,
+      },
+    });
 
     res.end();
     return;
