@@ -16,7 +16,9 @@ function safeText(s, maxLen) {
 async function loadPatientProfile(userId) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, age, sex, dob, biological_sex, allergies, known_conditions, phone')
+    // NOTE: `age` and legacy `sex` were dropped in `supabase/migrations/004_drop_legacy_profile_columns.sql`.
+    // We compute age from `dob` when needed and use `biological_sex`.
+    .select('id, phone, dob, biological_sex, allergies, known_conditions')
     .eq('id', userId)
     .maybeSingle();
 
