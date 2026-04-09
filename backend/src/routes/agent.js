@@ -539,9 +539,11 @@ Thank you.`;
       writePart('3', String(streamErr?.message ?? 'Stream error'));
     }
 
-    // If the model finished without emitting any text (e.g. maxSteps hit mid-tool-chain),
-    // inject a visible fallback so the client never shows a blank response.
+    // If the model finished without emitting any text (e.g. maxSteps hit mid-tool-chain,
+    // or model called tools but never generated a reply), inject a visible fallback.
     if (!hasText) {
+      const finishReason = finishPart?.finishReason ?? 'unknown';
+      console.error(`[agent] Stream ended with no text. finishReason=${finishReason} userId=${req.user?.id}`);
       writePart('0', "I'm sorry, something went wrong on my end. Please try sending your message again.");
     }
 
