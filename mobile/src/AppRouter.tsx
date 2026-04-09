@@ -17,7 +17,7 @@ import { OnboardingScreen } from './screens/OnboardingScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { TriageScreen } from './screens/TriageScreen';
 import { TriageResultsScreen } from './screens/TriageResultsScreen';
-import { NewConsultScreen } from './screens/NewConsultScreen';
+import { HealthAssistantScreen } from './screens/HealthAssistantScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { ThreadScreen } from './screens/ThreadScreen';
@@ -487,14 +487,7 @@ export function AppRouter() {
 
       {screen === 'newConsult' && (
         <TabScaffold activeTab="newConsult" onNavigate={goTab}>
-          <NewConsultScreen
-            busy={busy}
-            onViewIntake={() => setScreen('triageResults')}
-            onOpenThread={(threadId) => {
-              setActiveThreadId(threadId);
-              setScreen('thread');
-            }}
-          />
+          <HealthAssistantScreen busy={busy} />
         </TabScaffold>
       )}
 

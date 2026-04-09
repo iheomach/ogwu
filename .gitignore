@@ -98,6 +98,10 @@ dist
 # Sveltekit cache directory
 .svelte-kit/
 
+# macOS
+.DS_Store
+**/.DS_Store
+
 # vitepress build output
 **/.vitepress/dist
 

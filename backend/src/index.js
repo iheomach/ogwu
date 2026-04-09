@@ -21,6 +21,9 @@ app.use('/api/doctors', require('./routes/doctors'));
 app.use('/api/encounters', require('./routes/encounters'));
 app.use('/api/threads', require('./routes/threads'));
 app.use('/api/providers', require('./routes/providers'));
+app.use('/api/integrations/google', require('./routes/google'));
+app.use('/api/appointments', require('./routes/appointments'));
+app.use('/api/agent', require('./routes/agent'));
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

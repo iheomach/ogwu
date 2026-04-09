@@ -6,9 +6,16 @@ export const translations = {
   en: {
     tabs: {
       home: 'Home',
-      newConsult: 'New consult',
+      newConsult: 'Assistant',
       records: 'Records',
       profile: 'Profile',
+    },
+    assistant: {
+      title: 'AI Health Assistant',
+      helper: 'Tell me what’s going on. I can help you decide next steps and suggest nearby hospitals when needed.',
+      placeholder: 'e.g. I have a sore throat and fever…',
+      send: 'Send',
+      thinking: 'Thinking…',
     },
     common: {
       appName: 'Ogwu',
@@ -245,7 +252,7 @@ export const translations = {
   es: {
     tabs: {
       home: 'Inicio',
-      newConsult: 'Nueva consulta',
+      newConsult: 'Asistente',
       records: 'Registros',
       profile: 'Perfil',
       yourAnalytics: 'Tus estadísticas',
@@ -271,6 +278,13 @@ export const translations = {
       impactSoon2: 'También puede ayudarte a obtener las pruebas y siguientes pasos correctos.',
       impactRoutine1: 'Los controles tempranos pueden detectar problemas antes de que sean graves.',
       impactRoutine2: 'También ayudan a manejar mejor condiciones a largo plazo.',
+    },
+    assistant: {
+      title: 'Asistente de salud',
+      helper: 'Cuéntame qué pasa. Puedo ayudarte con los siguientes pasos y sugerir hospitales cercanos si hace falta.',
+      placeholder: 'p. ej. tengo dolor de garganta y fiebre…',
+      send: 'Enviar',
+      thinking: 'Pensando…',
     },
     common: {
       appName: 'Ogwu',
@@ -449,7 +463,7 @@ export const translations = {
   fr: {
     tabs: {
       home: 'Accueil',
-      newConsult: 'Nouvelle consult.',
+      newConsult: 'Assistant',
       records: 'Dossiers',
       profile: 'Profil',
       yourAnalytics: 'Vos statistiques',
@@ -475,6 +489,14 @@ export const translations = {
       impactSoon2: "Elle peut aussi aider à obtenir les bons examens et les prochaines étapes.",
       impactRoutine1: "Des contrôles précoces peuvent détecter des problèmes avant qu'ils ne deviennent graves.",
       impactRoutine2: "Ils soutiennent aussi une meilleure prise en charge à long terme.",
+    },
+    assistant: {
+      title: 'Assistant santé',
+      helper:
+        'Dites-moi ce qui se passe. Je peux aider à décider des prochaines étapes et suggérer des hôpitaux proches si nécessaire.',
+      placeholder: 'ex. j’ai mal à la gorge et de la fièvre…',
+      send: 'Envoyer',
+      thinking: 'Réflexion…',
     },
     common: {
       appName: 'Ogwu',
@@ -651,7 +673,7 @@ export const translations = {
   ig: {
     tabs: {
       home: 'Home',
-      newConsult: 'New consult',
+      newConsult: 'Assistant',
       records: 'Records',
       profile: 'Profile',
       yourAnalytics: 'Nyocha gị',
@@ -677,6 +699,13 @@ export const translations = {
       impactSoon2: 'Ọ nwekwara ike inyere nweta ule kwesịrị ekwesị na nzọụkwụ ọzọ.',
       impactRoutine1: 'Nlele mbụ nwere ike ịchọpụta nsogbu tupu o sie ike.',
       impactRoutine2: 'Ọ na-enyekwa aka n’ịlekọta ọrịa ogologo oge.',
+    },
+    assistant: {
+      title: 'Health Assistant',
+      helper: 'Kọwaa ihe na-eme. Enwere m ike inyere aka na nzọụkwụ ọzọ ma tụọ aro ụlọ ọgwụ ma ọ bụrụ na achọrọ.',
+      placeholder: 'Dịka: akpịrị na-afụ m ụfụ na ahụ ọkụ…',
+      send: 'Zipu',
+      thinking: 'Na-atụle…',
     },
     common: {
       appName: 'Ogwu',
@@ -875,7 +904,7 @@ export const translations = {
   yo: {
     tabs: {
       home: 'Home',
-      newConsult: 'New consult',
+      newConsult: 'Assistant',
       records: 'Records',
       useTabs: 'Lo taabu isalẹ lati bẹ̀rẹ̀ consult, wo records, tàbí ṣe àtúnṣe profaili rẹ.',
       profile: 'Profile',
@@ -902,6 +931,13 @@ export const translations = {
       impactSoon2: 'Haka kuma zai iya taimakawa wajen samun gwaje-gwaje masu dacewa da mataki na gaba.',
       impactRoutine1: 'Dubawa da wuri na iya gano matsala kafin ta tsananta.',
       impactRoutine2: 'Hakanan yana taimakawa wajen kula da cututtuka na dogon lokaci.',
+    },
+    assistant: {
+      title: 'Health Assistant',
+      helper: 'Sọ fún mi ohun tó ń ṣẹlẹ̀. Mo lè ràn ẹ́ lọ́wọ́ pẹ̀lú ìgbésẹ̀ tó kàn àti ìmọ̀ràn ilé ìwòsàn tó súnmọ́.',
+      placeholder: 'àpẹẹrẹ: ọfun mi ń dun, mo sì ní ìbà…',
+      send: 'Ránṣẹ́',
+      thinking: 'Ń rò…',
     },
     common: {
       appName: 'Ogwu',
@@ -1075,9 +1111,16 @@ export const translations = {
   ha: {
     tabs: {
       home: 'Home',
-      newConsult: 'New consult',
+      newConsult: 'Assistant',
       records: 'Records',
       profile: 'Profile',
+    },
+    assistant: {
+      title: 'Health Assistant',
+      helper: 'Ka fada min abin da ke faruwa. Zan taimaka da mataki na gaba kuma in ba da shawarwarin asibitoci idan ya dace.',
+      placeholder: 'misali: ina jin ciwon makogwaro da zazzabi…',
+      send: 'Aika',
+      thinking: 'Ana tunani…',
     },
     common: {
       appName: 'Ogwu',
