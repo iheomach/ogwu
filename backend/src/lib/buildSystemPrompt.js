@@ -21,7 +21,10 @@ function buildSystemPrompt(profile) {
   const allergies = csvish(profile?.allergies) || 'none reported';
   const conditions = csvish(profile?.known_conditions) || csvish(profile?.known_conditions_text) || 'none reported';
   const state = csvish(profile?.state) || 'not provided';
-  const country = csvish(profile?.country) || 'not provided';
+  const liveLocation = csvish(profile?.liveLocation);
+
+  // Prefer live GPS-derived location over stored profile state.
+  const locationLine = liveLocation || (state !== 'not provided' ? state : null) || 'not provided';
 
   return `You are Ogwu, an AI health assistant for patients in Nigeria and emerging markets.
 
@@ -30,7 +33,7 @@ Patient profile (do NOT ask the patient to repeat any of this):
 - Age: ${age ?? 'not provided'}
 - Allergies: ${allergies}
 - Existing conditions: ${conditions}
-- Location: ${state}${country !== 'not provided' ? `, ${country}` : ''}
+- Current location: ${locationLine}${liveLocation ? ' (from device GPS — use this for hospital search)' : ''}
 
 ## Your workflow
 

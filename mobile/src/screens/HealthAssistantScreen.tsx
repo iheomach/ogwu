@@ -113,7 +113,17 @@ const userBubbleStyle = {
   elevation: 4,
 };
 
-export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
+const TOOL_LABELS: Record<string, string> = {
+  searchHospitals: 'Searching hospitals near you...',
+  getHospitalBookingInfo: 'Checking booking options...',
+  bookAppointment: 'Booking your appointment...',
+  createConsult: 'Saving your record...',
+  flagEmergency: 'Flagging emergency...',
+  getPatientHistory: 'Reviewing your history...',
+  checkDrugInteraction: 'Checking medication safety...',
+};
+
+export function HealthAssistantScreen({ busy, location }: ScreenPropsBase) {
   const [isInitialized, setIsInitialized] = useState(false);
 
   const apiUrl = useMemo(() => {
@@ -134,9 +144,26 @@ export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
     api: apiUrl || '/api/agent/chat',
     fetch: authedFetch as any,
     streamProtocol: 'data',
+    body: location ? { location } : undefined,
   });
 
   const isLoading = status === 'submitted' || status === 'streaming';
+
+  // Derive a short label from whichever tool is currently active.
+  const thinkingLabel = useMemo(() => {
+    if (!isLoading) return null;
+    const lastAssistant = [...messages].reverse().find((m: any) => m.role === 'assistant');
+    const parts: any[] = (lastAssistant as any)?.parts || [];
+    const active = parts
+      .filter((p: any) =>
+        p.type?.startsWith('tool-') &&
+        (p.state === 'input-streaming' || p.state === 'input-available')
+      )
+      .at(-1);
+    if (!active) return 'Thinking...';
+    const toolName = active.type?.replace('tool-', '') ?? '';
+    return TOOL_LABELS[toolName] ?? 'Working on it...';
+  }, [isLoading, messages]);
 
   useEffect(() => {
     (async () => {
@@ -210,9 +237,12 @@ export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
               );
             })}
 
-            {isLoading && (
-              <View style={[glassBubbleStyle, { paddingVertical: spacing.sm }]}>
+            {isLoading && thinkingLabel && (
+              <View style={[glassBubbleStyle, { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }]}>
                 <ActivityIndicator color={colors.purple} size="small" />
+                <Text style={{ color: colors.grey500, fontSize: 13, fontStyle: 'italic' }}>
+                  {thinkingLabel}
+                </Text>
               </View>
             )}
 

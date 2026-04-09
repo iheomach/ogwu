@@ -285,6 +285,7 @@ router.post('/complete', authenticate, async (req, res) => {
     const locale = safeLocale(req.body?.locale);
     const profile = req.body?.profile || {};
     const qa = Array.isArray(req.body?.qa) ? req.body.qa : [];
+    const location = typeof req.body?.location === 'string' ? req.body.location.trim() : null;
 
     const trimmed = qa
       .filter((x) => x && typeof x.q === 'string')
@@ -308,11 +309,12 @@ router.post('/complete', authenticate, async (req, res) => {
     const languageName = languageMap[localeSafe] || 'English';
 
     // Ask the model for a short summary (still no advice)
+    const locationLine = location ? ` The patient is located in ${location}.` : '';
     const messages = [
       {
         role: 'system',
         content:
-          `Summarize the following patient intake in 4-6 bullets. ` +
+          `Summarize the following patient intake in 4-6 bullets.${locationLine} ` +
           `No diagnosis, no treatment advice. ` +
           `If emergency symptoms are present, include a first bullet saying they should seek urgent care. ` +
           `Return ONLY JSON: { "summary": string, "safety_note": string|null }. ` +
@@ -322,7 +324,7 @@ router.post('/complete', authenticate, async (req, res) => {
       },
       {
         role: 'user',
-        content: JSON.stringify({ locale, profile, answers: trimmed }),
+        content: JSON.stringify({ locale, profile, location: location || undefined, answers: trimmed }),
       },
     ];
 

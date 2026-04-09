@@ -47,6 +47,7 @@ export async function triageNext(params: {
   locale: SupportedLocale;
   profile: Partial<Profile>;
   qa: TriageQA[];
+  location?: string | null;
 }): Promise<NextQuestionResponse> {
   return apiPost<NextQuestionResponse>('/api/triage/next', params);
 }
@@ -55,6 +56,7 @@ export async function triageComplete(params: {
   locale: SupportedLocale;
   profile: Partial<Profile>;
   qa: TriageQA[];
+  location?: string | null;
 }): Promise<CompleteResponse> {
   return apiPost<CompleteResponse>('/api/triage/complete', params);
 }

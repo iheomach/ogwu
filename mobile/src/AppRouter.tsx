@@ -26,11 +26,13 @@ import type { SupportedLocale } from './i18n/translations';
 import type { TriageQA } from './types';
 import { triageComplete, triageNext, triageStatus } from './lib/triage';
 import { TabScaffold, type TabKey } from './ui/TabScaffold';
+import { requestAndGetLocation, formatLocation, type LocationSummary } from './lib/location';
 
 export function AppRouter() {
   const [isBooting, setIsBooting] = useState(true);
   const [busy, setBusy] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
+  const [locationSummary, setLocationSummary] = useState<LocationSummary | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [screen, setScreen] = useState<AppScreen>('phone');
   const [locale, setLocale] = useState<SupportedLocale>('en');
@@ -74,6 +76,12 @@ export function AppRouter() {
       try {
         const initialLocale = await initI18n();
         if (isMounted) setLocale(initialLocale);
+
+        // Request location on launch — runs in parallel with session restore.
+        requestAndGetLocation()
+          .then((loc) => { if (isMounted) setLocationSummary(loc); })
+          .catch(() => {});
+
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
         if (!isMounted) return;
@@ -170,6 +178,7 @@ export function AppRouter() {
           locale,
           profile: profile ?? {},
           qa: triageQa,
+          location: formatLocation(locationSummary),
         });
 
         if (!isMounted) return;
@@ -181,7 +190,7 @@ export function AppRouter() {
         if (res.done) {
           // Nothing to ask; still record completion so we don't prompt again.
           try {
-            await triageComplete({ locale, profile: profile ?? {}, qa: triageQa });
+            await triageComplete({ locale, profile: profile ?? {}, qa: triageQa, location: formatLocation(locationSummary) });
           } catch {
             // Non-fatal
           }
@@ -333,6 +342,7 @@ export function AppRouter() {
         locale,
         profile: profile ?? {},
         qa: nextQa,
+        location: formatLocation(locationSummary),
       });
 
       if (res.safety_note) {
@@ -340,7 +350,7 @@ export function AppRouter() {
       }
 
       if (res.done) {
-        const saved = await triageComplete({ locale, profile: profile ?? {}, qa: nextQa });
+        const saved = await triageComplete({ locale, profile: profile ?? {}, qa: nextQa, location: formatLocation(locationSummary) });
         if (saved.safety_note) {
           Alert.alert(t('triage.safetyTitle'), saved.safety_note);
         }
@@ -487,7 +497,7 @@ export function AppRouter() {
 
       {screen === 'newConsult' && (
         <TabScaffold activeTab="newConsult" onNavigate={goTab}>
-          <HealthAssistantScreen busy={busy} />
+          <HealthAssistantScreen busy={busy} location={formatLocation(locationSummary)} />
         </TabScaffold>
       )}
 

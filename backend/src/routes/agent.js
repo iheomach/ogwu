@@ -126,6 +126,7 @@ router.post('/chat', authenticate, async (req, res) => {
     const profile = await loadPatientProfile(req.user.id);
 
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+    const liveLocation = safeText(req.body?.location, 100) || null;
 
     const [{ streamText, tool }, { openai }, { z }] = await Promise.all([
       import('ai'),
@@ -180,7 +181,7 @@ router.post('/chat', authenticate, async (req, res) => {
     });
 
     const modelName = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-    const system = buildSystemPrompt({ ...profile, country: null });
+    const system = buildSystemPrompt({ ...profile, country: null, liveLocation });
 
     const result = streamText({
       model: openai(modelName),
