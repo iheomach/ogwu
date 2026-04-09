@@ -46,55 +46,37 @@ router.post('/chat', authenticate, async (req, res) => {
       import('zod'),
     ]);
 
-    // JSON Schema definitions (bypasses Zod conversion issues)
-    const searchHospitalsSchema = {
-      type: 'object',
-      properties: {
-        specialty: { type: 'string', description: 'Medical specialty' },
-        state: { type: 'string', description: 'State or region' },
-        has_emergency: { type: 'boolean', description: 'Filter for emergency capability' },
-        tier: { type: 'integer', description: 'Hospital tier level' },
-        country: { type: 'string', description: 'Country code' },
-      },
-      required: ['specialty', 'state'],
-    };
-
-    const createConsultSchema = {
-      type: 'object',
-      properties: {
-        complaint: { type: 'string', description: 'Chief complaint' },
-        urgency: { type: 'string', enum: ['emergency', 'urgent', 'routine', 'self_care'], description: 'Urgency level' },
-        symptoms: { type: 'array', items: { type: 'string' }, description: 'List of symptoms' },
-        recommended_specialty: { type: 'string', description: 'Recommended medical specialty' },
-        care_pathway: { type: 'string', description: 'Recommended care pathway' },
-        recommended_hospital_ids: { type: 'array', items: { type: 'string' }, description: 'Hospital recommendations' },
-        is_emergency_flagged: { type: 'boolean', description: 'Emergency flag' },
-      },
-      required: ['complaint', 'urgency', 'symptoms', 'care_pathway'],
-    };
-
-    const flagEmergencySchema = {
-      type: 'object',
-      properties: {
-        reason: { type: 'string', description: 'Emergency reason' },
-      },
-      required: ['reason'],
-    };
-
-    const getPatientHistorySchema = {
-      type: 'object',
-      properties: {
-        limit: { type: 'integer', description: 'Number of records to retrieve', default: 5 },
-      },
-    };
-
-    const checkDrugInteractionSchema = {
-      type: 'object',
-      properties: {
-        medication: { type: 'string', description: 'Medication name' },
-      },
-      required: ['medication'],
-    };
+    // The SDK converts these to JSON Schema internally before sending to OpenAI.
+    // Do NOT use plain objects here; they produce type: "None" and OpenAI rejects them.
+    const searchHospitalsSchema = z.object({
+      specialty: z.string().describe('Medical specialty, e.g. cardiology, nephrology'),
+      state: z.string().describe('Nigerian state or region the patient is in'),
+      has_emergency: z.boolean().optional().describe('Filter for emergency capability'),
+      tier: z.number().int().optional().describe('Hospital tier: 1=primary, 2=secondary, 3=tertiary'),
+      country: z.string().optional().describe('Country name, defaults to Nigeria'),
+    });
+ 
+    const createConsultSchema = z.object({
+      complaint: z.string().describe('Chief complaint in the patient\'s own words'),
+      urgency: z.enum(['emergency', 'urgent', 'routine', 'self_care']).describe('Triage urgency level'),
+      symptoms: z.array(z.string()).describe('List of symptoms reported'),
+      recommended_specialty: z.string().optional().describe('Recommended medical specialty'),
+      care_pathway: z.string().describe('Clear next steps for the patient'),
+      recommended_hospital_ids: z.array(z.string()).optional().describe('UUIDs of recommended hospitals'),
+      is_emergency_flagged: z.boolean().optional().describe('Whether this was flagged as an emergency'),
+    });
+ 
+    const flagEmergencySchema = z.object({
+      reason: z.string().describe('Why this is classified as an emergency'),
+    });
+ 
+    const getPatientHistorySchema = z.object({
+      limit: z.number().int().min(1).max(10).default(5).describe('Number of recent consults to retrieve'),
+    });
+ 
+    const checkDrugInteractionSchema = z.object({
+      medication: z.string().describe('Medication name to check'),
+    });
 
     const modelName = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
