@@ -63,11 +63,11 @@ router.post('/chat', authenticate, async (req, res) => {
           description:
             'Search for hospitals by medical specialty and patient location. Call this when triage indicates a facility visit is needed.',
           parameters: z.object({
-            specialty: z.string(),
-            state: z.string(),
+            specialty: z.string().min(1),
+            state: z.string().min(1),
             has_emergency: z.boolean().optional(),
-            tier: z.number().optional(),
-            country: z.string().optional(),
+            tier: z.number().int().optional(),
+            country: z.string().min(1).optional(),
           }),
           execute: async ({ specialty, state, has_emergency, tier, country }) => {
             let q = supabase
@@ -91,11 +91,11 @@ router.post('/chat', authenticate, async (req, res) => {
           description:
             'Save a structured consult record once triage is complete. Call this automatically — do not ask the patient to initiate saving.',
           parameters: z.object({
-            complaint: z.string(),
-            urgency: z.enum(['emergency', 'urgent', 'routine', 'self_care']),
-            symptoms: z.array(z.string()),
-            recommended_specialty: z.string().optional(),
-            care_pathway: z.string(),
+            complaint: z.string().min(1),
+            urgency: z.string().refine(val => ['emergency', 'urgent', 'routine', 'self_care'].includes(val)),
+            symptoms: z.array(z.string().min(1)),
+            recommended_specialty: z.string().min(1).optional(),
+            care_pathway: z.string().min(1),
             recommended_hospital_ids: z.array(z.string()).optional(),
             is_emergency_flagged: z.boolean().optional(),
           }),
@@ -128,7 +128,7 @@ router.post('/chat', authenticate, async (req, res) => {
           description:
             'Flag this consultation as an emergency requiring immediate action. Call this as soon as symptoms suggest an emergency — before other tools.',
           parameters: z.object({
-            reason: z.string(),
+            reason: z.string().min(1),
           }),
           execute: async ({ reason }) => {
             return {
@@ -144,7 +144,7 @@ router.post('/chat', authenticate, async (req, res) => {
           description:
             "Retrieve the patient's recent consult history.",
           parameters: z.object({
-            limit: z.number().default(5),
+            limit: z.number().int().default(5),
           }),
           execute: async ({ limit }) => {
             const lim = Math.max(1, Math.min(10, Number(limit || 5)));
@@ -163,7 +163,7 @@ router.post('/chat', authenticate, async (req, res) => {
           description:
             "Check if a medication is safe given the patient's allergies and existing conditions.",
           parameters: z.object({
-            medication: z.string(),
+            medication: z.string().min(1),
           }),
           execute: async ({ medication }) => {
             const med = safeText(medication, 80);
