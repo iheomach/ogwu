@@ -1,4 +1,6 @@
 const express = require('express');
+const { google } = require('googleapis');
+const { DateTime } = require('luxon');
 
 const router = express.Router();
 
@@ -15,9 +17,7 @@ function safeText(s, maxLen) {
 async function loadPatientProfile(userId) {
   const { data, error } = await supabase
     .from('profiles')
-    // NOTE: `age` and legacy `sex` were dropped in `supabase/migrations/004_drop_legacy_profile_columns.sql`.
-    // We compute age from `dob` when needed and use `biological_sex`.
-    .select('id, phone, dob, biological_sex, allergies, known_conditions')
+    .select('id, phone, dob, biological_sex, allergies, known_conditions, first_name, last_name')
     .eq('id', userId)
     .maybeSingle();
 
@@ -31,91 +31,356 @@ function normalizeUrgency(u) {
   return 'routine';
 }
 
-// Agent chat endpoint (streams AI SDK UI message stream over SSE)
+function getOAuthClient() {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI;
+  if (!clientId || !clientSecret || !redirectUri) return null;
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+}
+
+async function getClinicCalendarAuth() {
+  const { data, error } = await supabase
+    .from('integration_tokens')
+    .select('refresh_token, access_token, expiry, meta')
+    .eq('provider', 'google_calendar')
+    .maybeSingle();
+
+  if (error || !data?.refresh_token) return null;
+
+  const oauth2Client = getOAuthClient();
+  if (!oauth2Client) return null;
+
+  oauth2Client.setCredentials({
+    refresh_token: data.refresh_token,
+    access_token: data.access_token || undefined,
+    expiry_date: data.expiry ? new Date(data.expiry).getTime() : undefined,
+  });
+
+  const calendarId = data?.meta?.calendar_id || process.env.GOOGLE_CLINIC_CALENDAR_ID || 'primary';
+  return { oauth2Client, calendarId };
+}
+
+// Returns available 30-min slots in business hours over the next N days.
+async function fetchAvailableSlots(daysAhead = 5, timeZone = 'Africa/Lagos') {
+  const auth = await getClinicCalendarAuth();
+  if (!auth) return [];
+
+  const { oauth2Client, calendarId } = auth;
+  const cal = google.calendar({ version: 'v3', auth: oauth2Client });
+
+  const now = DateTime.now().setZone(timeZone);
+  const rangeEnd = now.plus({ days: daysAhead + 1 }).startOf('day');
+
+  // Query busy times for the whole range.
+  let busyTimes = [];
+  try {
+    const fb = await cal.freebusy.query({
+      requestBody: {
+        timeMin: now.toISO(),
+        timeMax: rangeEnd.toISO(),
+        items: [{ id: calendarId }],
+      },
+    });
+    busyTimes = fb?.data?.calendars?.[calendarId]?.busy || [];
+  } catch {
+    busyTimes = [];
+  }
+
+  // Generate all 30-min slots in 08:00–17:00 on weekdays.
+  const slots = [];
+  let cursor = now.plus({ hours: 1 }).startOf('hour');
+
+  while (cursor < rangeEnd && slots.length < 12) {
+    const weekday = cursor.weekday; // 1=Mon … 7=Sun
+    const hour = cursor.hour;
+
+    if (weekday >= 1 && weekday <= 5 && hour >= 8 && hour < 17) {
+      const slotEnd = cursor.plus({ minutes: 30 });
+      const busy = busyTimes.some((b) => {
+        const bStart = DateTime.fromISO(b.start);
+        const bEnd = DateTime.fromISO(b.end);
+        return cursor < bEnd && slotEnd > bStart;
+      });
+
+      if (!busy) {
+        slots.push({
+          starts_at_local: cursor.toFormat("yyyy-MM-dd'T'HH:mm"),
+          display: cursor.toFormat("ccc d MMM, h:mm a"),
+          time_zone: timeZone,
+        });
+      }
+    }
+
+    cursor = cursor.plus({ minutes: 30 });
+    // Skip non-business hours quickly.
+    if (cursor.hour >= 17) cursor = cursor.plus({ days: 1 }).startOf('day').set({ hour: 8 });
+    if (cursor.weekday > 5) cursor = cursor.set({ weekday: 1 }).plus(cursor.weekday === 6 ? { days: 2 } : { days: 1 });
+  }
+
+  return slots;
+}
+
 router.post('/chat', authenticate, async (req, res) => {
   try {
     const profile = await loadPatientProfile(req.user.id);
 
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
-    const locale = safeText(req.body?.locale, 10) || null;
 
-    // Dynamic imports keep the backend CommonJS without a full ESM migration.
     const [{ streamText, tool }, { openai }, { z }] = await Promise.all([
       import('ai'),
       import('@ai-sdk/openai'),
       import('zod'),
     ]);
 
-    // The SDK converts these to JSON Schema internally before sending to OpenAI.
-    // Do NOT use plain objects here; they produce type: "None" and OpenAI rejects them.
     const searchHospitalsSchema = z.object({
-      specialty: z.string().describe('Medical specialty, e.g. cardiology, nephrology'),
-      state: z.string().describe('Nigerian state or region the patient is in'),
-      has_emergency: z.boolean().optional().describe('Filter for emergency capability'),
-      tier: z.number().int().optional().describe('Hospital tier: 1=primary, 2=secondary, 3=tertiary'),
-      country: z.string().optional().describe('Country name, defaults to Nigeria'),
+      state: z.string().describe('Nigerian state or city the patient is in, e.g. Lagos, Abuja'),
+      specialty: z.string().optional().describe('Medical specialty hint, e.g. urology, general practice'),
+      has_emergency: z.boolean().optional().describe('True if emergency capability is required'),
     });
- 
+
+    const getHospitalBookingInfoSchema = z.object({
+      hospital_id: z.string().describe('UUID of the hospital from searchHospitals results'),
+      hospital_name: z.string().describe('Name of the hospital for context'),
+      hospital_phone: z.string().describe('Phone number of the hospital'),
+      is_onboarded: z.boolean().describe('Whether the hospital is onboarded on Ogwu'),
+      complaint: z.string().describe("Patient's chief complaint"),
+      urgency: z.enum(['emergency', 'urgent', 'routine', 'self_care']),
+      symptoms: z.array(z.string()).describe('List of reported symptoms'),
+      recommended_specialty: z.string().optional(),
+    });
+
+    const bookAppointmentSchema = z.object({
+      hospital_id: z.string().describe('UUID of the onboarded hospital'),
+      starts_at_local: z.string().describe("Slot start from getHospitalBookingInfo, e.g. '2026-04-10T09:00'"),
+      time_zone: z.string().describe('IANA timezone from the slot, e.g. Africa/Lagos'),
+      reason: z.string().describe('Brief appointment reason'),
+    });
+
     const createConsultSchema = z.object({
-      complaint: z.string().describe('Chief complaint in the patient\'s own words'),
-      urgency: z.enum(['emergency', 'urgent', 'routine', 'self_care']).describe('Triage urgency level'),
-      symptoms: z.array(z.string()).describe('List of symptoms reported'),
-      recommended_specialty: z.string().optional().describe('Recommended medical specialty'),
+      complaint: z.string().describe("Chief complaint in the patient's own words"),
+      urgency: z.enum(['emergency', 'urgent', 'routine', 'self_care']),
+      symptoms: z.array(z.string()),
+      recommended_specialty: z.string().optional(),
       care_pathway: z.string().describe('Clear next steps for the patient'),
-      recommended_hospital_ids: z.array(z.string()).optional().describe('UUIDs of recommended hospitals'),
-      is_emergency_flagged: z.boolean().optional().describe('Whether this was flagged as an emergency'),
+      recommended_hospital_ids: z.array(z.string()).optional(),
+      is_emergency_flagged: z.boolean().optional(),
     });
- 
+
     const flagEmergencySchema = z.object({
-      reason: z.string().describe('Why this is classified as an emergency'),
+      reason: z.string().describe('Why this is an emergency'),
     });
- 
+
     const getPatientHistorySchema = z.object({
-      limit: z.number().int().min(1).max(10).default(5).describe('Number of recent consults to retrieve'),
+      limit: z.number().int().min(1).max(10).default(5),
     });
- 
+
     const checkDrugInteractionSchema = z.object({
       medication: z.string().describe('Medication name to check'),
     });
 
     const modelName = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-
-    const system = buildSystemPrompt({
-      ...profile,
-      country: locale ? null : null,
-    });
+    const system = buildSystemPrompt({ ...profile, country: null });
 
     const result = streamText({
       model: openai(modelName),
       system,
       messages,
-      maxSteps: 5,
+      maxSteps: 10,
       tools: {
+        // ── 1. Search hospitals ──────────────────────────────────────────────
         searchHospitals: tool({
           description:
-            'Search for hospitals by medical specialty and patient location. Call this when triage indicates a facility visit is needed.',
+            'Search for hospitals near the patient. Call this once you know their location. ' +
+            'Returns hospitals with is_onboarded flag — use that to decide next steps.',
           inputSchema: searchHospitalsSchema,
-          execute: async ({ specialty, state, has_emergency, tier, country }) => {
+          execute: async ({ state, specialty, has_emergency }) => {
             let q = supabase
               .from('hospitals_directory')
               .select('id,name,city,state,type,tier,specialties,phone,website,has_emergency,is_onboarded')
               .eq('is_active', true)
-              .ilike('state', String(state))
-              .contains('specialties', [String(specialty)]);
+              .ilike('state', `%${String(state)}%`);
 
-            if (country) q = q.eq('country', String(country));
-            if (typeof tier === 'number') q = q.eq('tier', tier);
             if (has_emergency) q = q.eq('has_emergency', true);
+
+            // Soft specialty filter: try ilike match on the specialties text representation.
+            // We do NOT use .contains() here — it requires exact enum values which are brittle.
+            if (specialty) {
+              q = q.ilike('specialties::text', `%${String(specialty)}%`);
+            }
 
             const { data, error } = await q.limit(5);
             if (error) return { error: error.message };
-            return { hospitals: data || [] };
+            if (!data || data.length === 0) {
+              // Retry without specialty filter so the agent always gets something back.
+              const { data: fallback, error: fbErr } = await supabase
+                .from('hospitals_directory')
+                .select('id,name,city,state,type,tier,specialties,phone,website,has_emergency,is_onboarded')
+                .eq('is_active', true)
+                .ilike('state', `%${String(state)}%`)
+                .limit(5);
+              if (fbErr) return { error: fbErr.message };
+              return { hospitals: fallback || [], note: 'No exact specialty match — showing all hospitals in the area.' };
+            }
+            return { hospitals: data };
           },
         }),
 
-        createConsult: tool({
+        // ── 2. Get booking info (slots OR phone script) ──────────────────────
+        getHospitalBookingInfo: tool({
           description:
-            'Save a structured consult record once triage is complete. Call this automatically — do not ask the patient to initiate saving.',
+            'After searchHospitals, call this for the best hospital. ' +
+            'If is_onboarded=true, returns available Google Meet slots. ' +
+            'If is_onboarded=false, returns phone number and a ready-to-read call script.',
+          inputSchema: getHospitalBookingInfoSchema,
+          execute: async ({
+            hospital_id, hospital_name, hospital_phone,
+            is_onboarded, complaint, urgency, symptoms, recommended_specialty,
+          }) => {
+            if (is_onboarded) {
+              const slots = await fetchAvailableSlots(7, 'Africa/Lagos');
+              if (slots.length === 0) {
+                return {
+                  type: 'onboarded_no_slots',
+                  message: 'No available slots in the next 7 days. Ask the patient to call directly.',
+                  phone: hospital_phone,
+                };
+              }
+              return {
+                type: 'onboarded',
+                hospital_id,
+                hospital_name,
+                available_slots: slots,
+                instructions: 'Present these slots to the patient and ask which they prefer. Then call bookAppointment.',
+              };
+            }
+
+            // Not onboarded — generate phone script.
+            const patientName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'the patient';
+            const urgencyLine = urgency === 'emergency'
+              ? 'This is an EMERGENCY. I need to be seen immediately.'
+              : urgency === 'urgent'
+              ? 'My situation is urgent and I need to be seen within 24–48 hours.'
+              : 'I would like to schedule an appointment as soon as possible.';
+
+            const script = `Hello, my name is ${patientName}. I am calling to book an appointment.
+
+${urgencyLine}
+
+Here is a summary of my situation: ${complaint}. My main symptoms are: ${symptoms.join(', ')}.${recommended_specialty ? ` I have been advised to see a ${recommended_specialty} specialist.` : ''}
+
+Could you please let me know the earliest available appointment? I would also appreciate knowing your consultation fee and any documents I should bring.
+
+Thank you.`;
+
+            return {
+              type: 'not_onboarded',
+              hospital_name,
+              phone: hospital_phone,
+              call_script: script,
+              instructions: 'Show the patient the phone number and this script to guide their call.',
+            };
+          },
+        }),
+
+        // ── 3. Book Google Meet appointment ──────────────────────────────────
+        bookAppointment: tool({
+          description:
+            'Book a Google Meet appointment for an onboarded hospital. ' +
+            'Only call this after the patient confirms a specific slot from getHospitalBookingInfo.',
+          inputSchema: bookAppointmentSchema,
+          execute: async ({ hospital_id, starts_at_local, time_zone, reason }) => {
+            const auth = await getClinicCalendarAuth();
+            if (!auth) return { error: 'Calendar not configured — cannot book online. Please call the hospital directly.' };
+
+            const { oauth2Client, calendarId } = auth;
+
+            const { data: hospital } = await supabase
+              .from('hospitals_directory')
+              .select('id,name,is_onboarded')
+              .eq('id', hospital_id)
+              .maybeSingle();
+
+            if (!hospital?.is_onboarded) {
+              return { error: 'Hospital is not onboarded for online booking.' };
+            }
+
+            const tz = time_zone || 'Africa/Lagos';
+            const startDt = DateTime.fromISO(String(starts_at_local), { zone: tz });
+            if (!startDt.isValid) return { error: 'Invalid start time.' };
+            const endDt = startDt.plus({ minutes: 30 });
+
+            const cal = google.calendar({ version: 'v3', auth: oauth2Client });
+            const requestId = `ogwu-${profile.id}-${Date.now()}`;
+
+            let created;
+            try {
+              const res = await cal.events.insert({
+                calendarId,
+                conferenceDataVersion: 1,
+                requestBody: {
+                  summary: `Ogwu consult — ${hospital.name}`,
+                  description: `Reason: ${reason}\nPatient ID: ${profile.id}`,
+                  start: { dateTime: startDt.toISO(), timeZone: tz },
+                  end: { dateTime: endDt.toISO(), timeZone: tz },
+                  conferenceData: {
+                    createRequest: { requestId, conferenceSolutionKey: { type: 'hangoutsMeet' } },
+                  },
+                },
+              });
+              created = res.data;
+            } catch (e) {
+              return { error: `Calendar error: ${e?.message}` };
+            }
+
+            const meetingUrl =
+              created?.hangoutLink ||
+              created?.conferenceData?.entryPoints?.find((e) => e.entryPointType === 'video')?.uri ||
+              null;
+
+            const startsAtUtc = startDt.toUTC().toISO();
+
+            const { data: appt, error: apptErr } = await supabase
+              .from('appointments')
+              .insert({
+                patient_id: profile.id,
+                hospital_id: hospital.id,
+                status: 'scheduled',
+                starts_at: startsAtUtc,
+                duration_minutes: 30,
+                patient_time_zone: tz,
+                provider_time_zone: tz,
+                calendar_event_id: created?.id || null,
+                meeting_url: meetingUrl,
+                reason: safeText(reason, 500),
+                updated_at: new Date().toISOString(),
+              })
+              .select('id,starts_at,meeting_url')
+              .single();
+
+            if (apptErr) {
+              // Best-effort cleanup.
+              if (created?.id) {
+                try { await cal.events.delete({ calendarId, eventId: created.id }); } catch {}
+              }
+              return { error: apptErr.message };
+            }
+
+            return {
+              success: true,
+              appointment_id: appt.id,
+              starts_at: appt.starts_at,
+              meeting_url: meetingUrl,
+              message: meetingUrl
+                ? `Appointment booked! Google Meet link: ${meetingUrl}`
+                : 'Appointment booked. A Meet link will be sent shortly.',
+            };
+          },
+        }),
+
+        // ── 4. Save consult record ────────────────────────────────────────────
+        createConsult: tool({
+          description: 'Save a structured consult record once triage is complete. Call automatically.',
           inputSchema: createConsultSchema,
           execute: async (params) => {
             const payload = {
@@ -142,23 +407,20 @@ router.post('/chat', authenticate, async (req, res) => {
           },
         }),
 
+        // ── 5. Flag emergency ─────────────────────────────────────────────────
         flagEmergency: tool({
-          description:
-            'Flag this consultation as an emergency requiring immediate action. Call this as soon as symptoms suggest an emergency — before other tools.',
+          description: 'Flag an emergency. Call immediately when symptoms suggest one — before other tools.',
           inputSchema: flagEmergencySchema,
-          execute: async ({ reason }) => {
-            return {
-              flagged: true,
-              reason: safeText(reason, 300),
-              message:
-                'Emergency flagged. If you are in immediate danger, call your local emergency number or go to the nearest emergency department now.',
-            };
-          },
+          execute: async ({ reason }) => ({
+            flagged: true,
+            reason: safeText(reason, 300),
+            message: 'Emergency flagged. If in immediate danger, call emergency services or go to the nearest A&E now.',
+          }),
         }),
 
+        // ── 6. Patient history ────────────────────────────────────────────────
         getPatientHistory: tool({
-          description:
-            "Retrieve the patient's recent consult history.",
+          description: "Retrieve the patient's recent consult history.",
           inputSchema: getPatientHistorySchema,
           execute: async ({ limit }) => {
             const lim = Math.max(1, Math.min(10, Number(limit || 5)));
@@ -173,36 +435,27 @@ router.post('/chat', authenticate, async (req, res) => {
           },
         }),
 
+        // ── 7. Drug interaction check ─────────────────────────────────────────
         checkDrugInteraction: tool({
-          description:
-            "Check if a medication is safe given the patient's allergies and existing conditions.",
+          description: "Check if a medication is safe given the patient's allergies.",
           inputSchema: checkDrugInteractionSchema,
           execute: async ({ medication }) => {
             const med = safeText(medication, 80);
-            const allergies = String(profile?.allergies || '')
-              .split(',')
-              .map((x) => x.trim())
-              .filter(Boolean);
-
-            const risks = [];
-            for (const a of allergies) {
-              if (med.toLowerCase().includes(a.toLowerCase())) risks.push(`Patient reports allergy to ${a}`);
-            }
-
+            const allergies = String(profile?.allergies || '').split(',').map((x) => x.trim()).filter(Boolean);
+            const risks = allergies.filter((a) => med.toLowerCase().includes(a.toLowerCase()))
+              .map((a) => `Patient reports allergy to ${a}`);
             return {
               medication: med,
               risks,
               safe: risks.length === 0,
-              note: 'This is a basic check only. Always confirm with a pharmacist or clinician.',
+              note: 'Basic check only. Always confirm with a pharmacist or clinician.',
             };
           },
         }),
       },
     });
 
-    // Emit the v4-compatible data stream format that @ai-sdk/ui-utils@1.x expects.
-    // ai@5's pipeUIMessageStreamToResponse sends SSE (data: ...) which the v4
-    // client parser rejects with "Invalid code data".
+    // Emit v4-compatible data stream (what @ai-sdk/ui-utils@1.x expects).
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('X-Vercel-AI-Data-Stream', 'v1');
     res.setHeader('Cache-Control', 'no-cache');
@@ -215,41 +468,23 @@ router.post('/chat', authenticate, async (req, res) => {
     try {
       for await (const part of result.fullStream) {
         switch (part.type) {
-          case 'text-delta':
-            writePart('0', part.text);
-            break;
-          case 'tool-input-start':
-            writePart('b', { toolCallId: part.id, toolName: part.toolName });
-            break;
-          case 'tool-input-delta':
-            writePart('c', { toolCallId: part.id, argsTextDelta: part.delta });
-            break;
-          case 'tool-call':
-            writePart('9', { toolCallId: part.toolCallId, toolName: part.toolName, args: part.input });
-            break;
-          case 'tool-result':
-            writePart('a', { toolCallId: part.toolCallId, result: part.output });
-            break;
-          case 'start-step':
-            writePart('f', { messageId: `step-${Date.now()}` });
-            break;
+          case 'text-delta':    writePart('0', part.text); break;
+          case 'tool-input-start': writePart('b', { toolCallId: part.id, toolName: part.toolName }); break;
+          case 'tool-input-delta': writePart('c', { toolCallId: part.id, argsTextDelta: part.delta }); break;
+          case 'tool-call':    writePart('9', { toolCallId: part.toolCallId, toolName: part.toolName, args: part.input }); break;
+          case 'tool-result':  writePart('a', { toolCallId: part.toolCallId, result: part.output }); break;
+          case 'start-step':   writePart('f', { messageId: `step-${Date.now()}` }); break;
           case 'finish-step':
             writePart('e', {
               finishReason: part.finishReason,
-              usage: {
-                promptTokens: part.usage?.promptTokens ?? 0,
-                completionTokens: part.usage?.completionTokens ?? 0,
-              },
+              usage: { promptTokens: part.usage?.promptTokens ?? 0, completionTokens: part.usage?.completionTokens ?? 0 },
               isContinued: false,
             });
             break;
           case 'finish':
             writePart('d', {
               finishReason: part.finishReason,
-              usage: {
-                promptTokens: part.totalUsage?.promptTokens ?? 0,
-                completionTokens: part.totalUsage?.completionTokens ?? 0,
-              },
+              usage: { promptTokens: part.totalUsage?.promptTokens ?? 0, completionTokens: part.totalUsage?.completionTokens ?? 0 },
             });
             break;
           case 'error':
