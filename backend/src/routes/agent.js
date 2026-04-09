@@ -94,7 +94,7 @@ router.post('/chat', authenticate, async (req, res) => {
         searchHospitals: tool({
           description:
             'Search for hospitals by medical specialty and patient location. Call this when triage indicates a facility visit is needed.',
-          parameters: searchHospitalsSchema,
+          inputSchema: searchHospitalsSchema,
           execute: async ({ specialty, state, has_emergency, tier, country }) => {
             let q = supabase
               .from('hospitals_directory')
@@ -116,7 +116,7 @@ router.post('/chat', authenticate, async (req, res) => {
         createConsult: tool({
           description:
             'Save a structured consult record once triage is complete. Call this automatically — do not ask the patient to initiate saving.',
-          parameters: createConsultSchema,
+          inputSchema: createConsultSchema,
           execute: async (params) => {
             const payload = {
               patient_id: profile.id,
@@ -145,7 +145,7 @@ router.post('/chat', authenticate, async (req, res) => {
         flagEmergency: tool({
           description:
             'Flag this consultation as an emergency requiring immediate action. Call this as soon as symptoms suggest an emergency — before other tools.',
-          parameters: flagEmergencySchema,
+          inputSchema: flagEmergencySchema,
           execute: async ({ reason }) => {
             return {
               flagged: true,
@@ -159,7 +159,7 @@ router.post('/chat', authenticate, async (req, res) => {
         getPatientHistory: tool({
           description:
             "Retrieve the patient's recent consult history.",
-          parameters: getPatientHistorySchema,
+          inputSchema: getPatientHistorySchema,
           execute: async ({ limit }) => {
             const lim = Math.max(1, Math.min(10, Number(limit || 5)));
             const { data, error } = await supabase
@@ -176,7 +176,7 @@ router.post('/chat', authenticate, async (req, res) => {
         checkDrugInteraction: tool({
           description:
             "Check if a medication is safe given the patient's allergies and existing conditions.",
-          parameters: checkDrugInteractionSchema,
+          inputSchema: checkDrugInteractionSchema,
           execute: async ({ medication }) => {
             const med = safeText(medication, 80);
             const allergies = String(profile?.allergies || '')
