@@ -66,6 +66,7 @@ export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
   } = useChat({
     api: apiUrl || '/api/agent/chat',
     fetch: authedFetch as any,
+    streamProtocol: 'text', // Backend uses toTextStreamResponse() which sends plain text deltas
   });
 
   return (
