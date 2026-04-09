@@ -200,23 +200,12 @@ router.post('/chat', authenticate, async (req, res) => {
       },
     });
 
-    // Convert to UI message stream (includes tool calls, thinking, and text).
-    // useChat will parse these events and display agent progress.
-    const response = result.toUIMessageStreamResponse();
-
-    res.status(response.status);
-    response.headers.forEach((value, key) => {
-      res.setHeader(key, value);
+    // Use the SDK's native Express piping to preserve exact data-stream framing.
+    // This avoids parser errors on clients expecting UI message stream events.
+    result.pipeUIMessageStreamToResponse(res, {
+      originalMessages: messages,
     });
-
-    if (!response.body) {
-      res.end();
-      return;
-    }
-
-    // Pipe the Web ReadableStream to Express response.
-    const { Readable } = require('stream');
-    Readable.fromWeb(response.body).pipe(res);
+    return;
   } catch (err) {
     res.status(400).json({ error: err?.message || 'Failed to run agent' });
   }
