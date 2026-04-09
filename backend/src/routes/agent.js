@@ -200,14 +200,73 @@ router.post('/chat', authenticate, async (req, res) => {
       },
     });
 
-    // Use the SDK's native Express piping to preserve exact data-stream framing.
-    // This avoids parser errors on clients expecting UI message stream events.
-    result.pipeUIMessageStreamToResponse(res, {
-      originalMessages: messages,
-    });
+    // Emit the v4-compatible data stream format that @ai-sdk/ui-utils@1.x expects.
+    // ai@5's pipeUIMessageStreamToResponse sends SSE (data: ...) which the v4
+    // client parser rejects with "Invalid code data".
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('X-Vercel-AI-Data-Stream', 'v1');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.flushHeaders();
+
+    function writePart(code, value) {
+      res.write(`${code}:${JSON.stringify(value)}\n`);
+    }
+
+    try {
+      for await (const part of result.fullStream) {
+        switch (part.type) {
+          case 'text-delta':
+            writePart('0', part.text);
+            break;
+          case 'tool-input-start':
+            writePart('b', { toolCallId: part.id, toolName: part.toolName });
+            break;
+          case 'tool-input-delta':
+            writePart('c', { toolCallId: part.id, argsTextDelta: part.delta });
+            break;
+          case 'tool-call':
+            writePart('9', { toolCallId: part.toolCallId, toolName: part.toolName, args: part.args });
+            break;
+          case 'tool-result':
+            writePart('a', { toolCallId: part.toolCallId, result: part.result });
+            break;
+          case 'start-step':
+            writePart('f', { messageId: `step-${Date.now()}` });
+            break;
+          case 'finish-step':
+            writePart('e', {
+              finishReason: part.finishReason,
+              usage: {
+                promptTokens: part.usage?.promptTokens ?? 0,
+                completionTokens: part.usage?.completionTokens ?? 0,
+              },
+              isContinued: false,
+            });
+            break;
+          case 'finish':
+            writePart('d', {
+              finishReason: part.finishReason,
+              usage: {
+                promptTokens: part.totalUsage?.promptTokens ?? 0,
+                completionTokens: part.totalUsage?.completionTokens ?? 0,
+              },
+            });
+            break;
+          case 'error':
+            writePart('3', String(part.error?.message ?? part.error ?? 'Unknown error'));
+            break;
+        }
+      }
+    } catch (streamErr) {
+      writePart('3', String(streamErr?.message ?? 'Stream error'));
+    }
+
+    res.end();
     return;
   } catch (err) {
-    res.status(400).json({ error: err?.message || 'Failed to run agent' });
+    if (!res.headersSent) {
+      res.status(400).json({ error: err?.message || 'Failed to run agent' });
+    }
   }
 });
 
