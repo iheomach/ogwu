@@ -46,6 +46,56 @@ router.post('/chat', authenticate, async (req, res) => {
       import('zod'),
     ]);
 
+    // JSON Schema definitions (bypasses Zod conversion issues)
+    const searchHospitalsSchema = {
+      type: 'object',
+      properties: {
+        specialty: { type: 'string', description: 'Medical specialty' },
+        state: { type: 'string', description: 'State or region' },
+        has_emergency: { type: 'boolean', description: 'Filter for emergency capability' },
+        tier: { type: 'integer', description: 'Hospital tier level' },
+        country: { type: 'string', description: 'Country code' },
+      },
+      required: ['specialty', 'state'],
+    };
+
+    const createConsultSchema = {
+      type: 'object',
+      properties: {
+        complaint: { type: 'string', description: 'Chief complaint' },
+        urgency: { type: 'string', enum: ['emergency', 'urgent', 'routine', 'self_care'], description: 'Urgency level' },
+        symptoms: { type: 'array', items: { type: 'string' }, description: 'List of symptoms' },
+        recommended_specialty: { type: 'string', description: 'Recommended medical specialty' },
+        care_pathway: { type: 'string', description: 'Recommended care pathway' },
+        recommended_hospital_ids: { type: 'array', items: { type: 'string' }, description: 'Hospital recommendations' },
+        is_emergency_flagged: { type: 'boolean', description: 'Emergency flag' },
+      },
+      required: ['complaint', 'urgency', 'symptoms', 'care_pathway'],
+    };
+
+    const flagEmergencySchema = {
+      type: 'object',
+      properties: {
+        reason: { type: 'string', description: 'Emergency reason' },
+      },
+      required: ['reason'],
+    };
+
+    const getPatientHistorySchema = {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', description: 'Number of records to retrieve', default: 5 },
+      },
+    };
+
+    const checkDrugInteractionSchema = {
+      type: 'object',
+      properties: {
+        medication: { type: 'string', description: 'Medication name' },
+      },
+      required: ['medication'],
+    };
+
     const modelName = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
     const system = buildSystemPrompt({
@@ -62,13 +112,7 @@ router.post('/chat', authenticate, async (req, res) => {
         searchHospitals: tool({
           description:
             'Search for hospitals by medical specialty and patient location. Call this when triage indicates a facility visit is needed.',
-          parameters: z.object({
-            specialty: z.string().min(1),
-            state: z.string().min(1),
-            has_emergency: z.boolean().optional(),
-            tier: z.number().int().optional(),
-            country: z.string().min(1).optional(),
-          }).strict(),
+          parameters: searchHospitalsSchema,
           execute: async ({ specialty, state, has_emergency, tier, country }) => {
             let q = supabase
               .from('hospitals_directory')
@@ -90,15 +134,7 @@ router.post('/chat', authenticate, async (req, res) => {
         createConsult: tool({
           description:
             'Save a structured consult record once triage is complete. Call this automatically — do not ask the patient to initiate saving.',
-          parameters: z.object({
-            complaint: z.string().min(1),
-            urgency: z.string().refine(val => ['emergency', 'urgent', 'routine', 'self_care'].includes(val)),
-            symptoms: z.array(z.string().min(1)),
-            recommended_specialty: z.string().min(1).optional(),
-            care_pathway: z.string().min(1),
-            recommended_hospital_ids: z.array(z.string()).optional(),
-            is_emergency_flagged: z.boolean().optional(),
-          }).strict(),
+          parameters: createConsultSchema,
           execute: async (params) => {
             const payload = {
               patient_id: profile.id,
@@ -127,9 +163,7 @@ router.post('/chat', authenticate, async (req, res) => {
         flagEmergency: tool({
           description:
             'Flag this consultation as an emergency requiring immediate action. Call this as soon as symptoms suggest an emergency — before other tools.',
-          parameters: z.object({
-            reason: z.string().min(1),
-          }).strict(),
+          parameters: flagEmergencySchema,
           execute: async ({ reason }) => {
             return {
               flagged: true,
@@ -143,9 +177,7 @@ router.post('/chat', authenticate, async (req, res) => {
         getPatientHistory: tool({
           description:
             "Retrieve the patient's recent consult history.",
-          parameters: z.object({
-            limit: z.number().int().default(5),
-          }).strict(),
+          parameters: getPatientHistorySchema,
           execute: async ({ limit }) => {
             const lim = Math.max(1, Math.min(10, Number(limit || 5)));
             const { data, error } = await supabase
@@ -162,9 +194,7 @@ router.post('/chat', authenticate, async (req, res) => {
         checkDrugInteraction: tool({
           description:
             "Check if a medication is safe given the patient's allergies and existing conditions.",
-          parameters: z.object({
-            medication: z.string().min(1),
-          }).strict(),
+          parameters: checkDrugInteractionSchema,
           execute: async ({ medication }) => {
             const med = safeText(medication, 80);
             const allergies = String(profile?.allergies || '')
