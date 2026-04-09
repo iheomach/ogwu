@@ -188,11 +188,23 @@ router.post('/chat', authenticate, async (req, res) => {
       },
     });
 
-    // In `ai@5`, `streamText()` returns a StreamTextResult with helpers that can
-    // stream SSE responses directly to a Node/Express `res`.
-    // `useChat` expects this UI message stream protocol.
-    result.pipeUIMessageStreamToResponse(res);
-    return;
+    // Convert StreamTextResult to UI message stream Response, then pipe to Express.
+    // This streams in the data protocol format that useChat expects.
+    const response = result.toUIMessageStreamResponse();
+
+    res.status(response.status);
+    response.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+
+    if (!response.body) {
+      res.end();
+      return;
+    }
+
+    // Pipe the Web ReadableStream to Express response.
+    const { Readable } = require('stream');
+    Readable.fromWeb(response.body).pipe(res);
   } catch (err) {
     res.status(400).json({ error: err?.message || 'Failed to run agent' });
   }
