@@ -103,8 +103,7 @@ export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
   } = useChat({
     api: apiUrl || '/api/agent/chat',
     fetch: authedFetch as any,
-    // Uses default 'data' protocol which parses UI message stream
-    // (includes tool calls, tool results, and thinking steps)
+    streamProtocol: 'data',
   });
 
   // Restore messages from AsyncStorage on mount
