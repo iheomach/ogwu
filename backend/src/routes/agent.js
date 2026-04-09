@@ -225,10 +225,10 @@ router.post('/chat', authenticate, async (req, res) => {
             writePart('c', { toolCallId: part.id, argsTextDelta: part.delta });
             break;
           case 'tool-call':
-            writePart('9', { toolCallId: part.toolCallId, toolName: part.toolName, args: part.args });
+            writePart('9', { toolCallId: part.toolCallId, toolName: part.toolName, args: part.input });
             break;
           case 'tool-result':
-            writePart('a', { toolCallId: part.toolCallId, result: part.result });
+            writePart('a', { toolCallId: part.toolCallId, result: part.output });
             break;
           case 'start-step':
             writePart('f', { messageId: `step-${Date.now()}` });
