@@ -25,6 +25,15 @@ async function loadPatientProfile(userId) {
   return data || { id: userId };
 }
 
+async function loadTriageIntake(userId) {
+  const { data } = await supabase
+    .from('triage_intakes')
+    .select('answers, urgency, summary, safety_note, updated_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return data || null;
+}
+
 function normalizeUrgency(u) {
   const v = String(u || '').toLowerCase();
   if (v === 'emergency' || v === 'urgent' || v === 'routine' || v === 'self_care') return v;
@@ -123,7 +132,10 @@ async function fetchAvailableSlots(daysAhead = 5, timeZone = 'Africa/Lagos') {
 
 router.post('/chat', authenticate, async (req, res) => {
   try {
-    const profile = await loadPatientProfile(req.user.id);
+    const [profile, triageIntake] = await Promise.all([
+      loadPatientProfile(req.user.id),
+      loadTriageIntake(req.user.id),
+    ]);
 
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
     const liveLocation = safeText(req.body?.location, 100) || null;
@@ -181,7 +193,7 @@ router.post('/chat', authenticate, async (req, res) => {
     });
 
     const modelName = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-    const system = buildSystemPrompt({ ...profile, country: null, liveLocation });
+    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake });
 
     const result = streamText({
       model: openai(modelName),

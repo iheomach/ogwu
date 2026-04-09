@@ -15,6 +15,31 @@ function csvish(value) {
   return s.length > 0 ? s : null;
 }
 
+function buildTriageSection(intake) {
+  if (!intake) return '';
+
+  const lines = [];
+
+  if (intake.urgency) {
+    lines.push(`- Urgency assessed: ${intake.urgency}`);
+  }
+
+  if (Array.isArray(intake.answers) && intake.answers.length > 0) {
+    lines.push('- Triage Q&A (already answered — do NOT ask again):');
+    for (const { q, a } of intake.answers) {
+      if (q && a) lines.push(`    Q: ${q}\n    A: ${a}`);
+    }
+  }
+
+  if (intake.summary) {
+    lines.push(`- Triage summary: ${intake.summary}`);
+  }
+
+  if (lines.length === 0) return '';
+
+  return `\n\nPre-session triage (completed before this chat — treat as established context):\n${lines.join('\n')}`;
+}
+
 function buildSystemPrompt(profile) {
   const sex = csvish(profile?.biological_sex) || csvish(profile?.sex) || 'not provided';
   const age = profile?.age ?? computeAge(profile?.dob);
@@ -26,6 +51,8 @@ function buildSystemPrompt(profile) {
   // Prefer live GPS-derived location over stored profile state.
   const locationLine = liveLocation || (state !== 'not provided' ? state : null) || 'not provided';
 
+  const triageSection = buildTriageSection(profile?.triageIntake);
+
   return `You are Ogwu, an AI health assistant for patients in Nigeria and emerging markets.
 
 Patient profile (do NOT ask the patient to repeat any of this):
@@ -33,12 +60,13 @@ Patient profile (do NOT ask the patient to repeat any of this):
 - Age: ${age ?? 'not provided'}
 - Allergies: ${allergies}
 - Existing conditions: ${conditions}
-- Current location: ${locationLine}${liveLocation ? ' (from device GPS — use this for hospital search)' : ''}
+- Current location: ${locationLine}${liveLocation ? ' (from device GPS — use this for hospital search)' : ''}${triageSection}
 
 ## Your workflow
 
 ### Step 1 — Understand the complaint
-Ask focused clarifying questions. Do not overwhelm the patient. Triage urgency: emergency / urgent / routine / self_care.
+The patient's triage answers above are already known context. Skip any question already answered there.
+Ask only focused follow-up questions for anything still unclear. Triage urgency: emergency / urgent / routine / self_care.
 
 ### Step 2 — Search for hospitals
 Once you have the patient's location and enough symptom context, call searchHospitals.
