@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useChat } from '@ai-sdk/react';
@@ -50,6 +51,8 @@ function messageText(m: any): string {
 }
 
 export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
+  const [isInitialized, setIsInitialized] = useState(false);
+  
   const apiUrl = useMemo(() => {
     const base = process.env.EXPO_PUBLIC_API_URL;
     if (!base) return null;
@@ -63,11 +66,40 @@ export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
     isLoading,
     error,
     setInput,
+    setMessages,
   } = useChat({
     api: apiUrl || '/api/agent/chat',
     fetch: authedFetch as any,
     streamProtocol: 'text', // Backend uses toTextStreamResponse() which sends plain text deltas
   });
+
+  // Restore messages from AsyncStorage on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem('assistantMessages');
+        if (saved) {
+          setMessages(JSON.parse(saved));
+        }
+      } catch (err) {
+        console.error('Failed to restore assistant messages:', err);
+      } finally {
+        setIsInitialized(true);
+      }
+    })();
+  }, [setMessages]);
+
+  // Save messages to AsyncStorage whenever they change
+  useEffect(() => {
+    if (!isInitialized) return;
+    (async () => {
+      try {
+        await AsyncStorage.setItem('assistantMessages', JSON.stringify(messages));
+      } catch (err) {
+        console.error('Failed to save assistant messages:', err);
+      }
+    })();
+  }, [messages, isInitialized]);
 
   return (
     <SafeAreaView style={styles.container}>
