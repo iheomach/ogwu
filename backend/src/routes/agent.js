@@ -188,8 +188,9 @@ router.post('/chat', authenticate, async (req, res) => {
       },
     });
 
-    // Stream text deltas as plain text/event-stream (simplest format useChat supports).
-    const response = result.toTextStreamResponse();
+    // Convert to UI message stream (includes tool calls, thinking, and text).
+    // useChat will parse these events and display agent progress.
+    const response = result.toUIMessageStreamResponse();
 
     res.status(response.status);
     response.headers.forEach((value, key) => {

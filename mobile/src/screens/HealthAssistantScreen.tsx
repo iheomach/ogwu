@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -50,6 +50,39 @@ function messageText(m: any): string {
   return '';
 }
 
+function renderToolInvocation(part: any): ReactNode {
+  if (!part || !part.type?.startsWith('tool-')) return null;
+
+  const toolName = part.type.replace('tool-', '');
+  const state = part.state;
+  const input = part.input;
+  const output = part.output;
+  const errorText = part.errorText;
+
+  let statusText = '';
+  let statusColor = colors.grey500;
+
+  if (state === 'input-streaming') {
+    statusText = `🔄 ${toolName}: gathering input...`;
+    statusColor = colors.purple;
+  } else if (state === 'input-available') {
+    statusText = `⚙️ ${toolName}: processing...`;
+    statusColor = colors.purple;
+  } else if (state === 'output-available') {
+    statusText = `✓ ${toolName}: found results`;
+    statusColor = '#10b981';
+  } else if (state === 'output-error') {
+    statusText = `✗ ${toolName}: ${errorText || 'error'}`;
+    statusColor = colors.error;
+  }
+
+  return statusText ? (
+    <View key={`tool-${part.toolCallId}`} style={{ marginBottom: spacing.sm }}>
+      <Text style={{ color: statusColor, fontSize: 12, fontStyle: 'italic' }}>{statusText}</Text>
+    </View>
+  ) : null;
+}
+
 export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
   const [isInitialized, setIsInitialized] = useState(false);
   
@@ -70,7 +103,8 @@ export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
   } = useChat({
     api: apiUrl || '/api/agent/chat',
     fetch: authedFetch as any,
-    streamProtocol: 'text', // Backend uses toTextStreamResponse() which sends plain text deltas
+    // Uses default 'data' protocol which parses UI message stream
+    // (includes tool calls, tool results, and thinking steps)
   });
 
   // Restore messages from AsyncStorage on mount
@@ -123,22 +157,29 @@ export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
             {messages.map((m: any, idx: number) => {
               const role = (m as any)?.role;
               const text = messageText(m);
-              if (!text) return null;
+              const parts = (m as any)?.parts || [];
+              const toolParts = parts.filter((p: any) => p.type?.startsWith('tool-'));
 
-              const isUser = role === 'user';
               return (
-                <View
-                  key={(m as any)?.id || `${role}-${idx}`}
-                  style={{
-                    alignSelf: isUser ? 'flex-end' : 'flex-start',
-                    backgroundColor: isUser ? colors.purple : colors.grey100,
-                    padding: spacing.md,
-                    borderRadius: radius.md,
-                    marginBottom: spacing.sm,
-                    maxWidth: '92%',
-                  }}
-                >
-                  <Text style={{ color: isUser ? colors.white : colors.grey900, lineHeight: 20 }}>{text}</Text>
+                <View key={(m as any)?.id || `${role}-${idx}`}>
+                  {/* Text content */}
+                  {text && (
+                    <View
+                      style={{
+                        alignSelf: role === 'user' ? 'flex-end' : 'flex-start',
+                        backgroundColor: role === 'user' ? colors.purple : colors.grey100,
+                        padding: spacing.md,
+                        borderRadius: radius.md,
+                        marginBottom: spacing.sm,
+                        maxWidth: '92%',
+                      }}
+                    >
+                      <Text style={{ color: role === 'user' ? colors.white : colors.grey900, lineHeight: 20 }}>{text}</Text>
+                    </View>
+                  )}
+
+                  {/* Tool invocations */}
+                  {toolParts.map((part: any) => renderToolInvocation(part))}
                 </View>
               );
             })}
