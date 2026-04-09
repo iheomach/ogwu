@@ -1,5 +1,4 @@
 const express = require('express');
-const { Readable } = require('stream');
 
 const router = express.Router();
 
@@ -32,7 +31,7 @@ function normalizeUrgency(u) {
   return 'routine';
 }
 
-// Agent chat endpoint (streams Vercel AI SDK data stream)
+// Agent chat endpoint (streams AI SDK UI message stream over SSE)
 router.post('/chat', authenticate, async (req, res) => {
   try {
     const profile = await loadPatientProfile(req.user.id);
@@ -189,20 +188,11 @@ router.post('/chat', authenticate, async (req, res) => {
       },
     });
 
-    const response = result.toDataStreamResponse();
-
-    res.status(response.status);
-    response.headers.forEach((value, key) => {
-      res.setHeader(key, value);
-    });
-
-    if (!response.body) {
-      res.end();
-      return;
-    }
-
-    // Convert Web ReadableStream -> Node stream for Express.
-    Readable.fromWeb(response.body).pipe(res);
+    // In `ai@5`, `streamText()` returns a StreamTextResult with helpers that can
+    // stream SSE responses directly to a Node/Express `res`.
+    // `useChat` expects this UI message stream protocol.
+    result.pipeUIMessageStreamToResponse(res);
+    return;
   } catch (err) {
     res.status(400).json({ error: err?.message || 'Failed to run agent' });
   }
