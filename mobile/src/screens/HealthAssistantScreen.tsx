@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { useChat } from '@ai-sdk/react';
 import { fetch as expoFetch } from 'expo/fetch';
@@ -38,7 +39,6 @@ async function authedFetch(input: string, init?: RequestInit) {
 }
 
 function messageText(m: any): string {
-  // Vercel AI messages can be string content or structured parts depending on version.
   const c = (m as any)?.content;
   if (typeof c === 'string') return c;
   if (Array.isArray(c)) {
@@ -55,8 +55,6 @@ function renderToolInvocation(part: any): ReactNode {
 
   const toolName = part.type.replace('tool-', '');
   const state = part.state;
-  const input = part.input;
-  const output = part.output;
   const errorText = part.errorText;
 
   let statusText = '';
@@ -83,9 +81,41 @@ function renderToolInvocation(part: any): ReactNode {
   ) : null;
 }
 
+// Glass bubble for assistant messages
+const glassBubbleStyle = {
+  alignSelf: 'flex-start' as const,
+  backgroundColor: 'rgba(69, 0, 80, 0.06)',
+  borderWidth: 1,
+  borderColor: 'rgba(69, 0, 80, 0.12)',
+  padding: spacing.md,
+  borderRadius: 18,
+  marginBottom: spacing.sm,
+  maxWidth: '88%' as const,
+  shadowColor: colors.purple,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  elevation: 2,
+};
+
+// Solid bubble for user messages
+const userBubbleStyle = {
+  alignSelf: 'flex-end' as const,
+  backgroundColor: colors.purple,
+  padding: spacing.md,
+  borderRadius: 18,
+  marginBottom: spacing.sm,
+  maxWidth: '88%' as const,
+  shadowColor: colors.purple,
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.25,
+  shadowRadius: 10,
+  elevation: 4,
+};
+
 export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
   const [isInitialized, setIsInitialized] = useState(false);
-  
+
   const apiUrl = useMemo(() => {
     const base = process.env.EXPO_PUBLIC_API_URL;
     if (!base) return null;
@@ -96,7 +126,7 @@ export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
     messages,
     input,
     handleSubmit,
-    isLoading,
+    status,
     error,
     setInput,
     setMessages,
@@ -106,14 +136,13 @@ export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
     streamProtocol: 'data',
   });
 
-  // Restore messages from AsyncStorage on mount
+  const isLoading = status === 'submitted' || status === 'streaming';
+
   useEffect(() => {
     (async () => {
       try {
         const saved = await AsyncStorage.getItem('assistantMessages');
-        if (saved) {
-          setMessages(JSON.parse(saved));
-        }
+        if (saved) setMessages(JSON.parse(saved));
       } catch (err) {
         console.error('Failed to restore assistant messages:', err);
       } finally {
@@ -122,7 +151,6 @@ export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
     })();
   }, [setMessages]);
 
-  // Save messages to AsyncStorage whenever they change
   useEffect(() => {
     if (!isInitialized) return;
     (async () => {
@@ -135,24 +163,29 @@ export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
   }, [messages, isInitialized]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: '#FAF7FB' }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
       >
-        <View
-          style={[
-            styles.content,
-            { flex: 1, justifyContent: 'flex-start', opacity: busy ? 0.7 : 1 },
-          ]}
-        >
-          <View style={[styles.card, { marginBottom: 12 }]}>
-            <Text style={styles.value}>{t('assistant.title')}</Text>
-            <Text style={[styles.helper, { marginBottom: 0 }]}>{t('assistant.helper')}</Text>
-          </View>
+        <View style={{ flex: 1, opacity: busy ? 0.7 : 1 }}>
 
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 12 }}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 80 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Greeting bubble */}
+            <View style={glassBubbleStyle}>
+              <Text style={{ color: colors.purple, fontWeight: '700', fontSize: 14, marginBottom: 4 }}>
+                {t('assistant.title')}
+              </Text>
+              <Text style={{ color: colors.grey700, lineHeight: 20, fontSize: 14 }}>
+                {t('assistant.helper')}
+              </Text>
+            </View>
+
             {messages.map((m: any, idx: number) => {
               const role = (m as any)?.role;
               const text = messageText(m);
@@ -161,74 +194,98 @@ export function HealthAssistantScreen({ busy }: ScreenPropsBase) {
 
               return (
                 <View key={(m as any)?.id || `${role}-${idx}`}>
-                  {/* Text content */}
                   {text && (
-                    <View
-                      style={{
-                        alignSelf: role === 'user' ? 'flex-end' : 'flex-start',
-                        backgroundColor: role === 'user' ? colors.purple : colors.grey100,
-                        padding: spacing.md,
-                        borderRadius: radius.md,
-                        marginBottom: spacing.sm,
-                        maxWidth: '92%',
-                      }}
-                    >
-                      <Text style={{ color: role === 'user' ? colors.white : colors.grey900, lineHeight: 20 }}>{text}</Text>
+                    <View style={role === 'user' ? userBubbleStyle : glassBubbleStyle}>
+                      <Text style={{
+                        color: role === 'user' ? colors.white : colors.grey900,
+                        lineHeight: 20,
+                        fontSize: 15,
+                      }}>
+                        {text}
+                      </Text>
                     </View>
                   )}
-
-                  {/* Tool invocations */}
                   {toolParts.map((part: any) => renderToolInvocation(part))}
                 </View>
               );
             })}
 
             {isLoading && (
-              <View style={{ paddingVertical: 6 }}>
-                <ActivityIndicator color={colors.purple} />
+              <View style={[glassBubbleStyle, { paddingVertical: spacing.sm }]}>
+                <ActivityIndicator color={colors.purple} size="small" />
               </View>
             )}
 
             {!!error && (
-              <View style={[styles.card, { backgroundColor: colors.errorLight }]}>
-                <Text style={[styles.helper, { marginBottom: 0, color: colors.error }]}>
+              <View style={[glassBubbleStyle, { backgroundColor: 'rgba(239, 68, 68, 0.06)', borderColor: 'rgba(239, 68, 68, 0.2)' }]}>
+                <Text style={{ color: colors.error, fontSize: 14, lineHeight: 20 }}>
                   {String((error as any)?.message || error)}
                 </Text>
               </View>
             )}
           </ScrollView>
 
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-            <View style={{ flex: 1, marginRight: spacing.sm }}>
+          {/* Conjoined floating input bar */}
+          <View style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.sm,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'flex-end',
+              backgroundColor: 'rgba(255, 255, 255, 0.82)',
+              borderRadius: radius.full,
+              overflow: 'hidden',
+              shadowColor: colors.purple,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.1,
+              shadowRadius: 16,
+              elevation: 4,
+            }}>
               <TextInput
                 value={input}
                 onChangeText={(text) => setInput(text)}
                 placeholder={t('assistant.placeholder')}
-                placeholderTextColor={colors.grey500}
-                style={[styles.input, { minHeight: 44, maxHeight: 120 }]}
+                placeholderTextColor="rgba(107, 114, 128, 0.65)"
+                style={{
+                  flex: 1,
+                  minHeight: 48,
+                  maxHeight: 120,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: 12,
+                  fontSize: 15,
+                  color: colors.grey900,
+                  backgroundColor: 'transparent',
+                }}
                 multiline
               />
+              <TouchableOpacity
+                style={{
+                  width: 52,
+                  alignSelf: 'stretch',
+                  backgroundColor: (busy || isLoading || !apiUrl)
+                    ? 'rgba(69, 0, 80, 0.35)'
+                    : 'rgba(69, 0, 80, 0.6)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={() => handleSubmit()}
+                disabled={busy || isLoading || !apiUrl}
+                accessibilityRole="button"
+                activeOpacity={0.8}
+              >
+                {isLoading
+                  ? <ActivityIndicator color={colors.white} size="small" />
+                  : <MaterialIcons name="arrow-forward" size={22} color={colors.white} />
+                }
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[
-                styles.btnPrimary,
-                { paddingHorizontal: 16, paddingVertical: 12, marginTop: 0 },
-                (busy || isLoading || !apiUrl) && styles.btnPrimaryDisabled,
-              ]}
-              onPress={() => handleSubmit()}
-              disabled={busy || isLoading || !apiUrl}
-              accessibilityRole="button"
-              activeOpacity={0.85}
-            >
-              <Text style={styles.btnPrimaryText}>{isLoading ? t('assistant.thinking') : t('assistant.send')}</Text>
-            </TouchableOpacity>
           </View>
 
-          {!apiUrl && (
-            <Text style={[styles.helper, { marginTop: 10 }]}>
-              Missing EXPO_PUBLIC_API_URL
-            </Text>
-          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

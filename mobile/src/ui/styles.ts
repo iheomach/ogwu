@@ -1,8 +1,8 @@
 import { StyleSheet } from 'react-native';
 
 // Ogwu Design System
-// Minimal, clinical-clean with a confident purple accent
-// Inspired by Linear, Stripe, Clerk — tools that feel serious and trustworthy
+// Liquid-glass aesthetic: translucent surfaces, soft purple depth, pill shapes
+// Inspired by Apple's glass UI — serious, clinical, and alive
 
 export const colors = {
   purple: '#450050',
@@ -18,17 +18,32 @@ export const colors = {
   grey100: '#F5F5F5',
   white: '#FFFFFF',
 
+  // Screen background — barely-there lavender
+  bg: '#FAF7FB',
+
   error: '#EF4444',
-  errorLight: '#FEF2F2',
+  errorLight: 'rgba(239, 68, 68, 0.07)',
 
   warning: '#F59E0B',
-  warningLight: '#FFFBEB',
+  warningLight: 'rgba(245, 158, 11, 0.07)',
 
   urgent: '#F97316',
-  urgentLight: '#FFEDD5',
+  urgentLight: 'rgba(249, 115, 22, 0.07)',
 
   success: '#16A34A',
-  successLight: '#DCFCE7',
+  successLight: 'rgba(22, 163, 74, 0.07)',
+};
+
+// Glass tokens — reused across cards, inputs, dropdowns
+const glass = {
+  backgroundColor: 'rgba(255, 255, 255, 0.72)',
+  borderWidth: 1,
+  borderColor: 'rgba(69, 0, 80, 0.11)',
+  shadowColor: '#450050',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.07,
+  shadowRadius: 14,
+  elevation: 3,
 };
 
 export const font = {
@@ -40,8 +55,8 @@ export const font = {
 
 export const radius = {
   sm: 8,
-  md: 12,
-  lg: 16,
+  md: 14,
+  lg: 20,
   full: 999,
 };
 
@@ -58,7 +73,7 @@ export const styles = StyleSheet.create({
   // ─── Layout ────────────────────────────────────────────────────────────
   container: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.bg,
   },
   content: {
     flexGrow: 1,
@@ -138,24 +153,21 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   input: {
-    borderWidth: 1.5,
-    borderColor: colors.grey300,
+    ...glass,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 13,
     fontSize: 16,
     color: colors.black,
-    backgroundColor: colors.white,
     marginBottom: spacing.md,
   },
   inputFocused: {
     borderColor: colors.purple,
+    borderWidth: 1.5,
   },
   pickerContainer: {
-    borderWidth: 1.5,
-    borderColor: colors.grey300,
+    ...glass,
     borderRadius: radius.md,
-    backgroundColor: colors.white,
     marginBottom: spacing.md,
     overflow: 'hidden',
   },
@@ -173,12 +185,10 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   dropdownButton: {
-    borderWidth: 1.5,
-    borderColor: colors.grey300,
+    ...glass,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 13,
-    backgroundColor: colors.white,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -190,10 +200,8 @@ export const styles = StyleSheet.create({
   },
   dropdownMenu: {
     marginTop: spacing.xs,
-    borderWidth: 1.5,
-    borderColor: colors.grey300,
+    ...glass,
     borderRadius: radius.md,
-    backgroundColor: colors.white,
     overflow: 'hidden',
   },
   dropdownItem: {
@@ -204,7 +212,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   dropdownItemActive: {
-    backgroundColor: colors.purpleLight,
+    backgroundColor: 'rgba(69, 0, 80, 0.07)',
   },
   dropdownItemText: {
     fontSize: 15,
@@ -222,9 +230,16 @@ export const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: spacing.sm,
+    shadowColor: colors.purple,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    elevation: 5,
   },
   btnPrimaryDisabled: {
     backgroundColor: colors.purpleMid,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   btnPrimaryText: {
     color: colors.white,
@@ -244,8 +259,8 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
   },
   btnDestructive: {
-    borderWidth: 1.5,
-    borderColor: colors.grey300,
+    ...glass,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
     borderRadius: radius.md,
     paddingVertical: 15,
     alignItems: 'center',
@@ -259,18 +274,16 @@ export const styles = StyleSheet.create({
 
   // ─── Card / surface ──────────────────────────────────────────────────────
   card: {
-    backgroundColor: colors.white,
+    ...glass,
     borderRadius: radius.lg,
     padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.grey100,
   },
 
   // ─── Profile field row ───────────────────────────────────────────────────
   profileField: {
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.grey100,
+    borderBottomColor: 'rgba(69, 0, 80, 0.08)',
   },
   profileFieldLast: {
     borderBottomWidth: 0,
@@ -278,7 +291,9 @@ export const styles = StyleSheet.create({
 
   // ─── Pill / badge ─────────────────────────────────────────────────────────
   pill: {
-    backgroundColor: colors.purpleLight,
+    backgroundColor: 'rgba(69, 0, 80, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(69, 0, 80, 0.14)',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radius.full,
@@ -304,7 +319,7 @@ export const styles = StyleSheet.create({
   spacer: { flex: 1 },
   divider: {
     height: 1,
-    backgroundColor: colors.grey100,
+    backgroundColor: 'rgba(69, 0, 80, 0.08)',
     marginVertical: spacing.lg,
   },
   mt8: { marginTop: spacing.sm },

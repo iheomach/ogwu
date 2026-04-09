@@ -48,7 +48,7 @@ export function TabScaffold({
   children: React.ReactNode;
 }) {
   return (
-    <View style={{ flex: 1, backgroundColor: colors.white }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ flex: 1 }}>{children}</View>
 
       <SafeAreaView edges={['bottom']} style={styles.tabBarSafeArea}>
