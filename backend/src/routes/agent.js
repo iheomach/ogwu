@@ -188,9 +188,8 @@ router.post('/chat', authenticate, async (req, res) => {
       },
     });
 
-    // Convert StreamTextResult to UI message stream Response, then pipe to Express.
-    // This streams in the data protocol format that useChat expects.
-    const response = result.toUIMessageStreamResponse();
+    // Stream text deltas as plain text/event-stream (simplest format useChat supports).
+    const response = result.toTextStreamResponse();
 
     res.status(response.status);
     response.headers.forEach((value, key) => {
