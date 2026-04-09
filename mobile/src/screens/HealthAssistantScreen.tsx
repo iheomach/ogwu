@@ -149,6 +149,16 @@ export function HealthAssistantScreen({ busy, location }: ScreenPropsBase) {
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
+  const handleNewSession = async () => {
+    setMessages([]);
+    setInput('');
+    try {
+      await AsyncStorage.removeItem('assistantMessages');
+    } catch {
+      // Non-fatal
+    }
+  };
+
   // Derive a short label from whichever tool is currently active.
   const thinkingLabel = useMemo(() => {
     if (!isLoading) return null;
@@ -198,6 +208,37 @@ export function HealthAssistantScreen({ busy, location }: ScreenPropsBase) {
       >
         <View style={{ flex: 1, opacity: busy ? 0.7 : 1 }}>
 
+          {/* Toolbar */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.sm,
+            borderBottomWidth: 1,
+            borderBottomColor: 'rgba(69, 0, 80, 0.07)',
+          }}>
+            <Text style={{ color: colors.purple, fontWeight: '700', fontSize: 15 }}>
+              {t('assistant.title')}
+            </Text>
+            <TouchableOpacity
+              onPress={handleNewSession}
+              disabled={isLoading || messages.length === 0}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                opacity: messages.length === 0 ? 0.35 : 1,
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Start new session"
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="add-comment" size={16} color={colors.purple} />
+              <Text style={{ color: colors.purple, fontSize: 13, fontWeight: '600' }}>New chat</Text>
+            </TouchableOpacity>
+          </View>
+
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 80 }}
@@ -205,9 +246,6 @@ export function HealthAssistantScreen({ busy, location }: ScreenPropsBase) {
           >
             {/* Greeting bubble */}
             <View style={glassBubbleStyle}>
-              <Text style={{ color: colors.purple, fontWeight: '700', fontSize: 14, marginBottom: 4 }}>
-                {t('assistant.title')}
-              </Text>
               <Text style={{ color: colors.grey700, lineHeight: 20, fontSize: 14 }}>
                 {t('assistant.helper')}
               </Text>
