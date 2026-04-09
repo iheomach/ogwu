@@ -68,7 +68,7 @@ router.post('/chat', authenticate, async (req, res) => {
             has_emergency: z.boolean().optional(),
             tier: z.number().int().optional(),
             country: z.string().min(1).optional(),
-          }),
+          }).strict(),
           execute: async ({ specialty, state, has_emergency, tier, country }) => {
             let q = supabase
               .from('hospitals_directory')
@@ -98,7 +98,7 @@ router.post('/chat', authenticate, async (req, res) => {
             care_pathway: z.string().min(1),
             recommended_hospital_ids: z.array(z.string()).optional(),
             is_emergency_flagged: z.boolean().optional(),
-          }),
+          }).strict(),
           execute: async (params) => {
             const payload = {
               patient_id: profile.id,
@@ -129,7 +129,7 @@ router.post('/chat', authenticate, async (req, res) => {
             'Flag this consultation as an emergency requiring immediate action. Call this as soon as symptoms suggest an emergency — before other tools.',
           parameters: z.object({
             reason: z.string().min(1),
-          }),
+          }).strict(),
           execute: async ({ reason }) => {
             return {
               flagged: true,
@@ -145,7 +145,7 @@ router.post('/chat', authenticate, async (req, res) => {
             "Retrieve the patient's recent consult history.",
           parameters: z.object({
             limit: z.number().int().default(5),
-          }),
+          }).strict(),
           execute: async ({ limit }) => {
             const lim = Math.max(1, Math.min(10, Number(limit || 5)));
             const { data, error } = await supabase
@@ -164,7 +164,7 @@ router.post('/chat', authenticate, async (req, res) => {
             "Check if a medication is safe given the patient's allergies and existing conditions.",
           parameters: z.object({
             medication: z.string().min(1),
-          }),
+          }).strict(),
           execute: async ({ medication }) => {
             const med = safeText(medication, 80);
             const allergies = String(profile?.allergies || '')
