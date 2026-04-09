@@ -63,12 +63,12 @@ router.post('/chat', authenticate, async (req, res) => {
           description:
             'Search for hospitals by medical specialty and patient location. Call this when triage indicates a facility visit is needed.',
           parameters: z.object({
-            specialty: z.string(),
-            state: z.string(),
-            has_emergency: z.boolean().optional(),
-            tier: z.number().optional(),
-            country: z.string().optional().describe('Optional country code like NG or IN'),
-          }),
+            specialty: z.string().describe('Medical specialty (e.g. cardiology, orthopedics)'),
+            state: z.string().describe('State or region name'),
+            has_emergency: z.boolean().optional().describe('Whether hospital must have emergency department'),
+            tier: z.number().optional().describe('Hospital tier level (1-3)'),
+            country: z.string().optional().describe('Country code like NG or IN'),
+          }).describe('Hospital search parameters'),
           execute: async ({ specialty, state, has_emergency, tier, country }) => {
             let q = supabase
               .from('hospitals_directory')
@@ -91,14 +91,14 @@ router.post('/chat', authenticate, async (req, res) => {
           description:
             'Save a structured consult record once triage is complete. Call this automatically — do not ask the patient to initiate saving.',
           parameters: z.object({
-            complaint: z.string(),
-            urgency: z.enum(['emergency', 'urgent', 'routine', 'self_care']),
-            symptoms: z.array(z.string()),
-            recommended_specialty: z.string().optional(),
-            care_pathway: z.string(),
-            recommended_hospital_ids: z.array(z.string()).optional(),
-            is_emergency_flagged: z.boolean().optional(),
-          }),
+            complaint: z.string().describe('Chief complaint from patient'),
+            urgency: z.enum(['emergency', 'urgent', 'routine', 'self_care']).describe('Triage urgency level'),
+            symptoms: z.array(z.string().describe('Individual symptom')).describe('List of reported symptoms'),
+            recommended_specialty: z.string().optional().describe('Recommended medical specialty'),
+            care_pathway: z.string().describe('Recommended care pathway and next steps'),
+            recommended_hospital_ids: z.array(z.string()).optional().describe('Hospital IDs to recommend'),
+            is_emergency_flagged: z.boolean().optional().describe('Whether this is flagged as emergency'),
+          }).describe('Consult record to save'),
           execute: async (params) => {
             const payload = {
               patient_id: profile.id,
@@ -128,8 +128,8 @@ router.post('/chat', authenticate, async (req, res) => {
           description:
             'Flag this consultation as an emergency requiring immediate action. Call this as soon as symptoms suggest an emergency — before other tools.',
           parameters: z.object({
-            reason: z.string(),
-          }),
+            reason: z.string().describe('Reason why this is marked as emergency'),
+          }).describe('Emergency flag parameters'),
           execute: async ({ reason }) => {
             return {
               flagged: true,
@@ -144,8 +144,8 @@ router.post('/chat', authenticate, async (req, res) => {
           description:
             "Retrieve the patient's recent consult history.",
           parameters: z.object({
-            limit: z.number().default(5),
-          }),
+            limit: z.number().default(5).describe('Number of recent consults to retrieve (max 10)'),
+          }).describe('Patient history retrieval parameters'),
           execute: async ({ limit }) => {
             const lim = Math.max(1, Math.min(10, Number(limit || 5)));
             const { data, error } = await supabase
@@ -163,8 +163,8 @@ router.post('/chat', authenticate, async (req, res) => {
           description:
             "Check if a medication is safe given the patient's allergies and existing conditions.",
           parameters: z.object({
-            medication: z.string(),
-          }),
+            medication: z.string().describe('Medication name to check for interactions'),
+          }).describe('Drug interaction check parameters'),
           execute: async ({ medication }) => {
             const med = safeText(medication, 80);
             const allergies = String(profile?.allergies || '')
