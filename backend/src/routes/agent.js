@@ -215,38 +215,30 @@ router.post('/chat', authenticate, async (req, res) => {
                 return { error: 'no_location', message: 'Location is required. Ask the patient for their city or state before searching.' };
               }
 
-              let q = supabase
+              const baseQuery = () => supabase
                 .from('hospitals_directory')
                 .select('id,name,city,state,type,tier,specialties,phone,website,has_emergency,is_onboarded')
-                .eq('is_active', true)
-                .ilike('state', `%${stateClean}%`);
+                .eq('is_active', true);
 
+              // Primary: match by state name
+              let q = baseQuery().ilike('state', `%${stateClean}%`);
               if (has_emergency) q = q.eq('has_emergency', true);
 
-              if (specialty) {
-                q = q.ilike('specialties::text', `%${String(specialty)}%`);
-              }
-
               const { data, error } = await q.limit(5);
-              console.log(`[searchHospitals] primary query → ${data?.length ?? 0} results, error=${error?.message}`);
+              console.log(`[searchHospitals] state query → ${data?.length ?? 0} results, error=${error?.message}`);
               if (error) return { error: 'db_error', message: error.message };
 
-              if (!data || data.length === 0) {
-                // Retry without specialty filter.
-                const { data: fallback, error: fbErr } = await supabase
-                  .from('hospitals_directory')
-                  .select('id,name,city,state,type,tier,specialties,phone,website,has_emergency,is_onboarded')
-                  .eq('is_active', true)
-                  .ilike('state', `%${stateClean}%`)
-                  .limit(5);
-                console.log(`[searchHospitals] fallback query → ${fallback?.length ?? 0} results, error=${fbErr?.message}`);
-                if (fbErr) return { error: 'db_error', message: fbErr.message };
-                if (!fallback || fallback.length === 0) {
-                  return { error: 'no_hospitals', message: `No hospitals found in "${stateClean}". Tell the patient no results were found and advise them to call emergency services (199 or 112) or search Google Maps for nearby clinics.` };
-                }
-                return { hospitals: fallback, note: 'No exact specialty match — showing all hospitals in the area.' };
+              if (data && data.length > 0) return { hospitals: data };
+
+              // Fallback 1: state didn't match (e.g. patient outside NG/IN) — return closest hospitals overall
+              const { data: anywhere, error: anyErr } = await baseQuery()
+                .limit(5);
+              console.log(`[searchHospitals] anywhere fallback → ${anywhere?.length ?? 0} results, error=${anyErr?.message}`);
+              if (anyErr) return { error: 'db_error', message: anyErr.message };
+              if (!anywhere || anywhere.length === 0) {
+                return { error: 'no_hospitals', message: 'No hospitals found in the network. Tell the patient to call emergency services (199 or 112) or search Google Maps for nearby clinics.' };
               }
-              return { hospitals: data };
+              return { hospitals: anywhere, note: `No hospitals found near "${stateClean}" — showing available hospitals in the network instead. Inform the patient of this.` };
             } catch (e) {
               return { error: 'unexpected', message: String(e?.message ?? e) };
             }

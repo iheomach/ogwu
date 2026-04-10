@@ -305,14 +305,29 @@ const HOSPITALS = [
   // Dadra & Nagar Haveli (UT)
   { name: 'Government Hospital Silvassa', city: 'Silvassa', state: 'Dadra and Nagar Haveli', type: 'public', tier: 2, specialties: ['general practice', 'surgery', 'obstetrics', 'paediatrics'], phone: '+910260264012', website: null, has_emergency: true, is_onboarded: false },
   { name: 'District Hospital Daman', city: 'Daman', state: 'Dadra and Nagar Haveli', type: 'public', tier: 2, specialties: ['general practice', 'surgery', 'paediatrics'], phone: '+910260255678', website: null, has_emergency: true, is_onboarded: false },
+
+  // ── UNITED STATES (test data) ────────────────────────────────────────────────
+  // California
+  { name: 'Cedars-Sinai Medical Center', city: 'Los Angeles', state: 'California', type: 'private', tier: 3, specialties: ['general practice', 'cardiology', 'oncology', 'neurology', 'urology', 'surgery', 'obstetrics'], phone: '+13104231000', website: 'https://cedars-sinai.org', has_emergency: true, is_onboarded: false },
+  { name: 'UCLA Medical Center', city: 'Los Angeles', state: 'California', type: 'public', tier: 3, specialties: ['general practice', 'internal medicine', 'cardiology', 'oncology', 'neurology', 'urology', 'surgery'], phone: '+13108252111', website: 'https://uclahealth.org', has_emergency: true, is_onboarded: false },
+  { name: 'UCSF Medical Center', city: 'San Francisco', state: 'California', type: 'public', tier: 3, specialties: ['general practice', 'internal medicine', 'cardiology', 'oncology', 'transplant', 'neurology', 'urology'], phone: '+14154762000', website: 'https://ucsfhealth.org', has_emergency: true, is_onboarded: false },
+  { name: 'Stanford Health Care', city: 'Palo Alto', state: 'California', type: 'private', tier: 3, specialties: ['general practice', 'cardiology', 'oncology', 'neurology', 'surgery', 'transplant', 'urology'], phone: '+16507236661', website: 'https://stanfordhealthcare.org', has_emergency: true, is_onboarded: false },
+  { name: 'Kaiser Permanente Los Angeles', city: 'Los Angeles', state: 'California', type: 'private', tier: 3, specialties: ['general practice', 'internal medicine', 'obstetrics', 'paediatrics', 'urology', 'surgery'], phone: '+12134401200', website: 'https://kp.org', has_emergency: true, is_onboarded: false },
 ];
 
-// Nigerian states/territories
 const NG_STATES = new Set([
   'Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno',
   'Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','FCT','Gombe','Imo',
   'Jigawa','Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos','Nasarawa',
   'Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto','Taraba','Yobe','Zamfara',
+]);
+const IN_STATES = new Set([
+  'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat',
+  'Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh',
+  'Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan',
+  'Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal',
+  'Chandigarh','Delhi','Puducherry','Andaman and Nicobar Islands','Jammu & Kashmir',
+  'Ladakh','Lakshadweep','Dadra and Nagar Haveli',
 ]);
 
 async function seed() {
@@ -326,10 +341,10 @@ async function seed() {
     const batch = HOSPITALS.slice(i, i + BATCH).map((h) => ({
       ...h,
       is_active: true,
-      country: NG_STATES.has(h.state) ? 'NG' : 'IN',
+      country: NG_STATES.has(h.state) ? 'NG' : IN_STATES.has(h.state) ? 'IN' : 'US',
       admin1: h.state,
     }));
-    const { error } = await supabase.from('hospitals_directory').insert(batch);
+    const { error } = await supabase.from('hospitals_directory').upsert(batch, { onConflict: 'country,admin1,name', ignoreDuplicates: true });
     if (error) {
       console.error(`Batch ${i / BATCH + 1} failed:`, error.message);
       process.exit(1);

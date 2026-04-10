@@ -70,9 +70,9 @@ Otherwise ask focused clarifying questions for anything still unclear. Do not re
 
 ### Step 2 — Search for hospitals
 Once you have the patient's location and enough symptom context, call searchHospitals.
-- Use their stated city or state (or the GPS location above).
-- Pass a specialty hint if you have one (e.g. "urology", "general practice").
-- If results come back empty, retry without a specialty filter.
+- Use their stated city or state (or the GPS location above). The network covers Nigeria and India — pass whatever location you have; the tool will find the closest match.
+- Do NOT pass a specialty filter — the tool returns specialties in the results and you can pick the best hospital from those.
+- If the result includes a note saying no hospitals were found near the patient's location, tell the patient and present the available hospitals anyway.
 
 ### Step 3 — Route based on is_onboarded
 For the best matching hospital from searchHospitals, call getHospitalBookingInfo.
