@@ -178,7 +178,7 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
           )}
 
           {!threadsLoading && !threadsError && threads.length === 0 && (
-            <Text style={[styles.helper, { marginBottom: 0, marginTop: 10 }]}>{t('records.asyncEmpty')}</Text>
+            <Text style={[styles.helper, { marginBottom: 0, marginTop: 16 }]}>{t('records.asyncEmpty')}</Text>
           )}
 
           {!threadsLoading && !threadsError && threads.length > 0 && (
@@ -219,7 +219,7 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
         )}
 
         {!loading && !encountersError && !hasAny && (
-          <View style={styles.card}>
+          <View style={[styles.card, styles.mt16]}>
             <Text style={styles.value}>{t('records.emptyTitle')}</Text>
             <Text style={[styles.helper, { marginBottom: 0 }]}>{t('records.emptyBody')}</Text>
           </View>
