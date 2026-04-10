@@ -199,7 +199,7 @@ router.post('/chat', authenticate, async (req, res) => {
       model: openai(modelName),
       system,
       messages,
-      maxSteps: 10,
+      maxSteps: 20,
       tools: {
         // ── 1. Search hospitals ──────────────────────────────────────────────
         searchHospitals: tool({
@@ -517,7 +517,10 @@ Thank you.`;
             break;
           case 'tool-input-start': writePart('b', { toolCallId: part.id, toolName: part.toolName }); break;
           case 'tool-input-delta': writePart('c', { toolCallId: part.id, argsTextDelta: part.delta }); break;
-          case 'tool-call':    writePart('9', { toolCallId: part.toolCallId, toolName: part.toolName, args: part.input }); break;
+          case 'tool-call':
+            console.log(`[agent] tool-call: ${part.toolName} userId=${req.user?.id}`);
+            writePart('9', { toolCallId: part.toolCallId, toolName: part.toolName, args: part.input });
+            break;
           case 'tool-result':  writePart('a', { toolCallId: part.toolCallId, result: part.output }); break;
           case 'start-step':   writePart('f', { messageId: `step-${Date.now()}` }); break;
           case 'finish-step':
