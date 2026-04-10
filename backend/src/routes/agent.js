@@ -140,7 +140,7 @@ router.post('/chat', authenticate, async (req, res) => {
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
     const liveLocation = safeText(req.body?.location, 100) || null;
 
-    const [{ streamText, tool }, { openai }, { z }] = await Promise.all([
+    const [{ streamText, tool, stepCountIs }, { openai }, { z }] = await Promise.all([
       import('ai'),
       import('@ai-sdk/openai'),
       import('zod'),
@@ -199,7 +199,7 @@ router.post('/chat', authenticate, async (req, res) => {
       model: openai(modelName),
       system,
       messages,
-      maxSteps: 20,
+      stopWhen: stepCountIs(20),
       tools: {
         // ── 1. Search hospitals ──────────────────────────────────────────────
         searchHospitals: tool({
