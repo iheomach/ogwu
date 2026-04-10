@@ -502,9 +502,11 @@ Thank you.`;
 
     let hasText = false;
     let finishPart = null;
+    let stepCount = 0;
 
     try {
       for await (const part of result.fullStream) {
+        console.log(`[stream] type=${part.type}${part.toolName ? ` tool=${part.toolName}` : ''}${part.finishReason ? ` reason=${part.finishReason}` : ''}`);
         switch (part.type) {
           case 'text-delta':
             hasText = true;
@@ -513,14 +515,17 @@ Thank you.`;
           case 'tool-input-start': writePart('b', { toolCallId: part.id, toolName: part.toolName }); break;
           case 'tool-input-delta': writePart('c', { toolCallId: part.id, argsTextDelta: part.delta }); break;
           case 'tool-call':
-            console.log(`[agent] tool-call: ${part.toolName} userId=${req.user?.id}`);
             writePart('9', { toolCallId: part.toolCallId, toolName: part.toolName, args: part.input });
             break;
           case 'tool-result':
-            console.log(`[agent] tool-result: ${JSON.stringify(part.output).slice(0, 200)}`);
+            console.log(`[stream] tool-result output: ${JSON.stringify(part.output).slice(0, 300)}`);
             writePart('a', { toolCallId: part.toolCallId, result: part.output });
             break;
-          case 'start-step':   writePart('f', { messageId: `step-${Date.now()}` }); break;
+          case 'start-step':
+            stepCount++;
+            console.log(`[stream] --- step ${stepCount} start ---`);
+            writePart('f', { messageId: `step-${Date.now()}` });
+            break;
           case 'finish-step':
             writePart('e', {
               finishReason: part.finishReason,
@@ -532,11 +537,13 @@ Thank you.`;
             finishPart = part;
             break;
           case 'error':
+            console.error(`[stream] error event:`, part.error);
             writePart('3', String(part.error?.message ?? part.error ?? 'Unknown error'));
             break;
         }
       }
     } catch (streamErr) {
+      console.error(`[stream] caught:`, streamErr?.message);
       writePart('3', String(streamErr?.message ?? 'Stream error'));
     }
 
