@@ -210,6 +210,7 @@ router.post('/chat', authenticate, async (req, res) => {
           execute: async ({ state, specialty, has_emergency }) => {
             try {
               const stateClean = String(state || '').trim();
+              console.log(`[searchHospitals] state="${stateClean}" specialty="${specialty}" has_emergency=${has_emergency}`);
               if (!stateClean) {
                 return { error: 'no_location', message: 'Location is required. Ask the patient for their city or state before searching.' };
               }
@@ -227,6 +228,7 @@ router.post('/chat', authenticate, async (req, res) => {
               }
 
               const { data, error } = await q.limit(5);
+              console.log(`[searchHospitals] primary query → ${data?.length ?? 0} results, error=${error?.message}`);
               if (error) return { error: 'db_error', message: error.message };
 
               if (!data || data.length === 0) {
@@ -237,6 +239,7 @@ router.post('/chat', authenticate, async (req, res) => {
                   .eq('is_active', true)
                   .ilike('state', `%${stateClean}%`)
                   .limit(5);
+                console.log(`[searchHospitals] fallback query → ${fallback?.length ?? 0} results, error=${fbErr?.message}`);
                 if (fbErr) return { error: 'db_error', message: fbErr.message };
                 if (!fallback || fallback.length === 0) {
                   return { error: 'no_hospitals', message: `No hospitals found in "${stateClean}". Tell the patient no results were found and advise them to call emergency services (199 or 112) or search Google Maps for nearby clinics.` };
@@ -521,7 +524,10 @@ Thank you.`;
             console.log(`[agent] tool-call: ${part.toolName} userId=${req.user?.id}`);
             writePart('9', { toolCallId: part.toolCallId, toolName: part.toolName, args: part.input });
             break;
-          case 'tool-result':  writePart('a', { toolCallId: part.toolCallId, result: part.output }); break;
+          case 'tool-result':
+            console.log(`[agent] tool-result: ${JSON.stringify(part.output).slice(0, 200)}`);
+            writePart('a', { toolCallId: part.toolCallId, result: part.output });
+            break;
           case 'start-step':   writePart('f', { messageId: `step-${Date.now()}` }); break;
           case 'finish-step':
             writePart('e', {
