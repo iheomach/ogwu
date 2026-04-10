@@ -68,7 +68,6 @@ function impactLines(intake: TriageIntake | null): string[] {
 
 export function HomeScreen({
   busy,
-  phoneLabel,
   profile,
 }: HomeScreenProps) {
   const displayFirstName =
@@ -108,22 +107,10 @@ export function HomeScreen({
         style={{ flex: 1 }}
         contentContainerStyle={[styles.content, { justifyContent: 'flex-start', opacity: busy ? 0.7 : 1 }]}
       >
-      {/* Header */}
-      <View style={[styles.rowBetween, { marginBottom: 32 }]}>
-        <View style={styles.brandRow}>
-          <View style={styles.brandDot} />
-          <Text style={styles.brandName}>{t('common.appName')}</Text>
-        </View>
-        <View style={styles.pill}>
-          <Text style={styles.pillText}>{t('home.rolePatient')}</Text>
-        </View>
-      </View>
-
       {/* Greeting */}
-      <Text style={styles.title}>
+      <Text style={[styles.title, { marginTop: 8 }]}>
         {displayFirstName ? t('home.hi', { name: displayFirstName }) : t('home.hello')}
       </Text>
-      <Text style={[styles.helper, { marginBottom: 8 }]}>{phoneLabel}</Text>
       <View style={[styles.divider, { marginVertical: 8 }]} />
       <View style={styles.mt8} />
       <Text style={[styles.label, { marginBottom: 12 }]}>{t('home.yourAnalytics')}</Text>

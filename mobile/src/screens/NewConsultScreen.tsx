@@ -270,12 +270,7 @@ export function NewConsultScreen({ busy, onViewIntake, onOpenThread }: NewConsul
           <TouchableOpacity style={styles.btnGhost} onPress={() => setSelectedDoctorId(null)} disabled={busy}>
             <Text style={styles.btnGhostText}>{t('consult.backToDoctors')}</Text>
           </TouchableOpacity>
-        ) : (
-          <View style={[styles.brandRow, { marginBottom: 16 }]}>
-            <View style={styles.brandDot} />
-            <Text style={styles.brandName}>{t('common.appName')}</Text>
-          </View>
-        )}
+        ) : null}
 
         {!selectedDoctor && (
           <>

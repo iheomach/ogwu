@@ -104,11 +104,6 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
             <Text style={styles.btnGhostText}>{t('common.back')}</Text>
           </TouchableOpacity>
 
-          <View style={[styles.brandRow, { marginBottom: 16 }]}>
-            <View style={styles.brandDot} />
-            <Text style={styles.brandName}>{t('common.appName')}</Text>
-          </View>
-
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.helper}>{t('thread.helper')}</Text>
 

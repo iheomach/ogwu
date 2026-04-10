@@ -68,11 +68,6 @@ export function ProfileScreen({
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { justifyContent: 'flex-start' }]}>
-        <View style={[styles.brandRow, { marginBottom: 16 }]}>
-          <View style={styles.brandDot} />
-          <Text style={styles.brandName}>{t('common.appName')}</Text>
-        </View>
-
         <Text style={styles.title}>{t('profile.title')}</Text>
         <Text style={styles.helper}>{phoneLabel}</Text>
 

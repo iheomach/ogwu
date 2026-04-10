@@ -120,11 +120,6 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
         style={{ flex: 1 }}
         contentContainerStyle={[styles.content, { justifyContent: 'flex-start', opacity: busy ? 0.7 : 1 }]}
       >
-        <View style={[styles.brandRow, { marginBottom: 16 }]}>
-          <View style={styles.brandDot} />
-          <Text style={styles.brandName}>{t('common.appName')}</Text>
-        </View>
-
         <Text style={styles.title}>{t('records.title')}</Text>
         <Text style={styles.helper}>{t('records.helper')}</Text>
 
