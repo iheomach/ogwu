@@ -497,7 +497,12 @@ export function AppRouter() {
 
       {screen === 'newConsult' && (
         <TabScaffold activeTab="newConsult" onNavigate={goTab}>
-          <HealthAssistantScreen busy={busy} location={formatLocation(locationSummary)} />
+          <HealthAssistantScreen
+            busy={busy}
+            location={formatLocation(locationSummary)}
+            lat={locationSummary?.lat ?? null}
+            lon={locationSummary?.lon ?? null}
+          />
         </TabScaffold>
       )}
 

@@ -14,6 +14,18 @@ function safeText(s, maxLen) {
   return out.length > maxLen ? out.slice(0, maxLen) : out;
 }
 
+/** Great-circle distance in km between two lat/lon pairs (Haversine formula). */
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 async function loadPatientProfile(userId) {
   const { data, error } = await supabase
     .from('profiles')
@@ -139,6 +151,8 @@ router.post('/chat', authenticate, async (req, res) => {
 
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
     const liveLocation = safeText(req.body?.location, 100) || null;
+    const patientLat = typeof req.body?.lat === 'number' ? req.body.lat : null;
+    const patientLon = typeof req.body?.lon === 'number' ? req.body.lon : null;
 
     const [{ streamText, tool, stepCountIs }, { openai }, { z }] = await Promise.all([
       import('ai'),
@@ -147,7 +161,7 @@ router.post('/chat', authenticate, async (req, res) => {
     ]);
 
     const searchHospitalsSchema = z.object({
-      state: z.string().describe('Nigerian state or city the patient is in, e.g. Lagos, Abuja'),
+      state: z.string().optional().describe('City or state the patient is in (used as fallback if GPS is unavailable), e.g. Lagos, Abuja, California'),
       specialty: z.string().optional().describe('Medical specialty hint, e.g. urology, general practice'),
       has_emergency: z.boolean().optional().describe('True if emergency capability is required'),
     });
@@ -204,41 +218,62 @@ router.post('/chat', authenticate, async (req, res) => {
         // ── 1. Search hospitals ──────────────────────────────────────────────
         searchHospitals: tool({
           description:
-            'Search for hospitals near the patient. Call this once you know their location. ' +
-            'Returns hospitals with is_onboarded flag — use that to decide next steps.',
+            'Search for hospitals near the patient. If GPS coordinates are available they are used automatically ' +
+            'for Haversine distance ranking — just call this tool and the closest hospitals are returned. ' +
+            'Pass state/city only as a fallback hint when GPS is unavailable. ' +
+            'Returns hospitals sorted by proximity with is_onboarded flag — use that to decide next steps.',
           inputSchema: searchHospitalsSchema,
-          execute: async ({ state, specialty, has_emergency }) => {
+          execute: async ({ state, has_emergency }) => {
             try {
               const stateClean = String(state || '').trim();
-              console.log(`[searchHospitals] state="${stateClean}" specialty="${specialty}" has_emergency=${has_emergency}`);
-              if (!stateClean) {
+              const hasCoords = patientLat != null && patientLon != null;
+              console.log(`[searchHospitals] state="${stateClean}" has_emergency=${has_emergency} patientCoords=${hasCoords ? `${patientLat},${patientLon}` : 'none'}`);
+
+              // Fetch all active hospitals with coordinates
+              let q = supabase
+                .from('hospitals_directory')
+                .select('id,name,city,state,country,type,tier,specialties,phone,website,has_emergency,is_onboarded,lat,lon')
+                .eq('is_active', true);
+              if (has_emergency) q = q.eq('has_emergency', true);
+
+              const { data: all, error } = await q.limit(200);
+              if (error) return { error: 'db_error', message: error.message };
+              if (!all || all.length === 0) {
+                return { error: 'no_hospitals', message: 'No hospitals found in the network. Tell the patient to call emergency services (199 or 112) or search Google Maps for nearby clinics.' };
+              }
+
+              let ranked;
+
+              if (hasCoords) {
+                // Haversine ranking: attach distance_km, sort ascending, take top 5
+                ranked = all
+                  .map((h) => ({
+                    ...h,
+                    distance_km: (h.lat != null && h.lon != null)
+                      ? Math.round(haversineKm(patientLat, patientLon, h.lat, h.lon))
+                      : 99999,
+                  }))
+                  .sort((a, b) => a.distance_km - b.distance_km)
+                  .slice(0, 5)
+                  .map(({ lat: _lat, lon: _lon, ...rest }) => rest); // strip raw coords from LLM response
+                console.log(`[searchHospitals] Haversine top-5 distances: ${ranked.map((h) => `${h.name} ${h.distance_km}km`).join(' | ')}`);
+              } else if (stateClean) {
+                // Fallback: text-match on state
+                const stateMatches = all.filter((h) =>
+                  h.state?.toLowerCase().includes(stateClean.toLowerCase())
+                );
+                ranked = (stateMatches.length > 0 ? stateMatches : all).slice(0, 5)
+                  .map(({ lat: _lat, lon: _lon, ...rest }) => rest);
+                const note = stateMatches.length === 0
+                  ? `No hospitals found near "${stateClean}" — showing available hospitals in the network instead. Inform the patient of this.`
+                  : undefined;
+                console.log(`[searchHospitals] state-text match → ${stateMatches.length} results`);
+                return { hospitals: ranked, ...(note ? { note } : {}) };
+              } else {
                 return { error: 'no_location', message: 'Location is required. Ask the patient for their city or state before searching.' };
               }
 
-              const baseQuery = () => supabase
-                .from('hospitals_directory')
-                .select('id,name,city,state,type,tier,specialties,phone,website,has_emergency,is_onboarded')
-                .eq('is_active', true);
-
-              // Primary: match by state name
-              let q = baseQuery().ilike('state', `%${stateClean}%`);
-              if (has_emergency) q = q.eq('has_emergency', true);
-
-              const { data, error } = await q.limit(5);
-              console.log(`[searchHospitals] state query → ${data?.length ?? 0} results, error=${error?.message}`);
-              if (error) return { error: 'db_error', message: error.message };
-
-              if (data && data.length > 0) return { hospitals: data };
-
-              // Fallback 1: state didn't match (e.g. patient outside NG/IN) — return closest hospitals overall
-              const { data: anywhere, error: anyErr } = await baseQuery()
-                .limit(5);
-              console.log(`[searchHospitals] anywhere fallback → ${anywhere?.length ?? 0} results, error=${anyErr?.message}`);
-              if (anyErr) return { error: 'db_error', message: anyErr.message };
-              if (!anywhere || anywhere.length === 0) {
-                return { error: 'no_hospitals', message: 'No hospitals found in the network. Tell the patient to call emergency services (199 or 112) or search Google Maps for nearby clinics.' };
-              }
-              return { hospitals: anywhere, note: `No hospitals found near "${stateClean}" — showing available hospitals in the network instead. Inform the patient of this.` };
+              return { hospitals: ranked };
             } catch (e) {
               return { error: 'unexpected', message: String(e?.message ?? e) };
             }

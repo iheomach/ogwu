@@ -123,7 +123,7 @@ const TOOL_LABELS: Record<string, string> = {
   checkDrugInteraction: 'Checking medication safety...',
 };
 
-export function HealthAssistantScreen({ busy, location }: ScreenPropsBase) {
+export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsBase) {
   const [isInitialized, setIsInitialized] = useState(false);
 
   const apiUrl = useMemo(() => {
@@ -144,7 +144,11 @@ export function HealthAssistantScreen({ busy, location }: ScreenPropsBase) {
     api: apiUrl || '/api/agent/chat',
     fetch: authedFetch as any,
     streamProtocol: 'data',
-    body: location ? { location } : undefined,
+    body: {
+      ...(location ? { location } : {}),
+      ...(lat != null ? { lat } : {}),
+      ...(lon != null ? { lon } : {}),
+    },
   });
 
   const isLoading = status === 'submitted' || status === 'streaming';

@@ -30,6 +30,8 @@ export type AppScreen =
 export type ScreenPropsBase = {
   busy: boolean;
   location?: string | null;
+  lat?: number | null;
+  lon?: number | null;
 };
 
 export type PhoneScreenProps = ScreenPropsBase & {

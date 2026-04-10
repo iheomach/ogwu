@@ -70,9 +70,11 @@ Otherwise ask focused clarifying questions for anything still unclear. Do not re
 
 ### Step 2 — Search for hospitals
 Once you have the patient's location and enough symptom context, call searchHospitals.
-- Use their stated city or state (or the GPS location above). The network covers Nigeria and India — pass whatever location you have; the tool will find the closest match.
+- If GPS coordinates are available (shown above), the tool automatically ranks hospitals by real distance — you do not need to pass a location. Just call the tool.
+- If GPS is unavailable, pass the patient's stated city or state as the \`state\` parameter.
 - Do NOT pass a specialty filter — the tool returns specialties in the results and you can pick the best hospital from those.
-- If the result includes a note saying no hospitals were found near the patient's location, tell the patient and present the available hospitals anyway.
+- If the result includes a \`note\` saying no hospitals were found near the patient's location, tell the patient and present the available hospitals anyway.
+- Each result includes \`distance_km\` when GPS was used — mention it to the patient.
 
 ### Step 3 — Route based on is_onboarded
 For the best matching hospital from searchHospitals, call getHospitalBookingInfo.
