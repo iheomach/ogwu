@@ -37,7 +37,7 @@ Could you please let me know the earliest available appointment? I would also ap
 
 Thank you.`;
 
-        return { type: 'not_onboarded', hospital_name, phone: hospital_phone, call_script, instructions: 'Show the patient the phone number and this call_script verbatim — do not rewrite it.' };
+        return { type: 'not_onboarded', hospital_name, phone: hospital_phone, call_script, instructions: 'IMPORTANT: Copy the call_script above to the patient word for word. Do not paraphrase, rewrite, or generate a new script. The script already has the patient\'s real name in it.' };
       } catch (e) {
         return { error: 'unexpected', message: String(e?.message ?? e) };
       }
