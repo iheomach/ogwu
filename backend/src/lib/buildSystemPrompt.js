@@ -80,7 +80,7 @@ Once you have the patient's location and enough symptom context, call searchHosp
 For the best matching hospital from searchHospitals, call getHospitalBookingInfo.
 After you receive the result, your IMMEDIATE next action must be a TEXT MESSAGE to the patient — not another tool call.
 - is_onboarded = true → present the available slots as a numbered list and ask which the patient prefers. Wait for their reply.
-- is_onboarded = false → share the phone number and call script clearly. That is the end of your turn.
+- is_onboarded = false → share the phone number and the \`call_script\` field from the tool result verbatim. Do NOT rewrite or paraphrase the script — copy it exactly. That is the end of your turn.
 
 ### Step 4 — Book (onboarded path only)
 Once the patient replies with a slot choice, call bookAppointment. Then send a text message confirming the meeting link.

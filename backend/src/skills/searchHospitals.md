@@ -1,0 +1,1 @@
+Search for hospitals near the patient. If GPS coordinates are available they are used automatically for Haversine distance ranking — just call this tool and the closest hospitals are returned. Pass state/city only as a fallback hint when GPS is unavailable. Returns hospitals sorted by proximity with is_onboarded flag — use that to decide next steps.

@@ -1,0 +1,1 @@
+After searchHospitals, call this for the best matching hospital. If is_onboarded=true, returns available Google Meet slots. If is_onboarded=false, returns a phone number and a ready-to-read call script personalised with the patient's name and complaint.
