@@ -33,13 +33,13 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
                 : 99999,
             }))
             .sort((a, b) => a.distance_km - b.distance_km)
-            .slice(0, 5)
+            .slice(0, 3)
             .map(({ lat: _lat, lon: _lon, ...rest }) => rest);
-          console.log(`[searchHospitals] top-5: ${ranked.map((h) => `${h.name} ${h.distance_km}km`).join(' | ')}`);
+          console.log(`[searchHospitals] top-3: ${ranked.map((h) => `${h.name} ${h.distance_km}km`).join(' | ')}`);
         } else if (stateClean) {
           const matches = all.filter((h) => h.state?.toLowerCase().includes(stateClean.toLowerCase()));
           const pool = matches.length > 0 ? matches : all;
-          ranked = pool.slice(0, 5).map(({ lat: _lat, lon: _lon, ...rest }) => rest);
+          ranked = pool.slice(0, 3).map(({ lat: _lat, lon: _lon, ...rest }) => rest);
           const note = matches.length === 0
             ? `No hospitals found near "${stateClean}" — showing available hospitals in the network instead. Inform the patient.`
             : undefined;

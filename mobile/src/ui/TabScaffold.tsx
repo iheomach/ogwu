@@ -42,10 +42,12 @@ export function TabScaffold({
   activeTab,
   onNavigate,
   children,
+  locale: _locale,
 }: {
   activeTab: TabKey;
   onNavigate: (tab: TabKey) => void;
   children: React.ReactNode;
+  locale?: string;
 }) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

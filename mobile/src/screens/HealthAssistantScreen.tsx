@@ -465,12 +465,37 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
 
               const isHospitalSelection = role === 'user' && text.startsWith("I'd like to go with ");
 
+              // Suppress text bubble when this message renders hospital cards
+              const hasHospitalCards = toolParts.some((part: any) => {
+                const invocation = part.toolInvocation;
+                const toolName = invocation?.toolName ?? (part.type ?? '').replace('tool-', '');
+                const invState = part.state ?? invocation?.state ?? '';
+                if (toolName !== 'searchHospitals') return false;
+                if (invState !== 'output-available' && invState !== 'result') return false;
+                const hospitals =
+                  part.output?.hospitals ?? part.result?.hospitals ??
+                  invocation?.result?.hospitals ?? invocation?.output?.hospitals ??
+                  (Array.isArray(part.output) ? part.output : null) ??
+                  (Array.isArray(part.result) ? part.result : null);
+                return Array.isArray(hospitals) && hospitals.length > 0;
+              });
+
+              // Strip list items from text when hospital cards are rendered
+              const displayText = hasHospitalCards
+                ? text
+                    .split('\n')
+                    .filter((line) => !/^\s*[-•*]\s+\S|^\s*\d+\.\s+\S/.test(line))
+                    .join('\n')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim()
+                : text;
+
               return (
                 <View key={(m as any)?.id || `${role}-${idx}`}>
-                  {text && !isHospitalSelection && (
+                  {displayText && !isHospitalSelection && (
                     <View style={role === 'user' ? userBubbleStyle : glassBubbleStyle}>
                       <MessageText
-                        text={text}
+                        text={displayText}
                         color={role === 'user' ? colors.white : colors.grey900}
                       />
                     </View>

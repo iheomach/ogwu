@@ -483,7 +483,7 @@ export function AppRouter() {
       )}
 
       {screen === 'home' && (
-        <TabScaffold activeTab="home" onNavigate={goTab}>
+        <TabScaffold activeTab="home" onNavigate={goTab} locale={locale}>
           <HomeScreen
             busy={busy}
             phoneLabel={phoneLabel}
@@ -496,7 +496,7 @@ export function AppRouter() {
       )}
 
       {screen === 'newConsult' && (
-        <TabScaffold activeTab="newConsult" onNavigate={goTab}>
+        <TabScaffold activeTab="newConsult" onNavigate={goTab} locale={locale}>
           <HealthAssistantScreen
             busy={busy}
             location={formatLocation(locationSummary)}
@@ -517,7 +517,7 @@ export function AppRouter() {
       )}
 
       {screen === 'records' && (
-        <TabScaffold activeTab="records" onNavigate={goTab}>
+        <TabScaffold activeTab="records" onNavigate={goTab} locale={locale}>
           <RecordsScreen
             busy={busy}
             onOpenThread={(threadId) => {
@@ -529,7 +529,7 @@ export function AppRouter() {
       )}
 
       {screen === 'profile' && (
-        <TabScaffold activeTab="profile" onNavigate={goTab}>
+        <TabScaffold activeTab="profile" onNavigate={goTab} locale={locale}>
           <ProfileScreen
             busy={busy}
             phoneLabel={phoneLabel}

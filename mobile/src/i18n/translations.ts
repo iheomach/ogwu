@@ -672,10 +672,10 @@ export const translations = {
 
   ig: {
     tabs: {
-      home: 'Home',
-      newConsult: 'Assistant',
-      records: 'Records',
-      profile: 'Profile',
+      home: 'Ụlọ',
+      newConsult: 'Enyemaka',
+      records: 'Ndekọ',
+      profile: 'Profaịlụ',
       yourAnalytics: 'Nyocha gị',
       intakeSnapshot: 'Nchịkọta intake',
       noIntake: 'Enweghị intake',
@@ -903,11 +903,11 @@ export const translations = {
 
   yo: {
     tabs: {
-      home: 'Home',
-      newConsult: 'Assistant',
-      records: 'Records',
+      home: 'Ilé',
+      newConsult: 'Olùrànlọ́wọ́',
+      records: 'Àkọsílẹ̀',
       useTabs: 'Lo taabu isalẹ lati bẹ̀rẹ̀ consult, wo records, tàbí ṣe àtúnṣe profaili rẹ.',
-      profile: 'Profile',
+      profile: 'Profaili',
       yourAnalytics: 'Bayanan ka',
       intakeSnapshot: 'Taƙaitaccen intake',
       noIntake: 'Babu intake',
@@ -1110,10 +1110,10 @@ export const translations = {
 
   ha: {
     tabs: {
-      home: 'Home',
-      newConsult: 'Assistant',
-      records: 'Records',
-      profile: 'Profile',
+      home: 'Gida',
+      newConsult: 'Mataimaki',
+      records: 'Rikodin',
+      profile: 'Bayanai',
     },
     assistant: {
       title: 'Health Assistant',
