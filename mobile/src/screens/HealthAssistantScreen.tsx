@@ -295,8 +295,6 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
 
 export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsBase) {
   const [isInitialized, setIsInitialized] = useState(false);
-  const isNewSessionRef = useRef(false);
-
   const apiUrl = useMemo(() => {
     const base = process.env.EXPO_PUBLIC_API_URL;
     if (!base) return null;
@@ -329,16 +327,9 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
     append({ role: 'user', content: `I'd like to go with ${h.name}.` });
   };
 
-  const wrappedHandleSubmit = () => {
-    const extra = isNewSessionRef.current ? { newSession: true } : {};
-    isNewSessionRef.current = false;
-    handleSubmit(undefined, { body: extra });
-  };
-
   const handleNewSession = async () => {
     setMessages([]);
     setInput('');
-    isNewSessionRef.current = true;
     try {
       await AsyncStorage.removeItem('assistantMessages');
     } catch {
@@ -444,9 +435,11 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
               const parts = (m as any)?.parts || [];
               const toolParts = parts.filter((p: any) => p.type?.startsWith('tool-'));
 
+              const isHospitalSelection = role === 'user' && text.startsWith("I'd like to go with ");
+
               return (
                 <View key={(m as any)?.id || `${role}-${idx}`}>
-                  {text && (
+                  {text && !isHospitalSelection && (
                     <View style={role === 'user' ? userBubbleStyle : glassBubbleStyle}>
                       <MessageText
                         text={text}
@@ -559,7 +552,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
-                onPress={wrappedHandleSubmit}
+                onPress={() => handleSubmit()}
                 disabled={busy || isLoading || !apiUrl}
                 accessibilityRole="button"
                 activeOpacity={0.8}
