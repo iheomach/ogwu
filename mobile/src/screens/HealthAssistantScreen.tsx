@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  Animated,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   Text,
@@ -123,71 +125,169 @@ const TOOL_LABELS: Record<string, string> = {
   checkDrugInteraction: 'Checking medication safety...',
 };
 
+// ── Inline markdown + phone parser ──────────────────────────────────────────
+type Segment = { type: 'text' | 'bold' | 'phone'; content: string };
+const PHONE_RE = /^\+?[\d][\d\s\-(.)]{6,}[\d]$/;
+
+function parseMessage(text: string): Segment[] {
+  const segs: Segment[] = [];
+  const re = /\*\*([^*]+)\*\*|(\+?[\d][\d\s\-(.)]{7,}[\d])/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) segs.push({ type: 'text', content: text.slice(last, m.index) });
+    if (m[1] !== undefined) {
+      segs.push({ type: PHONE_RE.test(m[1].trim()) ? 'phone' : 'bold', content: m[1] });
+    } else if (m[2] !== undefined) {
+      segs.push({ type: 'phone', content: m[2] });
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) segs.push({ type: 'text', content: text.slice(last) });
+  return segs;
+}
+
+function MessageText({ text, color }: { text: string; color: string }) {
+  const segs = parseMessage(text);
+  return (
+    <Text style={{ color, lineHeight: 22, fontSize: 15 }}>
+      {segs.map((s, i) => {
+        if (s.type === 'bold') return <Text key={i} style={{ fontWeight: '700' }}>{s.content}</Text>;
+        if (s.type === 'phone') return (
+          <Text
+            key={i}
+            onPress={() => Linking.openURL(`tel:${s.content.replace(/[\s\-.()\u00A0]/g, '')}`)}
+            style={{ color: colors.purple, fontWeight: '600', textDecorationLine: 'underline' }}
+          >
+            {s.content}
+          </Text>
+        );
+        return <Text key={i}>{s.content}</Text>;
+      })}
+    </Text>
+  );
+}
+
+// ── Hospital cards with spring collapse animation ────────────────────────────
 function HospitalCards({ hospitals, onSelect, disabled }: {
   hospitals: any[];
   onSelect: (h: any) => void;
   disabled: boolean;
 }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const isAnimating = useRef(false);
+  const cardHeights = useRef<number[]>(hospitals.map(() => 110));
+
+  const anims = useRef(
+    hospitals.map(() => ({
+      translateY: new Animated.Value(0),
+      opacity: new Animated.Value(1),
+      scale: new Animated.Value(1),
+    }))
+  ).current;
+
+  const handleSelect = (h: any, selectedIdx: number) => {
+    if (isAnimating.current || selectedId !== null || disabled) return;
+    isAnimating.current = true;
+    setSelectedId(h.id);
+
+    const GAP = 12;
+    const animations = hospitals.map((_, i) => {
+      if (i === selectedIdx) {
+        return Animated.sequence([
+          Animated.spring(anims[i].scale, { toValue: 1.025, useNativeDriver: true, speed: 40, bounciness: 6 }),
+          Animated.spring(anims[i].scale, { toValue: 1, useNativeDriver: true, speed: 20 }),
+        ]);
+      }
+      // Converge toward selected card position
+      let offset = 0;
+      if (i < selectedIdx) {
+        for (let j = i; j < selectedIdx; j++) offset += cardHeights.current[j] + GAP;
+      } else {
+        for (let j = selectedIdx + 1; j <= i; j++) offset -= cardHeights.current[j] + GAP;
+      }
+      return Animated.parallel([
+        Animated.spring(anims[i].translateY, {
+          toValue: offset,
+          useNativeDriver: true,
+          damping: 18,
+          stiffness: 240,
+          mass: 0.7,
+        }),
+        Animated.timing(anims[i].opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]);
+    });
+
+    Animated.parallel(animations).start(() => {
+      isAnimating.current = false;
+      onSelect(h);
+    });
+  };
+
   return (
     <View style={{ marginBottom: spacing.sm }}>
-      {hospitals.map((h: any) => (
-        <TouchableOpacity
+      {hospitals.map((h: any, idx: number) => (
+        <Animated.View
           key={h.id}
-          onPress={() => onSelect(h)}
-          disabled={disabled}
-          activeOpacity={0.75}
+          onLayout={(e) => { cardHeights.current[idx] = e.nativeEvent.layout.height; }}
           style={{
-            backgroundColor: '#fff',
-            borderRadius: 14,
-            padding: spacing.md,
-            marginBottom: spacing.sm,
-            borderWidth: 1,
-            borderColor: 'rgba(69, 0, 80, 0.1)',
-            shadowColor: colors.purple,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.07,
-            shadowRadius: 8,
-            elevation: 2,
+            transform: [{ translateY: anims[idx].translateY }, { scale: anims[idx].scale }],
+            opacity: anims[idx].opacity,
+            zIndex: selectedId === h.id ? 10 : hospitals.length - idx,
           }}
         >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <Text style={{ fontWeight: '700', fontSize: 14, color: colors.grey900, flex: 1, marginRight: 8 }}>
-              {h.name}
+          <TouchableOpacity
+            onPress={() => handleSelect(h, idx)}
+            disabled={disabled || !!selectedId}
+            activeOpacity={0.75}
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: 14,
+              padding: spacing.md,
+              marginBottom: 12,
+              borderWidth: selectedId === h.id ? 2 : 1,
+              borderColor: selectedId === h.id ? colors.purple : 'rgba(69, 0, 80, 0.1)',
+              shadowColor: colors.purple,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.07,
+              shadowRadius: 8,
+              elevation: 2,
+            }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <Text style={{ fontWeight: '700', fontSize: 14, color: colors.grey900, flex: 1, marginRight: 8 }}>
+                {h.name}
+              </Text>
+              {h.distance_km != null && (
+                <Text style={{ fontSize: 12, color: colors.purple, fontWeight: '600' }}>{h.distance_km} km</Text>
+              )}
+            </View>
+            <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 3 }}>
+              {[h.city, h.state].filter(Boolean).join(', ')}
             </Text>
-            {h.distance_km != null && (
-              <Text style={{ fontSize: 12, color: colors.purple, fontWeight: '600' }}>
-                {h.distance_km} km
+            {Array.isArray(h.specialties) && h.specialties.length > 0 && (
+              <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 3 }} numberOfLines={1}>
+                {h.specialties.slice(0, 3).join(' · ')}
               </Text>
             )}
-          </View>
-
-          <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 3 }}>
-            {[h.city, h.state].filter(Boolean).join(', ')}
-          </Text>
-
-          {Array.isArray(h.specialties) && h.specialties.length > 0 && (
-            <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 3 }} numberOfLines={1}>
-              {h.specialties.slice(0, 3).join(' · ')}
-            </Text>
-          )}
-
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-            {h.has_emergency && (
-              <View style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                <Text style={{ fontSize: 10, color: colors.error, fontWeight: '600' }}>Emergency</Text>
-              </View>
-            )}
-            {h.is_onboarded ? (
-              <View style={{ backgroundColor: 'rgba(16,185,129,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                <Text style={{ fontSize: 10, color: '#10b981', fontWeight: '600' }}>Book online</Text>
-              </View>
-            ) : (
-              <View style={{ backgroundColor: 'rgba(107,114,128,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                <Text style={{ fontSize: 10, color: colors.grey500, fontWeight: '600' }}>Call to book</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+              {h.has_emergency && (
+                <View style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 10, color: colors.error, fontWeight: '600' }}>Emergency</Text>
+                </View>
+              )}
+              {h.is_onboarded ? (
+                <View style={{ backgroundColor: 'rgba(16,185,129,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 10, color: '#10b981', fontWeight: '600' }}>Book online</Text>
+                </View>
+              ) : (
+                <View style={{ backgroundColor: 'rgba(107,114,128,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 10, color: colors.grey500, fontWeight: '600' }}>Call to book</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
       ))}
     </View>
   );
@@ -340,30 +440,38 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
                 <View key={(m as any)?.id || `${role}-${idx}`}>
                   {text && (
                     <View style={role === 'user' ? userBubbleStyle : glassBubbleStyle}>
-                      <Text style={{
-                        color: role === 'user' ? colors.white : colors.grey900,
-                        lineHeight: 20,
-                        fontSize: 15,
-                      }}>
-                        {text}
-                      </Text>
+                      <MessageText
+                        text={text}
+                        color={role === 'user' ? colors.white : colors.grey900}
+                      />
                     </View>
                   )}
                   {toolParts.map((part: any) => {
+                    // Detect searchHospitals result across SDK format variants
+                    const partType = part.type ?? '';
+                    const invocation = part.toolInvocation;
+                    const toolName = invocation?.toolName ?? partType.replace('tool-', '');
+                    const invState = part.state ?? invocation?.state ?? '';
                     const isHospitalResult =
-                      part.type === 'tool-searchHospitals' &&
-                      part.state === 'output-available';
-                    if (isHospitalResult) console.log('[HospitalCards] part keys:', Object.keys(part), 'output:', JSON.stringify(part.output)?.slice(0, 200));
+                      toolName === 'searchHospitals' &&
+                      (invState === 'output-available' || invState === 'result');
+
                     if (isHospitalResult) {
+                      // Try every possible field path across SDK versions
                       const hospitals =
                         part.output?.hospitals ??
                         part.result?.hospitals ??
+                        invocation?.result?.hospitals ??
+                        invocation?.output?.hospitals ??
                         (Array.isArray(part.output) ? part.output : null) ??
                         (Array.isArray(part.result) ? part.result : null);
+
+                      console.log('[HospitalCards] state:', invState, 'hospitals:', hospitals?.length ?? 'none', JSON.stringify(part).slice(0, 300));
+
                       if (Array.isArray(hospitals) && hospitals.length > 0) {
                         return (
                           <HospitalCards
-                            key={`hospitals-${part.toolCallId}`}
+                            key={`hospitals-${part.toolCallId ?? partType}`}
                             hospitals={hospitals}
                             onSelect={handleSelectHospital}
                             disabled={isLoading}
