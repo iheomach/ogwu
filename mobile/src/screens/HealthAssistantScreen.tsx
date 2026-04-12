@@ -169,12 +169,74 @@ function MessageText({ text, color }: { text: string; color: string }) {
 }
 
 // ── Hospital cards with spring collapse animation ────────────────────────────
+function HospitalCard({ h, selected, onPress, disabled }: {
+  h: any;
+  selected: boolean;
+  onPress: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.75}
+      style={{
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: spacing.md,
+        marginBottom: 12,
+        borderWidth: selected ? 2 : 1,
+        borderColor: selected ? colors.purple : 'rgba(69, 0, 80, 0.1)',
+        shadowColor: colors.purple,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.07,
+        shadowRadius: 8,
+        elevation: 2,
+      }}
+    >
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Text style={{ fontWeight: '700', fontSize: 14, color: colors.grey900, flex: 1, marginRight: 8 }}>
+          {h.name}
+        </Text>
+        {h.distance_km != null && (
+          <Text style={{ fontSize: 12, color: colors.purple, fontWeight: '600' }}>{h.distance_km} km</Text>
+        )}
+      </View>
+      <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 3 }}>
+        {[h.city, h.state].filter(Boolean).join(', ')}
+      </Text>
+      {Array.isArray(h.specialties) && h.specialties.length > 0 && (
+        <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 3 }} numberOfLines={1}>
+          {h.specialties.slice(0, 3).join(' · ')}
+        </Text>
+      )}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+        {h.has_emergency && (
+          <View style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+            <Text style={{ fontSize: 10, color: colors.error, fontWeight: '600' }}>Emergency</Text>
+          </View>
+        )}
+        {h.is_onboarded ? (
+          <View style={{ backgroundColor: 'rgba(16,185,129,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+            <Text style={{ fontSize: 10, color: '#10b981', fontWeight: '600' }}>Book online</Text>
+          </View>
+        ) : (
+          <View style={{ backgroundColor: 'rgba(107,114,128,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+            <Text style={{ fontSize: 10, color: colors.grey500, fontWeight: '600' }}>Call to book</Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 function HospitalCards({ hospitals, onSelect, disabled }: {
   hospitals: any[];
   onSelect: (h: any) => void;
   disabled: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
   const isAnimating = useRef(false);
   const cardHeights = useRef<number[]>(hospitals.map(() => 110));
 
@@ -199,7 +261,6 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
           Animated.spring(anims[i].scale, { toValue: 1, useNativeDriver: true, speed: 20 }),
         ]);
       }
-      // Converge toward selected card position
       let offset = 0;
       if (i < selectedIdx) {
         for (let j = i; j < selectedIdx; j++) offset += cardHeights.current[j] + GAP;
@@ -220,9 +281,21 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
 
     Animated.parallel(animations).start(() => {
       isAnimating.current = false;
+      setCollapsed(true);
       onSelect(h);
     });
   };
+
+  // After collapse: render only the selected card, no leftover layout space
+  if (collapsed) {
+    const selected = hospitals.find((h) => h.id === selectedId);
+    if (!selected) return null;
+    return (
+      <View style={{ marginBottom: spacing.sm }}>
+        <HospitalCard h={selected} selected onPress={() => {}} disabled />
+      </View>
+    );
+  }
 
   return (
     <View style={{ marginBottom: spacing.sm }}>
@@ -236,57 +309,12 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
             zIndex: selectedId === h.id ? 10 : hospitals.length - idx,
           }}
         >
-          <TouchableOpacity
+          <HospitalCard
+            h={h}
+            selected={selectedId === h.id}
             onPress={() => handleSelect(h, idx)}
             disabled={disabled || !!selectedId}
-            activeOpacity={0.75}
-            style={{
-              backgroundColor: '#fff',
-              borderRadius: 14,
-              padding: spacing.md,
-              marginBottom: 12,
-              borderWidth: selectedId === h.id ? 2 : 1,
-              borderColor: selectedId === h.id ? colors.purple : 'rgba(69, 0, 80, 0.1)',
-              shadowColor: colors.purple,
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.07,
-              shadowRadius: 8,
-              elevation: 2,
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Text style={{ fontWeight: '700', fontSize: 14, color: colors.grey900, flex: 1, marginRight: 8 }}>
-                {h.name}
-              </Text>
-              {h.distance_km != null && (
-                <Text style={{ fontSize: 12, color: colors.purple, fontWeight: '600' }}>{h.distance_km} km</Text>
-              )}
-            </View>
-            <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 3 }}>
-              {[h.city, h.state].filter(Boolean).join(', ')}
-            </Text>
-            {Array.isArray(h.specialties) && h.specialties.length > 0 && (
-              <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 3 }} numberOfLines={1}>
-                {h.specialties.slice(0, 3).join(' · ')}
-              </Text>
-            )}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-              {h.has_emergency && (
-                <View style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 10, color: colors.error, fontWeight: '600' }}>Emergency</Text>
-                </View>
-              )}
-              {h.is_onboarded ? (
-                <View style={{ backgroundColor: 'rgba(16,185,129,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 10, color: '#10b981', fontWeight: '600' }}>Book online</Text>
-                </View>
-              ) : (
-                <View style={{ backgroundColor: 'rgba(107,114,128,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 10, color: colors.grey500, fontWeight: '600' }}>Call to book</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
+          />
         </Animated.View>
       ))}
     </View>
@@ -467,7 +495,6 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
                         (Array.isArray(part.output) ? part.output : null) ??
                         (Array.isArray(part.result) ? part.result : null);
 
-                      console.log('[HospitalCards] state:', invState, 'hospitals:', hospitals?.length ?? 'none', JSON.stringify(part).slice(0, 300));
 
                       if (Array.isArray(hospitals) && hospitals.length > 0) {
                         return (

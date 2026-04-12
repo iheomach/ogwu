@@ -1,4 +1,4 @@
-module.exports = function getHospitalBookingInfoSkill({ z, profile, fetchAvailableSlots }) {
+module.exports = function getHospitalBookingInfoSkill({ z, profile, supabase, fetchAvailableSlots }) {
   return {
     inputSchema: z.object({
       hospital_id: z.string().describe('UUID of the hospital from searchHospitals results'),
@@ -10,8 +10,20 @@ module.exports = function getHospitalBookingInfoSkill({ z, profile, fetchAvailab
       symptoms: z.array(z.string()).describe('List of reported symptoms'),
       recommended_specialty: z.string().optional(),
     }),
-    execute: async ({ hospital_id, hospital_name, hospital_phone, is_onboarded, complaint, urgency, symptoms, recommended_specialty }) => {
+    execute: async ({ hospital_id, hospital_name, hospital_phone, is_onboarded: agent_is_onboarded, complaint, urgency, symptoms, recommended_specialty }) => {
       try {
+        // Verify is_onboarded from DB — never trust the agent's value alone
+        let is_onboarded = agent_is_onboarded;
+        const { data: hosp } = await supabase
+          .from('hospitals_directory')
+          .select('is_onboarded, phone')
+          .eq('id', hospital_id)
+          .maybeSingle();
+        if (hosp) {
+          is_onboarded = hosp.is_onboarded === true;
+          if (!hospital_phone && hosp.phone) hospital_phone = hosp.phone;
+        }
+
         if (is_onboarded) {
           const slots = await fetchAvailableSlots(7, 'Africa/Lagos');
           if (slots.length === 0) {
