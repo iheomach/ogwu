@@ -350,20 +350,26 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
                     </View>
                   )}
                   {toolParts.map((part: any) => {
-                    if (
+                    const isHospitalResult =
                       part.type === 'tool-searchHospitals' &&
-                      part.state === 'output-available' &&
-                      Array.isArray(part.output?.hospitals) &&
-                      part.output.hospitals.length > 0
-                    ) {
-                      return (
-                        <HospitalCards
-                          key={`hospitals-${part.toolCallId}`}
-                          hospitals={part.output.hospitals}
-                          onSelect={handleSelectHospital}
-                          disabled={isLoading}
-                        />
-                      );
+                      part.state === 'output-available';
+                    if (isHospitalResult) console.log('[HospitalCards] part keys:', Object.keys(part), 'output:', JSON.stringify(part.output)?.slice(0, 200));
+                    if (isHospitalResult) {
+                      const hospitals =
+                        part.output?.hospitals ??
+                        part.result?.hospitals ??
+                        (Array.isArray(part.output) ? part.output : null) ??
+                        (Array.isArray(part.result) ? part.result : null);
+                      if (Array.isArray(hospitals) && hospitals.length > 0) {
+                        return (
+                          <HospitalCards
+                            key={`hospitals-${part.toolCallId}`}
+                            hospitals={hospitals}
+                            onSelect={handleSelectHospital}
+                            disabled={isLoading}
+                          />
+                        );
+                      }
                     }
                     return renderToolInvocation(part);
                   })}
