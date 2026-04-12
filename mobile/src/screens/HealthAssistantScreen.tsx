@@ -123,6 +123,76 @@ const TOOL_LABELS: Record<string, string> = {
   checkDrugInteraction: 'Checking medication safety...',
 };
 
+function HospitalCards({ hospitals, onSelect, disabled }: {
+  hospitals: any[];
+  onSelect: (h: any) => void;
+  disabled: boolean;
+}) {
+  return (
+    <View style={{ marginBottom: spacing.sm }}>
+      {hospitals.map((h: any) => (
+        <TouchableOpacity
+          key={h.id}
+          onPress={() => onSelect(h)}
+          disabled={disabled}
+          activeOpacity={0.75}
+          style={{
+            backgroundColor: '#fff',
+            borderRadius: 14,
+            padding: spacing.md,
+            marginBottom: spacing.sm,
+            borderWidth: 1,
+            borderColor: 'rgba(69, 0, 80, 0.1)',
+            shadowColor: colors.purple,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.07,
+            shadowRadius: 8,
+            elevation: 2,
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Text style={{ fontWeight: '700', fontSize: 14, color: colors.grey900, flex: 1, marginRight: 8 }}>
+              {h.name}
+            </Text>
+            {h.distance_km != null && (
+              <Text style={{ fontSize: 12, color: colors.purple, fontWeight: '600' }}>
+                {h.distance_km} km
+              </Text>
+            )}
+          </View>
+
+          <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 3 }}>
+            {[h.city, h.state].filter(Boolean).join(', ')}
+          </Text>
+
+          {Array.isArray(h.specialties) && h.specialties.length > 0 && (
+            <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 3 }} numberOfLines={1}>
+              {h.specialties.slice(0, 3).join(' · ')}
+            </Text>
+          )}
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {h.has_emergency && (
+              <View style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                <Text style={{ fontSize: 10, color: colors.error, fontWeight: '600' }}>Emergency</Text>
+              </View>
+            )}
+            {h.is_onboarded ? (
+              <View style={{ backgroundColor: 'rgba(16,185,129,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                <Text style={{ fontSize: 10, color: '#10b981', fontWeight: '600' }}>Book online</Text>
+              </View>
+            ) : (
+              <View style={{ backgroundColor: 'rgba(107,114,128,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                <Text style={{ fontSize: 10, color: colors.grey500, fontWeight: '600' }}>Call to book</Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
 export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsBase) {
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -136,6 +206,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
     messages,
     input,
     handleSubmit,
+    append,
     status,
     error,
     setInput,
@@ -152,6 +223,10 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
   });
 
   const isLoading = status === 'submitted' || status === 'streaming';
+
+  const handleSelectHospital = (h: any) => {
+    append({ role: 'user', content: `I'd like to go with ${h.name}.` });
+  };
 
   const handleNewSession = async () => {
     setMessages([]);
@@ -274,7 +349,24 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
                       </Text>
                     </View>
                   )}
-                  {toolParts.map((part: any) => renderToolInvocation(part))}
+                  {toolParts.map((part: any) => {
+                    if (
+                      part.type === 'tool-searchHospitals' &&
+                      part.state === 'output-available' &&
+                      Array.isArray(part.output?.hospitals) &&
+                      part.output.hospitals.length > 0
+                    ) {
+                      return (
+                        <HospitalCards
+                          key={`hospitals-${part.toolCallId}`}
+                          hospitals={part.output.hospitals}
+                          onSelect={handleSelectHospital}
+                          disabled={isLoading}
+                        />
+                      );
+                    }
+                    return renderToolInvocation(part);
+                  })}
                 </View>
               );
             })}

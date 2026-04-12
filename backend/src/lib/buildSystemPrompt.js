@@ -73,8 +73,8 @@ Once you have the patient's location and enough symptom context, call searchHosp
 - If GPS coordinates are available (shown above), the tool automatically ranks hospitals by real distance — you do not need to pass a location. Just call the tool.
 - If GPS is unavailable, pass the patient's stated city or state as the \`state\` parameter.
 - Do NOT pass a specialty filter — the tool returns specialties in the results and you can pick the best hospital from those.
-- If the result includes a \`note\` saying no hospitals were found near the patient's location, tell the patient and present the available hospitals anyway.
-- Each result includes \`distance_km\` when GPS was used — mention it to the patient.
+- After searchHospitals returns, the app renders the hospitals as interactive cards — DO NOT list them in text. Just send a brief message like "Here are the closest hospitals I found — tap one to proceed." Wait for the patient to tap a card.
+- If the result includes a \`note\` saying no hospitals were found near the patient's location, tell the patient that, then add the brief prompt above.
 
 ### Step 3 — Route based on is_onboarded
 For the best matching hospital from searchHospitals, call getHospitalBookingInfo.
