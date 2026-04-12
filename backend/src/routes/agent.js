@@ -140,6 +140,7 @@ router.post('/chat', authenticate, async (req, res) => {
     const liveLocation = safeText(req.body?.location, 100) || null;
     const patientLat = typeof req.body?.lat === 'number' ? req.body.lat : null;
     const patientLon = typeof req.body?.lon === 'number' ? req.body.lon : null;
+    const isNewSession = req.body?.newSession === true;
 
     const [{ streamText, tool, stepCountIs }, { openai }, { z }] = await Promise.all([
       import('ai'),
@@ -155,7 +156,7 @@ router.post('/chat', authenticate, async (req, res) => {
     };
 
     const tools = loadSkills(tool, skillCtx);
-    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake });
+    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake: isNewSession ? null : triageIntake });
 
     const result = streamText({
       model: openai(process.env.OPENAI_MODEL || 'gpt-4o-mini'),

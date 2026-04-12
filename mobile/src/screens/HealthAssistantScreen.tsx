@@ -295,6 +295,7 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
 
 export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsBase) {
   const [isInitialized, setIsInitialized] = useState(false);
+  const isNewSessionRef = useRef(false);
 
   const apiUrl = useMemo(() => {
     const base = process.env.EXPO_PUBLIC_API_URL;
@@ -328,9 +329,16 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
     append({ role: 'user', content: `I'd like to go with ${h.name}.` });
   };
 
+  const wrappedHandleSubmit = () => {
+    const extra = isNewSessionRef.current ? { newSession: true } : {};
+    isNewSessionRef.current = false;
+    handleSubmit(undefined, { body: extra });
+  };
+
   const handleNewSession = async () => {
     setMessages([]);
     setInput('');
+    isNewSessionRef.current = true;
     try {
       await AsyncStorage.removeItem('assistantMessages');
     } catch {
@@ -551,7 +559,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
-                onPress={() => handleSubmit()}
+                onPress={wrappedHandleSubmit}
                 disabled={busy || isLoading || !apiUrl}
                 accessibilityRole="button"
                 activeOpacity={0.8}
