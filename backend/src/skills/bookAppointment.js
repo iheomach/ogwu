@@ -16,13 +16,21 @@ module.exports = function bookAppointmentSkill({ z, supabase, profile, getClinic
 
         const { oauth2Client, calendarId } = auth;
 
-        const { data: hospital } = await supabase
+        let { data: hospital } = await supabase
           .from('hospitals_directory')
           .select('id,name,is_onboarded')
           .eq('id', hospital_id)
           .maybeSingle();
 
-        console.log(`[bookAppointment] hospital_id=${hospital_id} found=${!!hospital} is_onboarded=${hospital?.is_onboarded}`);
+        // Fallback: agent may pass a slug instead of UUID — try name match
+        if (!hospital) {
+          const { data: byName } = await supabase
+            .from('hospitals_directory')
+            .select('id,name,is_onboarded')
+            .ilike('name', hospital_id.replace(/_/g, ' '))
+            .maybeSingle();
+          hospital = byName;
+        }
 
         if (!hospital) return { error: 'hospital_not_found', message: `No hospital found with id: ${hospital_id}` };
         if (!hospital.is_onboarded) return { error: 'not_onboarded', message: 'This hospital does not support online booking. Tell the patient to call directly.' };

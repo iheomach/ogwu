@@ -13,13 +13,23 @@ module.exports = function getHospitalBookingInfoSkill({ z, profile, supabase, fe
     execute: async ({ hospital_id, hospital_name, hospital_phone, is_onboarded: agent_is_onboarded, complaint, urgency, symptoms, recommended_specialty }) => {
       try {
         // Verify is_onboarded from DB — never trust the agent's value alone
+        // Try by UUID first, fall back to name match in case agent passed a slug
         let is_onboarded = agent_is_onboarded;
-        const { data: hosp } = await supabase
+        let { data: hosp } = await supabase
           .from('hospitals_directory')
-          .select('is_onboarded, phone')
+          .select('id, is_onboarded, phone')
           .eq('id', hospital_id)
           .maybeSingle();
+        if (!hosp) {
+          const { data: byName } = await supabase
+            .from('hospitals_directory')
+            .select('id, is_onboarded, phone')
+            .ilike('name', hospital_name)
+            .maybeSingle();
+          hosp = byName;
+        }
         if (hosp) {
+          hospital_id = hosp.id; // always use real UUID downstream
           is_onboarded = hosp.is_onboarded === true;
           if (!hospital_phone && hosp.phone) hospital_phone = hosp.phone;
         }
