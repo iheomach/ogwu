@@ -96,7 +96,8 @@ module.exports = function bookAppointmentSkill({ z, supabase, profile, getClinic
           appointment_id: appt.id,
           starts_at: appt.starts_at,
           meeting_url: meetingUrl,
-          message: meetingUrl ? `Appointment booked! Google Meet link: ${meetingUrl}` : 'Appointment booked. A Meet link will be sent shortly.',
+          hospital_name: hospital.name,
+          message: meetingUrl ? `Appointment booked! Meeting link: ${meetingUrl}` : 'Appointment booked. A meeting link will be sent shortly.',
         };
       } catch (e) {
         return { error: 'unexpected', message: String(e?.message ?? e) };

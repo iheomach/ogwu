@@ -168,13 +168,76 @@ function MessageText({ text, color }: { text: string; color: string }) {
   );
 }
 
+// ── Add to Google Calendar button ────────────────────────────────────────────
+function toGCalDate(isoUtc: string): string {
+  // Converts ISO UTC string to YYYYMMDDTHHmmssZ
+  return isoUtc.replace(/[-:]/g, '').replace(/\.\d{3}/, '').replace('+00:00', 'Z');
+}
+
+function AddToCalendarButton({ startsAt, meetingUrl, hospitalName }: {
+  startsAt: string;
+  meetingUrl: string;
+  hospitalName: string;
+}) {
+  const calendarUrl = useMemo(() => {
+    const start = toGCalDate(startsAt);
+    // Add 30 minutes for end time
+    const endDate = new Date(startsAt);
+    endDate.setMinutes(endDate.getMinutes() + 30);
+    const end = toGCalDate(endDate.toISOString());
+    const title = encodeURIComponent(`Appointment at ${hospitalName}`);
+    const details = encodeURIComponent(`Join Google Meet: ${meetingUrl}`);
+    const location = encodeURIComponent(meetingUrl);
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&details=${details}&location=${location}`;
+  }, [startsAt, meetingUrl, hospitalName]);
+
+  return (
+    <TouchableOpacity
+      onPress={() => Linking.openURL(calendarUrl)}
+      activeOpacity={0.8}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(66,133,244,0.3)',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        marginTop: spacing.sm,
+        shadowColor: '#4285F4',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+        elevation: 2,
+      }}
+    >
+      {/* Google Calendar logo colours */}
+      <View style={{ width: 28, height: 28, borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
+        <View style={{ position: 'absolute', inset: 0, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#4285F4', borderRadius: 6 }} />
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 8, backgroundColor: '#4285F4', borderTopLeftRadius: 4, borderTopRightRadius: 4 }} />
+        <View style={{ position: 'absolute', bottom: 3, alignSelf: 'center' }}>
+          <Text style={{ fontSize: 11, fontWeight: '800', color: '#4285F4', lineHeight: 13 }}>31</Text>
+        </View>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: '#1a1a1a' }}>Add to Google Calendar</Text>
+        <Text style={{ fontSize: 11, color: colors.grey500, marginTop: 1 }}>Includes Google Meet link</Text>
+      </View>
+      <MaterialIcons name="open-in-new" size={16} color="#4285F4" />
+    </TouchableOpacity>
+  );
+}
+
 // ── Slot picker ──────────────────────────────────────────────────────────────
 type Slot = { starts_at_local: string; display: string; time_zone: string };
 
-function SlotPicker({ slots, hospitalName, onSelect, disabled }: {
+function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
   slots: Slot[];
   hospitalName: string;
-  onSelect: (slot: Slot) => void;
+  hospitalId: string;
+  onSelect: (slot: Slot, hospitalId: string) => void;
   disabled: boolean;
 }) {
   // Group slots by date label (e.g. "Tue 14 Apr")
@@ -195,7 +258,7 @@ function SlotPicker({ slots, hospitalName, onSelect, disabled }: {
 
   const handleConfirm = () => {
     if (!selectedSlot || disabled) return;
-    onSelect(selectedSlot);
+    onSelect(selectedSlot, hospitalId);
   };
 
   return (
@@ -482,11 +545,11 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
   const isLoading = status === 'submitted' || status === 'streaming';
 
   const handleSelectHospital = (h: any) => {
-    append({ role: 'user', content: `I'd like to go with ${h.name}.` });
+    append({ role: 'user', content: `I'd like to go with ${h.name} (hospital_id: ${h.id}).` });
   };
 
-  const handleSelectSlot = (slot: Slot) => {
-    append({ role: 'user', content: `I'd like to book the ${slot.display} slot.` });
+  const handleSelectSlot = (slot: Slot, hospitalId: string) => {
+    append({ role: 'user', content: `I'd like to book the ${slot.display} slot (hospital_id: ${hospitalId}, starts_at_local: ${slot.starts_at_local}, time_zone: ${slot.time_zone}).` });
   };
 
   const handleNewSession = async () => {
@@ -625,8 +688,19 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
                 return output?.type === 'onboarded' && Array.isArray(output?.available_slots) && output.available_slots.length > 0;
               });
 
-              // Strip numbered/bulleted list items from text when UI replaces them
-              const displayText = (hasHospitalCards || hasSlotPicker)
+              const hasCalendarButton = toolParts.some((part: any) => {
+                const invocation = part.toolInvocation;
+                const toolName = invocation?.toolName ?? (part.type ?? '').replace('tool-', '');
+                const invState = part.state ?? invocation?.state ?? '';
+                if (toolName !== 'bookAppointment') return false;
+                if (invState !== 'output-available' && invState !== 'result') return false;
+                const output = part.output ?? part.result ?? invocation?.result ?? invocation?.output;
+                return output?.success && output?.meeting_url;
+              });
+
+              // Strip numbered/bulleted list items when UI replaces them;
+              // strip Meet/meeting links when calendar button is shown
+              let displayText = (hasHospitalCards || hasSlotPicker)
                 ? text
                     .split('\n')
                     .filter((line) => !/^\s*[-•*]\s+\S|^\s*\d+\.\s+\S/.test(line))
@@ -634,6 +708,16 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
                     .replace(/\n{3,}/g, '\n\n')
                     .trim()
                 : text;
+
+              if (hasCalendarButton) {
+                displayText = displayText
+                  .replace(/\[.*?\]\(https?:\/\/meet\.google\.com\/[^\s)]+\)/g, '')
+                  .replace(/https?:\/\/meet\.google\.com\/\S+/g, '')
+                  .replace(/meeting link[^.!\n]*/gi, '')
+                  .replace(/google meet link[^.!\n]*/gi, '')
+                  .replace(/\n{3,}/g, '\n\n')
+                  .trim();
+              }
 
               return (
                 <View key={(m as any)?.id || `${role}-${idx}`}>
@@ -690,8 +774,28 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
                             key={`slots-${part.toolCallId ?? partType}`}
                             slots={output.available_slots}
                             hospitalName={output.hospital_name ?? 'Hospital'}
+                            hospitalId={output.hospital_id ?? ''}
                             onSelect={handleSelectSlot}
                             disabled={isLoading}
+                          />
+                        );
+                      }
+                    }
+
+                    // Detect bookAppointment success result
+                    const isBookingResult =
+                      toolName === 'bookAppointment' &&
+                      (invState === 'output-available' || invState === 'result');
+
+                    if (isBookingResult) {
+                      const output = part.output ?? part.result ?? invocation?.result ?? invocation?.output;
+                      if (output?.success && output?.meeting_url && output?.starts_at) {
+                        return (
+                          <AddToCalendarButton
+                            key={`calendar-${part.toolCallId ?? partType}`}
+                            startsAt={output.starts_at}
+                            meetingUrl={output.meeting_url}
+                            hospitalName={output.hospital_name ?? 'Hospital'}
                           />
                         );
                       }
