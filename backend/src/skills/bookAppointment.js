@@ -22,7 +22,10 @@ module.exports = function bookAppointmentSkill({ z, supabase, profile, getClinic
           .eq('id', hospital_id)
           .maybeSingle();
 
-        if (!hospital?.is_onboarded) return { error: 'not_onboarded', message: 'This hospital does not support online booking. Tell the patient to call directly.' };
+        console.log(`[bookAppointment] hospital_id=${hospital_id} found=${!!hospital} is_onboarded=${hospital?.is_onboarded}`);
+
+        if (!hospital) return { error: 'hospital_not_found', message: `No hospital found with id: ${hospital_id}` };
+        if (!hospital.is_onboarded) return { error: 'not_onboarded', message: 'This hospital does not support online booking. Tell the patient to call directly.' };
 
         const tz = time_zone || 'Africa/Lagos';
         const startDt = DateTime.fromISO(String(starts_at_local), { zone: tz });
