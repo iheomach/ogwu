@@ -663,6 +663,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
               const isHospitalSelection = role === 'user' && text.startsWith("I'd like to go with ");
               const isSlotSelection = role === 'user' && text.startsWith("I'd like to book the ");
 
+
               // Suppress text bubble when this message renders hospital cards or slot picker
               const hasHospitalCards = toolParts.some((part: any) => {
                 const invocation = part.toolInvocation;
