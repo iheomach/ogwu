@@ -35,7 +35,7 @@ module.exports = function getHospitalBookingInfoSkill({ z, profile, supabase, fe
         }
 
         if (is_onboarded) {
-          const slots = await fetchAvailableSlots(7, 'Africa/Lagos');
+          const slots = await fetchAvailableSlots(7);
           if (slots.length === 0) {
             return { type: 'onboarded_no_slots', message: 'No available slots in the next 7 days. Tell the patient to call directly.', phone: hospital_phone };
           }

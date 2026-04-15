@@ -60,12 +60,22 @@ async function getClinicCalendarAuth() {
   return { oauth2Client, calendarId };
 }
 
-async function fetchAvailableSlots(daysAhead = 5, timeZone = 'Africa/Lagos') {
+async function fetchAvailableSlots(daysAhead = 5, timeZone = null) {
   const auth = await getClinicCalendarAuth();
   if (!auth) return [];
 
   const { oauth2Client, calendarId } = auth;
   const cal = google.calendar({ version: 'v3', auth: oauth2Client });
+
+  // Use the calendar's own timezone if not explicitly provided
+  if (!timeZone) {
+    try {
+      const calMeta = await cal.calendars.get({ calendarId });
+      timeZone = calMeta.data.timeZone || 'UTC';
+    } catch {
+      timeZone = 'UTC';
+    }
+  }
   const now = DateTime.now().setZone(timeZone);
   const rangeEnd = now.plus({ days: daysAhead + 1 }).startOf('day');
 

@@ -709,24 +709,47 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
                     .trim()
                 : text;
 
+              // Extract calendar button data for inline rendering
+              let calendarData: { startsAt: string; meetingUrl: string; hospitalName: string } | null = null;
               if (hasCalendarButton) {
+                for (const part of toolParts) {
+                  const inv = part.toolInvocation;
+                  const tn = inv?.toolName ?? (part.type ?? '').replace('tool-', '');
+                  if (tn !== 'bookAppointment') continue;
+                  const output = part.output ?? part.result ?? inv?.result ?? inv?.output;
+                  if (output?.success && output?.meeting_url && output?.starts_at) {
+                    calendarData = { startsAt: output.starts_at, meetingUrl: output.meeting_url, hospitalName: output.hospital_name ?? 'Hospital' };
+                    break;
+                  }
+                }
                 displayText = displayText
                   .replace(/\[.*?\]\(https?:\/\/meet\.google\.com\/[^\s)]+\)/g, '')
                   .replace(/https?:\/\/meet\.google\.com\/\S+/g, '')
+                  .replace(/[Yy]ou can join.*?(?:link\s*)?[:.]\s*/g, '')
+                  .replace(/[Hh]ere(?:'s| is) your.*?(?:link|meet)[^.!\n]*[.!]?/g, '')
+                  .replace(/[Gg]oogle [Mm]eet link[^.!\n]*/g, '')
                   .replace(/meeting link[^.!\n]*/gi, '')
-                  .replace(/google meet link[^.!\n]*/gi, '')
                   .replace(/\n{3,}/g, '\n\n')
                   .trim();
               }
 
               return (
                 <View key={(m as any)?.id || `${role}-${idx}`}>
-                  {displayText && !isHospitalSelection && !isSlotSelection && (
+                  {(displayText || calendarData) && !isHospitalSelection && !isSlotSelection && (
                     <View style={role === 'user' ? userBubbleStyle : glassBubbleStyle}>
-                      <MessageText
-                        text={displayText}
-                        color={role === 'user' ? colors.white : colors.grey900}
-                      />
+                      {!!displayText && (
+                        <MessageText
+                          text={displayText}
+                          color={role === 'user' ? colors.white : colors.grey900}
+                        />
+                      )}
+                      {calendarData && (
+                        <AddToCalendarButton
+                          startsAt={calendarData.startsAt}
+                          meetingUrl={calendarData.meetingUrl}
+                          hospitalName={calendarData.hospitalName}
+                        />
+                      )}
                     </View>
                   )}
                   {toolParts.map((part: any) => {
@@ -787,19 +810,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
                       toolName === 'bookAppointment' &&
                       (invState === 'output-available' || invState === 'result');
 
-                    if (isBookingResult) {
-                      const output = part.output ?? part.result ?? invocation?.result ?? invocation?.output;
-                      if (output?.success && output?.meeting_url && output?.starts_at) {
-                        return (
-                          <AddToCalendarButton
-                            key={`calendar-${part.toolCallId ?? partType}`}
-                            startsAt={output.starts_at}
-                            meetingUrl={output.meeting_url}
-                            hospitalName={output.hospital_name ?? 'Hospital'}
-                          />
-                        );
-                      }
-                    }
+                    if (isBookingResult) return null; // rendered inside bubble above
 
                     return renderToolInvocation(part);
                   })}
