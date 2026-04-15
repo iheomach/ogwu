@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { RecordsScreenProps } from '../types';
-import type { ConsultThread, Encounter, TriageIntake, UrgencyTier } from '../types';
+import type { ConsultThread, Encounter, UrgencyTier } from '../types';
 import { encountersList } from '../lib/encounters';
 import { threadsList } from '../lib/threads';
-import { triageGetIntake } from '../lib/triage';
+import { fetchReport, buildReportText } from '../lib/report';
 import { styles, colors } from '../ui/styles';
 import { t } from '../i18n';
 
@@ -41,6 +41,22 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [threads, setThreads] = useState<ConsultThread[]>([]);
   const [threadsError, setThreadsError] = useState<string | null>(null);
+
+  const [exportLoading, setExportLoading] = useState(false);
+
+  const handleExport = async () => {
+    if (exportLoading) return;
+    try {
+      setExportLoading(true);
+      const data = await fetchReport();
+      const message = buildReportText(data);
+      await Share.share({ message, title: t('records.exportTitle') });
+    } catch (e: any) {
+      Alert.alert(t('records.exportErrorTitle'), e?.message ?? t('records.exportErrorBody'));
+    } finally {
+      setExportLoading(false);
+    }
+  };
 
   const [intakeLoading, setIntakeLoading] = useState(true);
   const [intake, setIntake] = useState<TriageIntake | null>(null);
@@ -123,43 +139,17 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
         <Text style={styles.title}>{t('records.title')}</Text>
         <Text style={styles.helper}>{t('records.helper')}</Text>
 
-        <Text style={[styles.label, { marginBottom: 12 }]}>{t('records.aiTriage')}</Text>
-        <View style={styles.card}>
-          <View style={styles.rowBetween}>
-            <Text style={styles.value}>{t('records.latestIntake')}</Text>
-            {intakeLoading ? (
-              <ActivityIndicator color={colors.purple} />
-            ) : intake ? (
-              <View style={[styles.pill, { backgroundColor: urgencyColors(intake.urgency ?? 'routine').bg }]}>
-                <Text style={[styles.pillText, { color: urgencyColors(intake.urgency ?? 'routine').fg }]}>
-                  {t(`triageResults.urgency_${(intake.urgency ?? 'routine') as any}`)}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.pill}>
-                <Text style={styles.pillText}>{t('home.noIntake')}</Text>
-              </View>
-            )}
-          </View>
+        <TouchableOpacity
+          style={[styles.btnPrimary, (busy || exportLoading) ? styles.btnPrimaryDisabled : null, { marginBottom: 24 }]}
+          onPress={handleExport}
+          disabled={busy || exportLoading}
+        >
+          {exportLoading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.btnPrimaryText}>{t('records.exportReport')}</Text>
+          }
+        </TouchableOpacity>
 
-          {intake?.summary ? (
-            <Text style={[styles.helper, { marginBottom: 0, marginTop: 10, color: colors.grey900 }]}>
-              {intake.summary}
-            </Text>
-          ) : (
-            <Text style={[styles.helper, { marginBottom: 0, marginTop: 10 }]}>
-              {t('triageResults.emptyBody')}
-            </Text>
-          )}
-
-          {intake?.safety_note ? (
-            <Text style={[styles.helper, { marginBottom: 0, marginTop: 10 }]}> 
-              {t('triageResults.safetyNote')}: {intake.safety_note}
-            </Text>
-          ) : null}
-        </View>
-
-        <View style={styles.mt24} />
         <Text style={[styles.label, { marginBottom: 12 }]}>{t('records.doctorVisits')}</Text>
 
         <View style={styles.card}>

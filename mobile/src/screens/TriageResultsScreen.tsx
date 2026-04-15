@@ -14,6 +14,7 @@ import { styles, colors } from '../ui/styles';
 import { t } from '../i18n';
 import { triageGetIntake } from '../lib/triage';
 import { encountersCreateShare } from '../lib/encounters';
+import { fetchReport, buildReportText } from '../lib/report';
 
 function urgencyColors(urgency: TriageIntake['urgency']) {
   switch (urgency) {
@@ -33,47 +34,26 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
   const [error, setError] = useState<string | null>(null);
   const [intake, setIntake] = useState<TriageIntake | null>(null);
 
+  const [shareLoading, setShareLoading] = useState(false);
+
   const onShare = async () => {
-    if (!intake) return;
-
-    const urgencyKey = `triageResults.urgency_${(intake.urgency ?? 'routine') as any}`;
-    const urgencyLabel = t(urgencyKey);
-
-    const parts: string[] = [];
-    parts.push(t('triageResults.shareHeader'));
-    parts.push(`${t('triageResults.urgency')}: ${urgencyLabel}`);
-    if (intake.summary) {
-      parts.push('');
-      parts.push(`${t('triageResults.summary')}:`);
-      parts.push(intake.summary);
-    }
-
-    if (intake.safety_note) {
-      parts.push('');
-      parts.push(`${t('triageResults.safetyNote')}:`);
-      parts.push(intake.safety_note);
-    }
-    parts.push('');
-    parts.push(`${t('triageResults.answers')}:`);
-    intake.answers.forEach((qa, idx) => {
-      parts.push(`${idx + 1}. ${qa.q}`);
-      parts.push(`${qa.a || t('common.dash')}`);
-      parts.push('');
-    });
-
-    const message = parts.join('\n').trim();
-
+    if (!intake || shareLoading) return;
     try {
+      setShareLoading(true);
+      const data = await fetchReport();
+      const message = buildReportText(data);
       const res = await Share.share({ message, title: t('triageResults.shareTitle') });
       if ((res as any)?.action === Share.sharedAction) {
         try {
           await encountersCreateShare({ doctor_id: null });
-        } catch (e: any) {
-          Alert.alert(t('records.title'), e?.message ?? t('common.error'));
+        } catch {
+          // best-effort — don't block the share on a failed encounter record
         }
       }
     } catch (e: any) {
       Alert.alert(t('triageResults.shareErrorTitle'), e?.message ?? t('triageResults.shareErrorBody'));
+    } finally {
+      setShareLoading(false);
     }
   };
   useEffect(() => {
@@ -112,11 +92,14 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
         <Text style={styles.helper}>{t('triageResults.helper')}</Text>
 
         <TouchableOpacity
-          style={[styles.btnPrimary, busy || loading || !intake ? styles.btnPrimaryDisabled : null]}
+          style={[styles.btnPrimary, busy || loading || !intake || shareLoading ? styles.btnPrimaryDisabled : null]}
           onPress={onShare}
-          disabled={busy || loading || !intake}
+          disabled={busy || loading || !intake || shareLoading}
         >
-          <Text style={styles.btnPrimaryText}>{t('triageResults.share')}</Text>
+          {shareLoading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.btnPrimaryText}>{t('triageResults.share')}</Text>
+          }
         </TouchableOpacity>
 
         {loading && (

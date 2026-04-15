@@ -726,10 +726,14 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
                 displayText = displayText
                   .replace(/\[.*?\]\(https?:\/\/meet\.google\.com\/[^\s)]+\)/g, '')
                   .replace(/https?:\/\/meet\.google\.com\/\S+/g, '')
-                  .replace(/[Yy]ou can join.*?(?:link\s*)?[:.]\s*/g, '')
+                  .replace(/[Yy]ou can join.*?[:.][^\n]*/g, '')
                   .replace(/[Hh]ere(?:'s| is) your.*?(?:link|meet)[^.!\n]*[.!]?/g, '')
                   .replace(/[Gg]oogle [Mm]eet link[^.!\n]*/g, '')
                   .replace(/meeting link[^.!\n]*/gi, '')
+                  // Remove lines that are blank or contain only punctuation/whitespace
+                  .split('\n')
+                  .filter((line) => line.trim().replace(/[.!?,;:\-–—]/g, '').trim().length > 0)
+                  .join('\n')
                   .replace(/\n{3,}/g, '\n\n')
                   .trim();
               }
