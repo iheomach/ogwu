@@ -241,10 +241,13 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
   onSelect: (slot: Slot, hospitalId: string) => void;
   disabled: boolean;
 }) {
-  // Build map: 'yyyy-MM-dd' -> Slot[]
+  // Build map: 'yyyy-MM-dd' -> Slot[], deduped by starts_at_local
   const slotsByDate = useMemo(() => {
     const map = new Map<string, Slot[]>();
+    const seen = new Set<string>();
     for (const s of slots) {
+      if (seen.has(s.starts_at_local)) continue;
+      seen.add(s.starts_at_local);
       const dateKey = s.starts_at_local.split('T')[0];
       if (!map.has(dateKey)) map.set(dateKey, []);
       map.get(dateKey)!.push(s);
