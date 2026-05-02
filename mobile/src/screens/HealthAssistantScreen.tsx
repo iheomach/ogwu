@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react';
 import {
   Animated,
   ActivityIndicator,
@@ -18,6 +18,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useChat } from '@ai-sdk/react';
 import { fetch as expoFetch } from 'expo/fetch';
 
+import { Calendar } from 'react-native-calendars';
 import { supabase } from '../../lib/supabase';
 import type { ScreenPropsBase } from '../types';
 import { colors, radius, spacing, styles } from '../ui/styles';
@@ -240,21 +241,62 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
   onSelect: (slot: Slot, hospitalId: string) => void;
   disabled: boolean;
 }) {
-  // Group slots by date label (e.g. "Tue 14 Apr")
-  const dates = useMemo(() => {
+  // Build map: 'yyyy-MM-dd' -> Slot[]
+  const slotsByDate = useMemo(() => {
     const map = new Map<string, Slot[]>();
     for (const s of slots) {
-      const dateLabel = s.display.split(', ')[0]; // "Tue 14 Apr"
-      if (!map.has(dateLabel)) map.set(dateLabel, []);
-      map.get(dateLabel)!.push(s);
+      const dateKey = s.starts_at_local.split('T')[0];
+      if (!map.has(dateKey)) map.set(dateKey, []);
+      map.get(dateKey)!.push(s);
     }
-    return Array.from(map.entries()); // [["Tue 14 Apr", [slot, ...]], ...]
+    return map;
   }, [slots]);
 
-  const [selectedDate, setSelectedDate] = useState<string>(dates[0]?.[0] ?? '');
-  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+  const firstAvailable = useMemo(() => {
+    const keys = [...slotsByDate.keys()].sort();
+    return keys[0] ?? null;
+  }, [slotsByDate]);
 
-  const timesForDate = dates.find(([d]) => d === selectedDate)?.[1] ?? [];
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(firstAvailable);
+  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+  const [textDate, setTextDate] = useState<string>('');
+  const [inputFocused, setInputFocused] = useState(false);
+
+  const markedDates = useMemo(() => {
+    const marks: Record<string, any> = {};
+    for (const dateKey of slotsByDate.keys()) {
+      marks[dateKey] = {
+        marked: true,
+        dotColor: dateKey === selectedDateKey ? '#fff' : colors.purple,
+        selected: dateKey === selectedDateKey,
+        selectedColor: colors.purple,
+      };
+    }
+    return marks;
+  }, [slotsByDate, selectedDateKey]);
+
+  const timesForDate = selectedDateKey ? (slotsByDate.get(selectedDateKey) ?? []) : [];
+
+  const handleDayPress = useCallback((day: { dateString: string }) => {
+    const key = day.dateString;
+    if (!slotsByDate.has(key)) return;
+    setSelectedDateKey(key);
+    setSelectedSlot(null);
+    const [y, m, d] = key.split('-');
+    setTextDate(`${m}/${d}/${y}`);
+  }, [slotsByDate]);
+
+  const handleTextChange = (text: string) => {
+    setTextDate(text);
+    const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (match) {
+      const key = `${match[3]}-${match[1]}-${match[2]}`;
+      if (slotsByDate.has(key)) {
+        setSelectedDateKey(key);
+        setSelectedSlot(null);
+      }
+    }
+  };
 
   const handleConfirm = () => {
     if (!selectedSlot || disabled) return;
@@ -278,67 +320,104 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
       {/* Header */}
       <View style={{ backgroundColor: colors.purple, paddingHorizontal: spacing.md, paddingVertical: 12 }}>
         <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{hospitalName}</Text>
-        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 2 }}>Select an available slot</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 2 }}>Select an available date and time</Text>
       </View>
 
-      {/* Date chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: 12, gap: 8 }}
-      >
-        {dates.map(([dateLabel]) => {
-          const active = dateLabel === selectedDate;
-          return (
-            <TouchableOpacity
-              key={dateLabel}
-              onPress={() => { setSelectedDate(dateLabel); setSelectedSlot(null); }}
-              disabled={disabled}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 7,
-                borderRadius: 20,
-                backgroundColor: active ? colors.purple : 'rgba(69,0,80,0.06)',
-                borderWidth: 1,
-                borderColor: active ? colors.purple : 'rgba(69,0,80,0.12)',
-              }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#fff' : colors.grey700 }}>
-                {dateLabel}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* Time slots grid */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.md, paddingBottom: 12, gap: 8 }}>
-        {timesForDate.map((slot) => {
-          const timeLabel = slot.display.split(', ')[1]; // "8:00 AM"
-          const active = selectedSlot?.starts_at_local === slot.starts_at_local;
-          return (
-            <TouchableOpacity
-              key={slot.starts_at_local}
-              onPress={() => setSelectedSlot(slot)}
-              disabled={disabled}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 8,
-                borderRadius: 10,
-                backgroundColor: active ? colors.purple : 'rgba(69,0,80,0.04)',
-                borderWidth: 1,
-                borderColor: active ? colors.purple : 'rgba(69,0,80,0.12)',
-                minWidth: 80,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? '#fff' : colors.grey700 }}>
-                {timeLabel}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+      {/* Date text input */}
+      <View style={{ paddingHorizontal: spacing.md, paddingTop: 14, paddingBottom: 8 }}>
+        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.grey500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+          Jump to date
+        </Text>
+        <TextInput
+          value={textDate}
+          onChangeText={handleTextChange}
+          placeholder="MM/DD/YYYY"
+          placeholderTextColor={colors.grey300}
+          keyboardType="numbers-and-punctuation"
+          maxLength={10}
+          editable={!disabled}
+          onFocus={() => setInputFocused(true)}
+          onBlur={() => setInputFocused(false)}
+          style={{
+            borderWidth: 1.5,
+            borderColor: inputFocused ? colors.purple : 'rgba(69,0,80,0.15)',
+            borderRadius: 10,
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            fontSize: 15,
+            color: colors.grey900,
+            backgroundColor: 'rgba(69,0,80,0.02)',
+            letterSpacing: 1,
+          }}
+        />
       </View>
+
+      {/* Calendar */}
+      <Calendar
+        current={selectedDateKey ?? undefined}
+        onDayPress={handleDayPress}
+        markedDates={markedDates}
+        disableAllTouchEventsForDisabledDays
+        enableSwipeMonths
+        theme={{
+          calendarBackground: '#fff',
+          selectedDayBackgroundColor: colors.purple,
+          selectedDayTextColor: '#fff',
+          todayTextColor: colors.purple,
+          dayTextColor: colors.grey900,
+          textDisabledColor: 'rgba(0,0,0,0.18)',
+          dotColor: colors.purple,
+          selectedDotColor: '#fff',
+          arrowColor: colors.purple,
+          monthTextColor: colors.grey900,
+          textDayFontWeight: '500',
+          textMonthFontWeight: '700',
+          textDayHeaderFontWeight: '600',
+          textDayFontSize: 13,
+          textMonthFontSize: 14,
+          textDayHeaderFontSize: 11,
+        }}
+      />
+
+      {/* Time slots */}
+      {selectedDateKey && (
+        <View style={{ paddingHorizontal: spacing.md, paddingTop: 4, paddingBottom: 12 }}>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.grey500, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+            Available times
+          </Text>
+          {timesForDate.length === 0 ? (
+            <Text style={{ fontSize: 13, color: colors.grey500 }}>No slots available for this date.</Text>
+          ) : (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {timesForDate.map((slot) => {
+                const timeLabel = slot.display.split(', ')[1];
+                const active = selectedSlot?.starts_at_local === slot.starts_at_local;
+                return (
+                  <TouchableOpacity
+                    key={slot.starts_at_local}
+                    onPress={() => setSelectedSlot(slot)}
+                    disabled={disabled}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 10,
+                      backgroundColor: active ? colors.purple : 'rgba(69,0,80,0.04)',
+                      borderWidth: 1,
+                      borderColor: active ? colors.purple : 'rgba(69,0,80,0.12)',
+                      minWidth: 80,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? '#fff' : colors.grey700 }}>
+                      {timeLabel}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Confirm button */}
       <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.md }}>
@@ -353,7 +432,7 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
           }}
         >
           <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
-            {selectedSlot ? `Confirm ${selectedSlot.display}` : 'Select a time'}
+            {selectedSlot ? `Confirm ${selectedSlot.display}` : 'Select a time to confirm'}
           </Text>
         </TouchableOpacity>
       </View>

@@ -90,7 +90,7 @@ async function fetchAvailableSlots(daysAhead = 5, timeZone = null) {
   const slots = [];
   let cursor = now.plus({ hours: 1 }).startOf('hour');
 
-  while (cursor < rangeEnd && slots.length < 12) {
+  while (cursor < rangeEnd && slots.length < 60) {
     const weekday = cursor.weekday;
     const hour = cursor.hour;
 
