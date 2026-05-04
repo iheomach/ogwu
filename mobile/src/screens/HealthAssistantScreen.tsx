@@ -596,7 +596,7 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
   );
 }
 
-export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsBase) {
+export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospital }: ScreenPropsBase & { onSendToHospital?: () => void }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const apiUrl = useMemo(() => {
     const base = process.env.EXPO_PUBLIC_API_URL;
@@ -723,6 +723,31 @@ export function HealthAssistantScreen({ busy, location, lat, lon }: ScreenPropsB
               <Text style={{ color: colors.purple, fontSize: 13, fontWeight: '600' }}>New chat</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Send to hospital CTA — shown once AI has responded */}
+          {onSendToHospital && !isLoading && messages.some((m: any) => m.role === 'assistant') && (
+            <TouchableOpacity
+              onPress={onSendToHospital}
+              activeOpacity={0.85}
+              style={{
+                marginHorizontal: spacing.lg,
+                marginTop: spacing.sm,
+                marginBottom: 2,
+                backgroundColor: colors.purple,
+                borderRadius: 12,
+                paddingVertical: 11,
+                paddingHorizontal: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13, flex: 1 }}>
+                Send your health summary to a hospital
+              </Text>
+              <MaterialIcons name="arrow-forward" size={16} color="#fff" />
+            </TouchableOpacity>
+          )}
 
           <ScrollView
             style={{ flex: 1 }}

@@ -22,6 +22,7 @@ import { HealthAssistantScreen } from './screens/HealthAssistantScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { ThreadScreen } from './screens/ThreadScreen';
+import { SendToHospitalScreen } from './screens/SendToHospitalScreen';
 import { initI18n, setLocale as persistLocale, t } from './i18n';
 import type { SupportedLocale } from './i18n/translations';
 import type { TriageQA } from './types';
@@ -504,8 +505,20 @@ export function AppRouter() {
             location={formatLocation(locationSummary)}
             lat={locationSummary?.lat ?? null}
             lon={locationSummary?.lon ?? null}
+            onSendToHospital={() => setScreen('sendToHospital')}
           />
         </TabScaffold>
+      )}
+
+      {screen === 'sendToHospital' && (
+        <SendToHospitalScreen
+          busy={busy}
+          onBack={() => setScreen('newConsult')}
+          onSent={(threadId) => {
+            setActiveThreadId(threadId);
+            setScreen('thread');
+          }}
+        />
       )}
 
       {screen === 'thread' && activeThreadId && (

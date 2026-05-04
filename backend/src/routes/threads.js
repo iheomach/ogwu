@@ -9,7 +9,8 @@ function safeText(s, maxLen) {
   return out.length > maxLen ? out.slice(0, maxLen) : out;
 }
 
-function pickProviderType({ doctor_id, external_provider }) {
+function pickProviderType({ doctor_id, hospital_id, external_provider }) {
+  if (hospital_id) return 'hospital';
   if (doctor_id) return 'onboarded';
   if (external_provider) return 'external';
   return null;
@@ -69,13 +70,14 @@ router.get('/', authenticate, async (req, res) => {
 router.post('/', authenticate, async (req, res) => {
   try {
     const doctor_id = req.body?.doctor_id ? String(req.body.doctor_id) : null;
+    const hospital_id = req.body?.hospital_id ? String(req.body.hospital_id) : null;
     const external_provider = req.body?.external_provider && typeof req.body.external_provider === 'object'
       ? req.body.external_provider
       : null;
 
-    const provider_type = pickProviderType({ doctor_id, external_provider });
+    const provider_type = pickProviderType({ doctor_id, hospital_id, external_provider });
     if (!provider_type) {
-      return res.status(400).json({ error: 'doctor_id or external_provider is required' });
+      return res.status(400).json({ error: 'hospital_id, doctor_id, or external_provider is required' });
     }
 
     const intake = await snapshotLatestIntake(req.user.id);
@@ -89,6 +91,7 @@ router.post('/', authenticate, async (req, res) => {
         patient_id: req.user.id,
         provider_type,
         doctor_id,
+        hospital_id,
         external_provider,
         locale,
         urgency,
@@ -96,7 +99,7 @@ router.post('/', authenticate, async (req, res) => {
         status: 'open',
       })
       .select(
-        'id, patient_id, provider_type, doctor_id, external_provider, locale, urgency, status, created_at, updated_at'
+        'id, patient_id, provider_type, doctor_id, hospital_id, external_provider, locale, urgency, status, created_at, updated_at'
       )
       .single();
 

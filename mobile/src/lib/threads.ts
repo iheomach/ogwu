@@ -6,6 +6,7 @@ export async function threadsList(): Promise<{ threads: ConsultThread[] }> {
 }
 
 export async function threadsCreate(payload: {
+  hospital_id?: string | null;
   doctor_id?: string | null;
   external_provider?: {
     name?: string | null;

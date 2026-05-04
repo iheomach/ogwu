@@ -23,6 +23,7 @@ export type AppScreen =
   | 'triageResults'
   | 'home'
   | 'newConsult'
+  | 'sendToHospital'
   | 'thread'
   | 'records'
   | 'profile';
@@ -77,6 +78,11 @@ export type HomeScreenProps = ScreenPropsBase & {
 export type NewConsultScreenProps = ScreenPropsBase & {
   onViewIntake: () => void;
   onOpenThread: (threadId: string) => void;
+};
+
+export type SendToHospitalScreenProps = ScreenPropsBase & {
+  onBack: () => void;
+  onSent: (threadId: string) => void;
 };
 
 export type RecordsScreenProps = ScreenPropsBase & {

@@ -25,6 +25,7 @@ app.use('/api/integrations/google', require('./routes/google'));
 app.use('/api/appointments', require('./routes/appointments'));
 app.use('/api/agent', require('./routes/agent'));
 app.use('/api/report', require('./routes/report'));
+app.use('/api/hospitals', require('./routes/hospitals'));
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
