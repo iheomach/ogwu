@@ -596,8 +596,9 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
   );
 }
 
-export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospital }: ScreenPropsBase & { onSendToHospital?: () => void }) {
+export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospital, onOpenThread }: ScreenPropsBase & { onSendToHospital?: () => void; onOpenThread?: (threadId: string) => void }) {
   const [isInitialized, setIsInitialized] = useState(false);
+  const [sendingToHospital, setSendingToHospital] = useState(false);
   const apiUrl = useMemo(() => {
     const base = process.env.EXPO_PUBLIC_API_URL;
     if (!base) return null;
@@ -659,6 +660,23 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     const toolName = active.type?.replace('tool-', '') ?? '';
     return TOOL_LABELS[toolName] ?? 'Working on it...';
   }, [isLoading, messages]);
+
+  // Detect endConversation tool result in messages
+  const endConversationData = useMemo(() => {
+    for (const m of [...messages].reverse()) {
+      if ((m as any).role !== 'assistant') continue;
+      const parts: any[] = (m as any).parts ?? [];
+      for (const part of parts) {
+        const toolName = (part.toolInvocation?.toolName) ?? part.type?.replace('tool-', '');
+        if (toolName !== 'endConversation') continue;
+        const output = part.output ?? part.result ?? part.toolInvocation?.result ?? part.toolInvocation?.output;
+        if (output?.ended && output?.hospital_id) {
+          return { hospitalId: output.hospital_id as string, hospitalName: output.hospital_name as string };
+        }
+      }
+    }
+    return null;
+  }, [messages]);
 
   useEffect(() => {
     (async () => {
@@ -724,30 +742,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
             </TouchableOpacity>
           </View>
 
-          {/* Send to hospital CTA — shown once AI has responded */}
-          {onSendToHospital && !isLoading && messages.some((m: any) => m.role === 'assistant') && (
-            <TouchableOpacity
-              onPress={onSendToHospital}
-              activeOpacity={0.85}
-              style={{
-                marginHorizontal: spacing.lg,
-                marginTop: spacing.sm,
-                marginBottom: 2,
-                backgroundColor: colors.purple,
-                borderRadius: 12,
-                paddingVertical: 11,
-                paddingHorizontal: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13, flex: 1 }}>
-                Send your health summary to a hospital
-              </Text>
-              <MaterialIcons name="arrow-forward" size={16} color="#fff" />
-            </TouchableOpacity>
-          )}
+
 
           <ScrollView
             style={{ flex: 1 }}
@@ -948,7 +943,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
             )}
           </ScrollView>
 
-          {/* Conjoined floating input bar */}
+          {/* Bottom bar — input OR send-to-hospital button */}
           <View style={{
             position: 'absolute',
             bottom: 0,
@@ -957,56 +952,105 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
             paddingHorizontal: spacing.lg,
             paddingVertical: spacing.sm,
           }}>
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'flex-end',
-              backgroundColor: 'rgba(255, 255, 255, 0.82)',
-              borderRadius: radius.full,
-              overflow: 'hidden',
-              shadowColor: colors.purple,
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.1,
-              shadowRadius: 16,
-              elevation: 4,
-            }}>
-              <TextInput
-                value={input}
-                onChangeText={(text) => setInput(text)}
-                placeholder={t('assistant.placeholder')}
-                placeholderTextColor="rgba(107, 114, 128, 0.65)"
-                style={{
-                  flex: 1,
-                  minHeight: 48,
-                  maxHeight: 120,
-                  paddingHorizontal: spacing.md,
-                  paddingVertical: 12,
-                  fontSize: 15,
-                  color: colors.grey900,
-                  backgroundColor: 'transparent',
-                }}
-                multiline
-              />
+            {endConversationData ? (
+              /* Conversation ended — replace input with full-width purple send button */
               <TouchableOpacity
+                onPress={async () => {
+                  if (sendingToHospital) return;
+                  try {
+                    setSendingToHospital(true);
+                    const { threadsCreate } = await import('../lib/threads');
+                    const res = await threadsCreate({ hospital_id: endConversationData.hospitalId });
+                    const threadId = res?.thread?.id;
+                    if (threadId && onOpenThread) onOpenThread(threadId);
+                  } catch (e: any) {
+                    const { Alert } = await import('react-native');
+                    Alert.alert('Error', e?.message ?? 'Could not send summary');
+                  } finally {
+                    setSendingToHospital(false);
+                  }
+                }}
+                activeOpacity={0.85}
+                disabled={sendingToHospital}
                 style={{
-                  width: 52,
-                  alignSelf: 'stretch',
-                  backgroundColor: (busy || isLoading || !apiUrl)
-                    ? 'rgba(69, 0, 80, 0.35)'
-                    : 'rgba(69, 0, 80, 0.6)',
+                  flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  backgroundColor: colors.purple,
+                  borderRadius: radius.full,
+                  minHeight: 48,
+                  paddingHorizontal: spacing.md,
+                  shadowColor: colors.purple,
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 16,
+                  elevation: 4,
+                  gap: 8,
                 }}
-                onPress={() => handleSubmit()}
-                disabled={busy || isLoading || !apiUrl}
-                accessibilityRole="button"
-                activeOpacity={0.8}
               >
-                {isLoading
+                {sendingToHospital
                   ? <ActivityIndicator color={colors.white} size="small" />
-                  : <MaterialIcons name="arrow-forward" size={22} color={colors.white} />
+                  : <>
+                      <Text style={{ color: colors.white, fontWeight: '600', fontSize: 15 }}>
+                        Send summary to {endConversationData.hospitalName}
+                      </Text>
+                      <MaterialIcons name="arrow-forward" size={20} color={colors.white} />
+                    </>
                 }
               </TouchableOpacity>
-            </View>
+            ) : (
+              /* Normal chat input */
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'flex-end',
+                backgroundColor: 'rgba(255, 255, 255, 0.82)',
+                borderRadius: radius.full,
+                overflow: 'hidden',
+                shadowColor: colors.purple,
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.1,
+                shadowRadius: 16,
+                elevation: 4,
+              }}>
+                <TextInput
+                  value={input}
+                  onChangeText={(text) => setInput(text)}
+                  placeholder={t('assistant.placeholder')}
+                  placeholderTextColor="rgba(107, 114, 128, 0.65)"
+                  style={{
+                    flex: 1,
+                    minHeight: 48,
+                    maxHeight: 120,
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: 12,
+                    fontSize: 15,
+                    color: colors.grey900,
+                    backgroundColor: 'transparent',
+                  }}
+                  multiline
+                />
+                <TouchableOpacity
+                  style={{
+                    width: 52,
+                    alignSelf: 'stretch',
+                    backgroundColor: (busy || isLoading || !apiUrl)
+                      ? 'rgba(69, 0, 80, 0.35)'
+                      : 'rgba(69, 0, 80, 0.6)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => handleSubmit()}
+                  disabled={busy || isLoading || !apiUrl}
+                  accessibilityRole="button"
+                  activeOpacity={0.8}
+                >
+                  {isLoading
+                    ? <ActivityIndicator color={colors.white} size="small" />
+                    : <MaterialIcons name="arrow-forward" size={22} color={colors.white} />
+                  }
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
         </View>

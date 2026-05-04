@@ -96,6 +96,7 @@ module.exports = function bookAppointmentSkill({ z, supabase, profile, getClinic
           appointment_id: appt.id,
           starts_at: appt.starts_at,
           meeting_url: meetingUrl,
+          hospital_id: hospital.id,
           hospital_name: hospital.name,
           message: meetingUrl ? `Appointment booked! Meeting link: ${meetingUrl}` : 'Appointment booked. A meeting link will be sent shortly.',
         };

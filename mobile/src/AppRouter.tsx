@@ -505,7 +505,10 @@ export function AppRouter() {
             location={formatLocation(locationSummary)}
             lat={locationSummary?.lat ?? null}
             lon={locationSummary?.lon ?? null}
-            onSendToHospital={() => setScreen('sendToHospital')}
+            onOpenThread={(threadId) => {
+              setActiveThreadId(threadId);
+              setScreen('thread');
+            }}
           />
         </TabScaffold>
       )}
