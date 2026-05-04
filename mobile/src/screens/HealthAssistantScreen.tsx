@@ -575,9 +575,26 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     }
   };
 
+  // Tools that render their own interactive UI — suppress the spinner while
+  // the AI narrates alongside them so the calendar/hospital list isn't cluttered.
+  const UI_RENDERING_TOOLS = new Set(['searchHospitals', 'getHospitalBookingInfo', 'bookAppointment']);
+
   // Derive a short label from whichever tool is currently active.
   const thinkingLabel = useMemo(() => {
     if (!isLoading) return null;
+
+    // If a UI-rendering tool has already produced a result, the interactive
+    // widget is visible — hide the spinner while the AI writes its narration.
+    const hasRenderedUI = messages.some((m: any) => {
+      if (m.role !== 'assistant') return false;
+      return ((m as any).parts ?? []).some((p: any) => {
+        const tn = p.toolInvocation?.toolName ?? (p.type ?? '').replace('tool-', '');
+        const state = p.state ?? p.toolInvocation?.state ?? '';
+        return UI_RENDERING_TOOLS.has(tn) && (state === 'output-available' || state === 'result');
+      });
+    });
+    if (hasRenderedUI) return null;
+
     const lastAssistant = [...messages].reverse().find((m: any) => m.role === 'assistant');
     const parts: any[] = (lastAssistant as any)?.parts || [];
     const active = parts
