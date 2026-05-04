@@ -608,17 +608,19 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     return TOOL_LABELS[toolName] ?? 'Working on it...';
   }, [isLoading, messages]);
 
-  // Detect endConversation tool result in messages
+  // Show send-summary button as soon as bookAppointment succeeds.
   const endConversationData = useMemo(() => {
     for (const m of [...messages].reverse()) {
       if ((m as any).role !== 'assistant') continue;
       const parts: any[] = (m as any).parts ?? [];
       for (const part of parts) {
-        const toolName = (part.toolInvocation?.toolName) ?? part.type?.replace('tool-', '');
-        if (toolName !== 'endConversation') continue;
-        const output = part.output ?? part.result ?? part.toolInvocation?.result ?? part.toolInvocation?.output;
-        if (output?.ended && output?.hospital_id) {
-          return { hospitalId: output.hospital_id as string, hospitalName: output.hospital_name as string };
+        const toolName = (part.toolInvocation?.toolName) ?? (part.type ?? '').replace('tool-', '');
+        const state = part.state ?? part.toolInvocation?.state ?? '';
+        if (toolName === 'bookAppointment' && (state === 'output-available' || state === 'result')) {
+          const output = part.output ?? part.result ?? part.toolInvocation?.result ?? part.toolInvocation?.output;
+          if (output?.success && output?.hospital_id) {
+            return { hospitalId: output.hospital_id as string, hospitalName: output.hospital_name as string };
+          }
         }
       }
     }
