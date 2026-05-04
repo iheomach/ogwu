@@ -9,6 +9,20 @@ function safeText(s, maxLen) {
   return out.length > maxLen ? out.slice(0, maxLen) : out;
 }
 
+function formatIntakeSummaryMessage(intake) {
+  if (!intake) return null;
+  const urgencyLabel = { emergency: '🔴 Emergency', urgent: '🟠 Urgent', soon: '🟡 See soon', routine: '🟢 Routine' }[intake.urgency] ?? intake.urgency;
+  const lines = [urgencyLabel];
+  if (intake.summary) lines.push('\n' + intake.summary);
+  if (Array.isArray(intake.answers) && intake.answers.length > 0) {
+    lines.push('\nTriage responses:');
+    for (const { q, a } of intake.answers) {
+      if (q && a) lines.push(`• ${q}\n  → ${a}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 function pickProviderType({ doctor_id, hospital_id, external_provider }) {
   if (hospital_id) return 'hospital';
   if (doctor_id) return 'onboarded';
@@ -40,27 +54,33 @@ async function snapshotLatestIntake(userId) {
 // List threads for current patient
 router.get('/', authenticate, async (req, res) => {
   try {
-    // Try embedding doctor info, but fail open if joins aren't supported.
-    const withJoin = await supabase
+    const { data: threads, error } = await supabase
       .from('consult_threads')
       .select(
-        'id, patient_id, provider_type, doctor_id, external_provider, locale, urgency, status, created_at, updated_at, doctor:doctors(id, name, primary_specialty, hospital_name, location)'
+        'id, patient_id, provider_type, doctor_id, hospital_id, external_provider, locale, urgency, status, intake_snapshot, created_at, updated_at, doctor:doctors(id, name, primary_specialty, hospital_name, location)'
       )
       .eq('patient_id', req.user.id)
       .order('created_at', { ascending: false });
 
-    if (!withJoin.error) {
-      return res.json({ threads: withJoin.data ?? [] });
+    if (error) return res.status(400).json({ error: error.message });
+
+    // Enrich hospital threads with hospital name
+    const hospitalIds = [...new Set((threads ?? []).filter(t => t.hospital_id).map(t => t.hospital_id))];
+    let hospitalNames = {};
+    if (hospitalIds.length > 0) {
+      const { data: hospitals } = await supabase
+        .from('hospitals_directory')
+        .select('id, name')
+        .in('id', hospitalIds);
+      (hospitals ?? []).forEach(h => { hospitalNames[h.id] = h.name; });
     }
 
-    const fallback = await supabase
-      .from('consult_threads')
-      .select('id, patient_id, provider_type, doctor_id, external_provider, locale, urgency, status, created_at, updated_at')
-      .eq('patient_id', req.user.id)
-      .order('created_at', { ascending: false });
+    const enriched = (threads ?? []).map(t => ({
+      ...t,
+      hospital_name: t.hospital_id ? (hospitalNames[t.hospital_id] ?? null) : null,
+    }));
 
-    if (fallback.error) return res.status(400).json({ error: fallback.error.message });
-    return res.json({ threads: fallback.data ?? [] });
+    return res.json({ threads: enriched });
   } catch (err) {
     return res.status(400).json({ error: err.message || 'Failed to load consult threads' });
   }
@@ -104,7 +124,29 @@ router.post('/', authenticate, async (req, res) => {
       .single();
 
     if (error) return res.status(400).json({ error: error.message });
-    return res.status(201).json({ thread: data });
+
+    // Auto-insert health summary as the first message in the thread
+    const summaryBody = formatIntakeSummaryMessage(intake);
+    if (summaryBody) {
+      await supabase.from('consult_messages').insert({
+        thread_id: data.id,
+        sender_role: 'patient',
+        body: summaryBody,
+      });
+    }
+
+    // Resolve hospital name if applicable
+    let hospital_name = null;
+    if (hospital_id) {
+      const { data: hosp } = await supabase
+        .from('hospitals_directory')
+        .select('name')
+        .eq('id', hospital_id)
+        .maybeSingle();
+      hospital_name = hosp?.name ?? null;
+    }
+
+    return res.status(201).json({ thread: { ...data, hospital_name } });
   } catch (err) {
     return res.status(400).json({ error: err.message || 'Failed to create consult thread' });
   }

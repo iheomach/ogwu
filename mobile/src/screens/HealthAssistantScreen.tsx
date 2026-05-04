@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react';
 import {
+  Alert,
   Animated,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -20,6 +21,7 @@ import { fetch as expoFetch } from 'expo/fetch';
 
 import { Calendar } from 'react-native-calendars';
 import { supabase } from '../../lib/supabase';
+import { threadsCreate } from '../lib/threads';
 import type { ScreenPropsBase } from '../types';
 import { colors, spacing, styles } from '../ui/styles';
 import { t } from '../i18n';
@@ -750,10 +752,12 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
 
               // Strip numbered/bulleted list items as soon as the tool is called (not just
               // when results arrive) so streaming slot/hospital text never flashes on screen.
+              // The \d+\.(\s|$) pattern catches partial lines like "53." before the slot
+              // text has streamed in, not just complete "53. 9:00 AM" lines.
               let displayText = (searchHospitalsCalled || slotPickerCalled)
                 ? text
                     .split('\n')
-                    .filter((line) => !/^\s*[-•*]\s+\S|^\s*\d+\.\s+\S/.test(line))
+                    .filter((line) => !/^\s*[-•*]\s+\S|^\s*\d+\.(\s|$)|^\s*\d+\s*$/.test(line))
                     .join('\n')
                     .replace(/\n{3,}/g, '\n\n')
                     .trim()
@@ -899,12 +903,10 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                   if (sendingToHospital) return;
                   try {
                     setSendingToHospital(true);
-                    const { threadsCreate } = await import('../lib/threads');
                     const res = await threadsCreate({ hospital_id: endConversationData.hospitalId });
                     const threadId = res?.thread?.id;
                     if (threadId && onOpenThread) onOpenThread(threadId);
                   } catch (e: any) {
-                    const { Alert } = await import('react-native');
                     Alert.alert('Error', e?.message ?? 'Could not send summary');
                   } finally {
                     setSendingToHospital(false);

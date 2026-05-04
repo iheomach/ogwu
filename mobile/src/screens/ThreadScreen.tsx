@@ -1,21 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import type { ConsultMessage, ConsultThread, ScreenPropsBase } from '../types';
-import { styles, colors } from '../ui/styles';
+import { styles, colors, spacing } from '../ui/styles';
 import { t } from '../i18n';
-import { threadMessageSend, threadMessagesList, threadsList } from '../lib/threads';
+import { threadMessagesList, threadsList } from '../lib/threads';
 
 export type ThreadScreenProps = ScreenPropsBase & {
   threadId: string;
@@ -26,9 +24,18 @@ function formatTime(iso: string): string {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleString();
+    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   } catch {
     return '';
+  }
+}
+
+function urgencyLabel(urgency?: string | null): string {
+  switch (urgency) {
+    case 'emergency': return '🔴 Emergency';
+    case 'urgent':    return '🟠 Urgent';
+    case 'soon':      return '🟡 See soon';
+    default:          return '🟢 Routine';
   }
 }
 
@@ -36,31 +43,22 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
   const [loading, setLoading] = useState(true);
   const [thread, setThread] = useState<ConsultThread | null>(null);
   const [messages, setMessages] = useState<ConsultMessage[]>([]);
-  const [draft, setDraft] = useState('');
-  const [focused, setFocused] = useState(false);
-
-  const title = useMemo(() => {
-    if (thread?.provider_type === 'external') return t('thread.externalTitle');
-    if (thread?.doctor?.name) return thread.doctor.name;
-    return t('thread.title');
-  }, [thread?.provider_type, thread?.doctor?.name]);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setLoading(true);
-
-        // Load thread metadata (via list endpoint, to keep API surface minimal)
-        const listRes = await threadsList();
+        const [listRes, msgRes] = await Promise.all([
+          threadsList(),
+          threadMessagesList(threadId),
+        ]);
+        if (!mounted) return;
         const found = Array.isArray(listRes?.threads)
-          ? listRes.threads.find((x) => x && x.id === threadId) ?? null
+          ? (listRes.threads.find((x) => x?.id === threadId) ?? null)
           : null;
-        if (!mounted) return;
         setThread(found);
-
-        const msgRes = await threadMessagesList(threadId);
-        if (!mounted) return;
         setMessages(Array.isArray(msgRes?.messages) ? msgRes.messages : []);
       } catch (e: any) {
         if (!mounted) return;
@@ -69,105 +67,142 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
         if (mounted) setLoading(false);
       }
     })();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [threadId]);
 
-  const onSend = async () => {
-    const body = draft.trim();
-    if (!body) return;
+  const providerName = thread?.hospital_name
+    ?? thread?.doctor?.name
+    ?? (thread?.external_provider?.name || null)
+    ?? 'Care team';
 
-    try {
-      setDraft('');
-      const res = await threadMessageSend(threadId, { body });
-      const msg = res?.message;
-      if (msg) setMessages((prev) => [...prev, msg]);
-    } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+  const urgency = thread?.urgency ?? thread?.intake_snapshot?.urgency;
+
+  // If no messages were auto-inserted (old thread or backend edge case),
+  // synthesize the first message from the intake_snapshot on the thread.
+  const displayMessages: ConsultMessage[] = (() => {
+    if (messages.length > 0) return messages;
+    const snap = thread?.intake_snapshot;
+    if (!snap) return [];
+    const urgencyLabel = { emergency: '🔴 Emergency', urgent: '🟠 Urgent', soon: '🟡 See soon', routine: '🟢 Routine' }[snap.urgency ?? 'routine'] ?? '🟢 Routine';
+    const lines: string[] = [urgencyLabel];
+    if (snap.summary) lines.push('\n' + snap.summary);
+    if (Array.isArray(snap.answers) && snap.answers.length > 0) {
+      lines.push('\nTriage responses:');
+      for (const { q, a } of snap.answers) {
+        if (q && a) lines.push(`• ${q}\n  → ${a}`);
+      }
     }
-  };
+    return [{
+      id: 'snapshot',
+      thread_id: threadId,
+      sender_role: 'patient',
+      body: lines.join('\n'),
+      created_at: thread?.created_at ?? new Date().toISOString(),
+    }];
+  })();
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={[styles.content, { justifyContent: 'flex-start', opacity: busy ? 0.7 : 1 }]}
-          keyboardShouldPersistTaps="handled"
+
+      {/* Toolbar */}
+      <View style={styles.assistantToolbar}>
+        <TouchableOpacity
+          onPress={onBack}
+          disabled={busy}
+          style={styles.newChatButton}
+          activeOpacity={0.7}
         >
-          <TouchableOpacity style={styles.btnGhost} onPress={onBack} disabled={busy}>
-            <Text style={styles.btnGhostText}>{t('common.back')}</Text>
-          </TouchableOpacity>
+          <MaterialIcons name="arrow-back" size={20} color={colors.purple} />
+          <Text style={styles.newChatButtonText}>Back</Text>
+        </TouchableOpacity>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={styles.assistantToolbarTitle}>{providerName}</Text>
+          <Text style={{ fontSize: 11, color: colors.grey500 }}>Health summary sent</Text>
+        </View>
+      </View>
 
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.helper}>{t('thread.helper')}</Text>
+      <ScrollView
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xl }}
+        showsVerticalScrollIndicator={false}
+        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+      >
+        {/* Context pill */}
+        {urgency && (
+          <View style={{
+            alignSelf: 'center',
+            backgroundColor: 'rgba(69,0,80,0.06)',
+            borderRadius: 20,
+            paddingHorizontal: 14,
+            paddingVertical: 6,
+            marginBottom: spacing.lg,
+          }}>
+            <Text style={{ fontSize: 12, color: colors.grey500, fontWeight: '500' }}>
+              {urgencyLabel(urgency)} · Sent to {providerName}
+            </Text>
+          </View>
+        )}
 
-          {loading && (
-            <View style={[styles.center, { paddingHorizontal: 0, paddingVertical: 24 }]}>
-              <ActivityIndicator color={colors.purple} />
-            </View>
-          )}
-
-          {!loading && messages.length === 0 && (
-            <View style={styles.card}>
-              <Text style={styles.value}>{t('thread.emptyTitle')}</Text>
-              <Text style={[styles.helper, { marginBottom: 0 }]}>{t('thread.emptyBody')}</Text>
-            </View>
-          )}
-
-          {!loading && messages.length > 0 && (
-            <>
-              {messages.map((m, idx) => {
-                const isPatient = m.sender_role === 'patient';
-                return (
-                  <View
-                    key={m.id}
-                    style={[
-                      styles.card,
-                      idx > 0 && styles.mt16,
-                      isPatient ? { borderColor: colors.purpleLight, backgroundColor: colors.white } : null,
-                    ]}
-                  >
-                    <Text style={[styles.label, { marginTop: 0 }]}> 
-                      {isPatient ? t('thread.you') : t('thread.provider')} • {formatTime(m.created_at)}
+        {loading ? (
+          <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+            <ActivityIndicator color={colors.purple} />
+          </View>
+        ) : (
+          <>
+            {displayMessages.map((m) => {
+              const isPatient = m.sender_role === 'patient';
+              const isSystem  = m.sender_role === 'system';
+              return (
+                <View
+                  key={m.id}
+                  style={{ marginBottom: spacing.sm, alignItems: isPatient ? 'flex-end' : 'flex-start' }}
+                >
+                  <View style={isPatient ? styles.userBubble : styles.assistantBubble}>
+                    <Text style={{
+                      color: isPatient ? colors.white : colors.grey900,
+                      fontSize: 14,
+                      lineHeight: 21,
+                    }}>
+                      {m.body}
                     </Text>
-                    <Text style={[styles.value, { marginTop: 6 }]}>{m.body}</Text>
+                    <Text style={{
+                      fontSize: 11,
+                      marginTop: 6,
+                      color: isPatient ? 'rgba(255,255,255,0.6)' : colors.grey500,
+                      alignSelf: isPatient ? 'flex-end' : 'flex-start',
+                    }}>
+                      {isSystem ? 'System' : isPatient ? 'You' : providerName} · {formatTime(m.created_at)}
+                    </Text>
                   </View>
-                );
-              })}
-            </>
-          )}
+                </View>
+              );
+            })}
+          </>
+        )}
+      </ScrollView>
 
-          <View style={styles.mt24} />
+      {/* Waiting status bar — provider response flow not yet live */}
+      <View style={{
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(69,0,80,0.07)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+      }}>
+        <View style={{
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: '#16A34A',
+        }} />
+        <Text style={{ fontSize: 13, color: colors.grey500, flex: 1 }}>
+          Summary delivered. {providerName} will respond here once they review it.
+        </Text>
+      </View>
 
-          <Text style={styles.inputLabel}>{t('thread.messageLabel')}</Text>
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            placeholder={t('thread.messagePlaceholder')}
-            placeholderTextColor={colors.grey300}
-            multiline
-            style={[styles.input, focused && styles.inputFocused, styles.textArea]}
-            editable={!busy}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-          />
-
-          <TouchableOpacity
-            style={[styles.btnPrimary, (busy || draft.trim().length === 0) && styles.btnPrimaryDisabled]}
-            onPress={onSend}
-            disabled={busy || draft.trim().length === 0}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.btnPrimaryText}>{t('thread.send')}</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

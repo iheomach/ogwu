@@ -149,8 +149,10 @@ export type ExternalProviderResult = {
 export type ConsultThread = {
   id: string;
   patient_id: string;
-  provider_type: 'onboarded' | 'external';
+  provider_type: 'onboarded' | 'external' | 'hospital';
   doctor_id: string | null;
+  hospital_id: string | null;
+  hospital_name: string | null;
   external_provider: ExternalProvider | null;
   locale: string | null;
   urgency: UrgencyTier;
@@ -163,6 +165,11 @@ export type ConsultThread = {
     primary_specialty: string;
     hospital_name: string;
     location: string;
+  } | null;
+  intake_snapshot?: {
+    urgency: UrgencyTier;
+    summary: string | null;
+    answers: Array<{ q: string; a: string }>;
   } | null;
 };
 
