@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Text,
   View,
 } from 'react-native';
@@ -412,10 +413,11 @@ export function AppRouter() {
   if (isBooting) {
     return (
       <View style={[styles.center, { backgroundColor: '#fff' }]}>
-        <View style={[styles.brandRow, { marginBottom: 24 }]}>
-          <View style={styles.brandDot} />
-          <Text style={styles.brandName}>Ogwu</Text>
-        </View>
+        <Image
+          source={require('../assets/ogwu-ios.png')}
+          style={{ width: 72, height: 72, borderRadius: 16, marginBottom: 24 }}
+          resizeMode="contain"
+        />
         <ActivityIndicator color={colors.purple} />
       </View>
     );
