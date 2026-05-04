@@ -700,8 +700,14 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
               const isSlotSelection = role === 'user' && text.startsWith("I'd like to book the ");
 
 
-              // Suppress text bubble when this message renders hospital cards or slot picker
-              const hasHospitalCards = toolParts.some((part: any) => {
+              // ── Tool call detection ──────────────────────────────────────────────
+              // "Called" = tool exists in any state (used to pre-suppress streaming text).
+              // "Ready"  = tool has a usable result (used to render the UI widget).
+
+              const searchHospitalsCalled = toolParts.some((p: any) =>
+                (p.toolInvocation?.toolName ?? (p.type ?? '').replace('tool-', '')) === 'searchHospitals'
+              );
+              const hasHospitalCards = searchHospitalsCalled && toolParts.some((part: any) => {
                 const invocation = part.toolInvocation;
                 const toolName = invocation?.toolName ?? (part.type ?? '').replace('tool-', '');
                 const invState = part.state ?? invocation?.state ?? '';
@@ -715,7 +721,11 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                 return Array.isArray(hospitals) && hospitals.length > 0;
               });
 
-              const hasSlotPicker = toolParts.some((part: any) => {
+              // Suppress slot list in streaming text as soon as getHospitalBookingInfo is called.
+              const slotPickerCalled = toolParts.some((p: any) =>
+                (p.toolInvocation?.toolName ?? (p.type ?? '').replace('tool-', '')) === 'getHospitalBookingInfo'
+              );
+              const hasSlotPicker = slotPickerCalled && toolParts.some((part: any) => {
                 const invocation = part.toolInvocation;
                 const toolName = invocation?.toolName ?? (part.type ?? '').replace('tool-', '');
                 const invState = part.state ?? invocation?.state ?? '';
@@ -725,7 +735,10 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                 return output?.type === 'onboarded' && Array.isArray(output?.available_slots) && output.available_slots.length > 0;
               });
 
-              const hasCalendarButton = toolParts.some((part: any) => {
+              const bookAppointmentCalled = toolParts.some((p: any) =>
+                (p.toolInvocation?.toolName ?? (p.type ?? '').replace('tool-', '')) === 'bookAppointment'
+              );
+              const hasCalendarButton = bookAppointmentCalled && toolParts.some((part: any) => {
                 const invocation = part.toolInvocation;
                 const toolName = invocation?.toolName ?? (part.type ?? '').replace('tool-', '');
                 const invState = part.state ?? invocation?.state ?? '';
@@ -735,9 +748,9 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                 return output?.success && output?.meeting_url;
               });
 
-              // Strip numbered/bulleted list items when UI replaces them;
-              // strip Meet/meeting links when calendar button is shown
-              let displayText = (hasHospitalCards || hasSlotPicker)
+              // Strip numbered/bulleted list items as soon as the tool is called (not just
+              // when results arrive) so streaming slot/hospital text never flashes on screen.
+              let displayText = (searchHospitalsCalled || slotPickerCalled)
                 ? text
                     .split('\n')
                     .filter((line) => !/^\s*[-•*]\s+\S|^\s*\d+\.\s+\S/.test(line))
