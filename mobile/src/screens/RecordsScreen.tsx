@@ -33,6 +33,47 @@ function formatDate(iso: string): string {
   }
 }
 
+function toRoman(n: number): string {
+  const vals = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
+  const syms = ['M', 'CM', 'D', 'CD', 'C', 'XC', 'L', 'XL', 'X', 'IX', 'V', 'IV', 'I'];
+  let out = '';
+  for (let i = 0; i < vals.length; i++) {
+    while (n >= vals[i]) { out += syms[i]; n -= vals[i]; }
+  }
+  return out;
+}
+
+function conditionBase(th: ConsultThread): string {
+  const s = (th.intake_snapshot?.summary ?? '').trim();
+  if (s) return s.split(/\s+/).slice(0, 6).join(' ');
+  if (th.provider_type === 'external') return th.external_provider?.name ?? 'External provider';
+  if (th.doctor?.name) return th.doctor.name;
+  return 'Async consult';
+}
+
+function buildThreadTitles(threads: ConsultThread[]): Map<string, string> {
+  // Patient's own threads — group by base condition title only
+  const groups = new Map<string, ConsultThread[]>();
+  for (const th of threads) {
+    const base = conditionBase(th);
+    const g = groups.get(base) ?? [];
+    g.push(th);
+    groups.set(base, g);
+  }
+
+  const result = new Map<string, string>();
+  for (const [base, group] of groups) {
+    if (group.length === 1) {
+      result.set(group[0].id, base);
+    } else {
+      // threads arrive newest-first; sort ascending so oldest = I
+      const sorted = [...group].sort((a, b) => a.created_at.localeCompare(b.created_at));
+      sorted.forEach((th, i) => result.set(th.id, `${base} ${toRoman(i + 1)}`));
+    }
+  }
+  return result;
+}
+
 export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
   const [loading, setLoading] = useState(true);
   const [encounters, setEncounters] = useState<Encounter[]>([]);
@@ -129,6 +170,7 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
   }, []);
 
   const hasAny = useMemo(() => encounters.length > 0, [encounters.length]);
+  const threadTitles = useMemo(() => buildThreadTitles(threads), [threads]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -177,9 +219,7 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
                   activeOpacity={0.9}
                 >
                   <Text style={styles.value}>
-                    {th.provider_type === 'external'
-                      ? th.external_provider?.name || t('thread.externalTitle')
-                      : th.doctor?.name || t('thread.title')}
+                    {threadTitles.get(th.id) ?? conditionBase(th)}
                   </Text>
                   <Text style={[styles.helper, { marginBottom: 0, marginTop: 6 }]}>
                     {formatDate(th.created_at)} • {t(`triageResults.urgency_${(th.urgency ?? 'routine') as any}`)}

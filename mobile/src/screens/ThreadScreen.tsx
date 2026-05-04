@@ -30,14 +30,6 @@ function formatTime(iso: string): string {
   }
 }
 
-function urgencyLabel(urgency?: string | null): string {
-  switch (urgency) {
-    case 'emergency': return '🔴 Emergency';
-    case 'urgent':    return '🟠 Urgent';
-    case 'soon':      return '🟡 See soon';
-    default:          return '🟢 Routine';
-  }
-}
 
 export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
   const [loading, setLoading] = useState(true);
@@ -74,8 +66,6 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
     ?? thread?.doctor?.name
     ?? (thread?.external_provider?.name || null)
     ?? 'Care team';
-
-  const urgency = thread?.urgency ?? thread?.intake_snapshot?.urgency;
 
   // If no messages were auto-inserted (old thread or backend edge case),
   // synthesize the first message from the intake_snapshot on the thread.
@@ -128,21 +118,6 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
       >
-        {/* Context pill */}
-        {urgency && (
-          <View style={{
-            alignSelf: 'center',
-            backgroundColor: 'rgba(69,0,80,0.06)',
-            borderRadius: 20,
-            paddingHorizontal: 14,
-            paddingVertical: 6,
-            marginBottom: spacing.lg,
-          }}>
-            <Text style={{ fontSize: 12, color: colors.grey500, fontWeight: '500' }}>
-              {urgencyLabel(urgency)} · Sent to {providerName}
-            </Text>
-          </View>
-        )}
 
         {loading ? (
           <View style={{ alignItems: 'center', paddingVertical: 40 }}>
