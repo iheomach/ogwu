@@ -21,7 +21,7 @@ import { fetch as expoFetch } from 'expo/fetch';
 import { Calendar } from 'react-native-calendars';
 import { supabase } from '../../lib/supabase';
 import type { ScreenPropsBase } from '../types';
-import { colors, radius, spacing, styles } from '../ui/styles';
+import { colors, spacing, styles } from '../ui/styles';
 import { t } from '../i18n';
 
 async function authedFetch(input: string, init?: RequestInit) {
@@ -78,43 +78,12 @@ function renderToolInvocation(part: any): ReactNode {
   }
 
   return statusText ? (
-    <View key={`tool-${part.toolCallId}`} style={{ marginBottom: spacing.sm }}>
-      <Text style={{ color: statusColor, fontSize: 12, fontStyle: 'italic' }}>{statusText}</Text>
+    <View key={`tool-${part.toolCallId}`} style={styles.toolStatusRow}>
+      <Text style={[styles.toolStatusText, { color: statusColor }]}>{statusText}</Text>
     </View>
   ) : null;
 }
 
-// Glass bubble for assistant messages
-const glassBubbleStyle = {
-  alignSelf: 'flex-start' as const,
-  backgroundColor: 'rgba(69, 0, 80, 0.06)',
-  borderWidth: 1,
-  borderColor: 'rgba(69, 0, 80, 0.12)',
-  padding: spacing.md,
-  borderRadius: 18,
-  marginBottom: spacing.sm,
-  maxWidth: '88%' as const,
-  shadowColor: colors.purple,
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.06,
-  shadowRadius: 8,
-  elevation: 2,
-};
-
-// Solid bubble for user messages
-const userBubbleStyle = {
-  alignSelf: 'flex-end' as const,
-  backgroundColor: colors.purple,
-  padding: spacing.md,
-  borderRadius: 18,
-  marginBottom: spacing.sm,
-  maxWidth: '88%' as const,
-  shadowColor: colors.purple,
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.25,
-  shadowRadius: 10,
-  elevation: 4,
-};
 
 const TOOL_LABELS: Record<string, string> = {
   searchHospitals: 'Searching hospitals near you...',
@@ -196,35 +165,19 @@ function AddToCalendarButton({ startsAt, meetingUrl, hospitalName }: {
     <TouchableOpacity
       onPress={() => Linking.openURL(calendarUrl)}
       activeOpacity={0.8}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(66,133,244,0.3)',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        marginTop: spacing.sm,
-        shadowColor: '#4285F4',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 6,
-        elevation: 2,
-      }}
+      style={styles.gcalButton}
     >
       {/* Google Calendar logo colours */}
-      <View style={{ width: 28, height: 28, borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
-        <View style={{ position: 'absolute', inset: 0, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#4285F4', borderRadius: 6 }} />
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 8, backgroundColor: '#4285F4', borderTopLeftRadius: 4, borderTopRightRadius: 4 }} />
-        <View style={{ position: 'absolute', bottom: 3, alignSelf: 'center' }}>
-          <Text style={{ fontSize: 11, fontWeight: '800', color: '#4285F4', lineHeight: 13 }}>31</Text>
+      <View style={styles.gcalIconOuter}>
+        <View style={styles.gcalIconBorder} />
+        <View style={styles.gcalIconHeader} />
+        <View style={styles.gcalIconDateWrap}>
+          <Text style={styles.gcalIconDateText}>31</Text>
         </View>
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: '#1a1a1a' }}>Add to Google Calendar</Text>
-        <Text style={{ fontSize: 11, color: colors.grey500, marginTop: 1 }}>Includes Google Meet link</Text>
+      <View style={styles.spacer}>
+        <Text style={styles.gcalLabel}>Add to Google Calendar</Text>
+        <Text style={styles.gcalSubtitle}>Includes Google Meet link</Text>
       </View>
       <MaterialIcons name="open-in-new" size={16} color="#4285F4" />
     </TouchableOpacity>
@@ -307,28 +260,16 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
   };
 
   return (
-    <View style={{
-      backgroundColor: '#fff',
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: 'rgba(69,0,80,0.1)',
-      overflow: 'hidden',
-      marginBottom: spacing.sm,
-      shadowColor: colors.purple,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.07,
-      shadowRadius: 8,
-      elevation: 2,
-    }}>
+    <View style={styles.slotPickerContainer}>
       {/* Header */}
-      <View style={{ backgroundColor: colors.purple, paddingHorizontal: spacing.md, paddingVertical: 12 }}>
-        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{hospitalName}</Text>
-        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 2 }}>Select an available date and time</Text>
+      <View style={styles.slotPickerHeader}>
+        <Text style={styles.slotPickerHospitalName}>{hospitalName}</Text>
+        <Text style={styles.slotPickerSubtitle}>Select an available date and time</Text>
       </View>
 
       {/* Date text input */}
       <View style={{ paddingHorizontal: spacing.md, paddingTop: 14, paddingBottom: 8 }}>
-        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.grey500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+        <Text style={[styles.slotPickerSectionLabel, { marginBottom: 6 }]}>
           Jump to date
         </Text>
         <TextInput
@@ -385,7 +326,7 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
       {/* Time slots */}
       {selectedDateKey && (
         <View style={{ paddingHorizontal: spacing.md, paddingTop: 4, paddingBottom: 12 }}>
-          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.grey500, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+          <Text style={[styles.slotPickerSectionLabel, { marginBottom: 10 }]}>
             Available times
           </Text>
           {timesForDate.length === 0 ? (
@@ -434,7 +375,7 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
             alignItems: 'center',
           }}
         >
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
+          <Text style={styles.slotConfirmBtnText}>
             {selectedSlot ? `Confirm ${selectedSlot.display}` : 'Select a time to confirm'}
           </Text>
         </TouchableOpacity>
@@ -455,49 +396,38 @@ function HospitalCard({ h, selected, onPress, disabled }: {
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.75}
-      style={{
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        padding: spacing.md,
-        marginBottom: 12,
-        borderWidth: selected ? 2 : 1,
-        borderColor: selected ? colors.purple : 'rgba(69, 0, 80, 0.1)',
-        shadowColor: colors.purple,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.07,
-        shadowRadius: 8,
-        elevation: 2,
-      }}
+      style={[
+        styles.hospitalCard,
+        { borderWidth: selected ? 2 : 1, borderColor: selected ? colors.purple : 'rgba(69, 0, 80, 0.1)' },
+      ]}
     >
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <Text style={{ fontWeight: '700', fontSize: 14, color: colors.grey900, flex: 1, marginRight: 8 }}>
-          {h.name}
-        </Text>
+      <View style={styles.hospitalCardHeader}>
+        <Text style={styles.hospitalCardName}>{h.name}</Text>
         {h.distance_km != null && (
-          <Text style={{ fontSize: 12, color: colors.purple, fontWeight: '600' }}>{h.distance_km} km</Text>
+          <Text style={styles.hospitalCardDistance}>{h.distance_km} km</Text>
         )}
       </View>
-      <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 3 }}>
+      <Text style={styles.hospitalCardLocation}>
         {[h.city, h.state].filter(Boolean).join(', ')}
       </Text>
       {Array.isArray(h.specialties) && h.specialties.length > 0 && (
-        <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 3 }} numberOfLines={1}>
+        <Text style={styles.hospitalCardLocation} numberOfLines={1}>
           {h.specialties.slice(0, 3).join(' · ')}
         </Text>
       )}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+      <View style={styles.hospitalCardBadgesRow}>
         {h.has_emergency && (
-          <View style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-            <Text style={{ fontSize: 10, color: colors.error, fontWeight: '600' }}>Emergency</Text>
+          <View style={styles.emergencyBadge}>
+            <Text style={styles.emergencyBadgeText}>Emergency</Text>
           </View>
         )}
         {h.is_onboarded ? (
-          <View style={{ backgroundColor: 'rgba(16,185,129,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-            <Text style={{ fontSize: 10, color: '#10b981', fontWeight: '600' }}>Book online</Text>
+          <View style={styles.bookOnlineBadge}>
+            <Text style={styles.bookOnlineBadgeText}>Book online</Text>
           </View>
         ) : (
-          <View style={{ backgroundColor: 'rgba(107,114,128,0.08)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-            <Text style={{ fontSize: 10, color: colors.grey500, fontWeight: '600' }}>Call to book</Text>
+          <View style={styles.callToBookBadge}>
+            <Text style={styles.callToBookBadgeText}>Call to book</Text>
           </View>
         )}
       </View>
@@ -712,33 +642,18 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
         <View style={{ flex: 1, opacity: busy ? 0.7 : 1 }}>
 
           {/* Toolbar */}
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.sm,
-            borderBottomWidth: 1,
-            borderBottomColor: 'rgba(69, 0, 80, 0.07)',
-          }}>
-            <Text style={{ color: colors.purple, fontWeight: '700', fontSize: 15 }}>
-              {t('assistant.title')}
-            </Text>
+          <View style={styles.assistantToolbar}>
+            <Text style={styles.assistantToolbarTitle}>{t('assistant.title')}</Text>
             <TouchableOpacity
               onPress={handleNewSession}
               disabled={isLoading || messages.length === 0}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 4,
-                opacity: messages.length === 0 ? 0.35 : 1,
-              }}
+              style={[styles.newChatButton, { opacity: messages.length === 0 ? 0.35 : 1 }]}
               accessibilityRole="button"
               accessibilityLabel="Start new session"
               activeOpacity={0.7}
             >
               <MaterialIcons name="add-comment" size={16} color={colors.purple} />
-              <Text style={{ color: colors.purple, fontSize: 13, fontWeight: '600' }}>New chat</Text>
+              <Text style={styles.newChatButtonText}>New chat</Text>
             </TouchableOpacity>
           </View>
 
@@ -750,7 +665,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
             showsVerticalScrollIndicator={false}
           >
             {/* Greeting bubble */}
-            <View style={glassBubbleStyle}>
+            <View style={styles.assistantBubble}>
               <Text style={{ color: colors.grey700, lineHeight: 20, fontSize: 14 }}>
                 {t('assistant.helper')}
               </Text>
@@ -843,7 +758,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
               return (
                 <View key={(m as any)?.id || `${role}-${idx}`}>
                   {(displayText || calendarData) && !isHospitalSelection && !isSlotSelection && (
-                    <View style={role === 'user' ? userBubbleStyle : glassBubbleStyle}>
+                    <View style={role === 'user' ? styles.userBubble : styles.assistantBubble}>
                       {!!displayText && (
                         <MessageText
                           text={displayText}
@@ -926,7 +841,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
             })}
 
             {isLoading && thinkingLabel && (
-              <View style={[glassBubbleStyle, { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }]}>
+              <View style={[styles.assistantBubble, { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }]}>
                 <ActivityIndicator color={colors.purple} size="small" />
                 <Text style={{ color: colors.grey500, fontSize: 13, fontStyle: 'italic' }}>
                   {thinkingLabel}
@@ -935,7 +850,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
             )}
 
             {!!error && (
-              <View style={[glassBubbleStyle, { backgroundColor: 'rgba(239, 68, 68, 0.06)', borderColor: 'rgba(239, 68, 68, 0.2)' }]}>
+              <View style={[styles.assistantBubble, { backgroundColor: 'rgba(239, 68, 68, 0.06)', borderColor: 'rgba(239, 68, 68, 0.2)' }]}>
                 <Text style={{ color: colors.error, fontSize: 14, lineHeight: 20 }}>
                   {String((error as any)?.message || error)}
                 </Text>
@@ -944,14 +859,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
           </ScrollView>
 
           {/* Bottom bar — input OR send-to-hospital button */}
-          <View style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.sm,
-          }}>
+          <View style={styles.chatBottomBar}>
             {endConversationData ? (
               /* Conversation ended — replace input with full-width purple send button */
               <TouchableOpacity
@@ -972,26 +880,12 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                 }}
                 activeOpacity={0.85}
                 disabled={sendingToHospital}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: colors.purple,
-                  borderRadius: radius.full,
-                  minHeight: 48,
-                  paddingHorizontal: spacing.md,
-                  shadowColor: colors.purple,
-                  shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 16,
-                  elevation: 4,
-                  gap: 8,
-                }}
+                style={styles.sendSummaryButton}
               >
                 {sendingToHospital
                   ? <ActivityIndicator color={colors.white} size="small" />
                   : <>
-                      <Text style={{ color: colors.white, fontWeight: '600', fontSize: 15 }}>
+                      <Text style={styles.sendSummaryButtonText}>
                         Send summary to {endConversationData.hospitalName}
                       </Text>
                       <MaterialIcons name="arrow-forward" size={20} color={colors.white} />
@@ -1000,45 +894,20 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
               </TouchableOpacity>
             ) : (
               /* Normal chat input */
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'flex-end',
-                backgroundColor: 'rgba(255, 255, 255, 0.82)',
-                borderRadius: radius.full,
-                overflow: 'hidden',
-                shadowColor: colors.purple,
-                shadowOffset: { width: 0, height: 6 },
-                shadowOpacity: 0.1,
-                shadowRadius: 16,
-                elevation: 4,
-              }}>
+              <View style={styles.chatInputBar}>
                 <TextInput
                   value={input}
                   onChangeText={(text) => setInput(text)}
                   placeholder={t('assistant.placeholder')}
                   placeholderTextColor="rgba(107, 114, 128, 0.65)"
-                  style={{
-                    flex: 1,
-                    minHeight: 48,
-                    maxHeight: 120,
-                    paddingHorizontal: spacing.md,
-                    paddingVertical: 12,
-                    fontSize: 15,
-                    color: colors.grey900,
-                    backgroundColor: 'transparent',
-                  }}
+                  style={styles.chatTextInput}
                   multiline
                 />
                 <TouchableOpacity
-                  style={{
-                    width: 52,
-                    alignSelf: 'stretch',
-                    backgroundColor: (busy || isLoading || !apiUrl)
-                      ? 'rgba(69, 0, 80, 0.35)'
-                      : 'rgba(69, 0, 80, 0.6)',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
+                  style={[
+                    styles.chatSendButton,
+                    { backgroundColor: (busy || isLoading || !apiUrl) ? 'rgba(69, 0, 80, 0.35)' : 'rgba(69, 0, 80, 0.6)' },
+                  ]}
                   onPress={() => handleSubmit()}
                   disabled={busy || isLoading || !apiUrl}
                   accessibilityRole="button"

@@ -13,7 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import type { HomeScreenProps } from '../types';
 import type { TriageIntake } from '../types';
 import { triageGetIntake } from '../lib/triage';
-import { colors, spacing } from '../ui/styles';
+import { colors, styles, spacing } from '../ui/styles';
 import { t } from '../i18n';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -81,35 +81,14 @@ function QuickActionCard({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={1}
-        style={{
-          backgroundColor: '#fff',
-          borderRadius: 16,
-          padding: spacing.md,
-          borderWidth: 1,
-          borderColor: 'rgba(69,0,80,0.08)',
-          shadowColor: colors.purple,
-          shadowOffset: { width: 0, height: 3 },
-          shadowOpacity: 0.08,
-          shadowRadius: 10,
-          elevation: 3,
-          minHeight: 110,
-          justifyContent: 'space-between',
-        }}
+        style={styles.quickActionCard}
       >
-        <View style={{
-          width: 38,
-          height: 38,
-          borderRadius: 12,
-          backgroundColor: accent ? `${accent}18` : 'rgba(69,0,80,0.07)',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 10,
-        }}>
+        <View style={[styles.quickActionIconBox, { backgroundColor: accent ? `${accent}18` : 'rgba(69,0,80,0.07)' }]}>
           <MaterialIcons name={icon} size={20} color={accent ?? colors.purple} />
         </View>
         <View>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.grey900 }}>{label}</Text>
-          <Text style={{ fontSize: 11, color: colors.grey500, marginTop: 2 }}>{subtitle}</Text>
+          <Text style={styles.quickActionLabel}>{label}</Text>
+          <Text style={styles.quickActionSubtitle}>{subtitle}</Text>
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -119,21 +98,11 @@ function QuickActionCard({
 function UrgencyBanner({ intake }: { intake: TriageIntake }) {
   const cfg = urgencyConfig(intake.urgency ?? 'routine');
   return (
-    <View style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: cfg.bg,
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      gap: 10,
-      borderWidth: 1,
-      borderColor: `${cfg.fg}30`,
-    }}>
+    <View style={[styles.urgencyBannerRow, { backgroundColor: cfg.bg, borderColor: `${cfg.fg}30` }]}>
       <MaterialIcons name={cfg.icon} size={18} color={cfg.fg} />
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 12, fontWeight: '700', color: cfg.fg }}>{cfg.label}</Text>
-        <Text style={{ fontSize: 11, color: cfg.fg, opacity: 0.8, marginTop: 1 }}>
+        <Text style={[styles.urgencyBannerLabel, { color: cfg.fg }]}>{cfg.label}</Text>
+        <Text style={[styles.urgencyBannerSummary, { color: cfg.fg }]}>
           {intake.summary ?? `${intake.answers.length} intake answers on file`}
         </Text>
       </View>
@@ -182,42 +151,28 @@ export function HomeScreen({
   const tags = useMemo(() => deriveSituationTags(intake), [intake]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FAF7FB' }}>
+    <SafeAreaView style={styles.container}>
       <ScrollView
-        style={{ flex: 1 }}
+        style={styles.spacer}
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
           {/* ── Hero header ── */}
-          <View style={{
-            backgroundColor: colors.purple,
-            paddingTop: 24,
-            paddingBottom: 32,
-            paddingHorizontal: spacing.lg,
-            borderBottomLeftRadius: 28,
-            borderBottomRightRadius: 28,
-          }}>
-            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: '500' }}>
-              {getGreeting()}
-            </Text>
-            <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff', marginTop: 2, letterSpacing: -0.5 }}>
-              {displayName ? displayName : 'Welcome'}
-            </Text>
-            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', marginTop: 6, lineHeight: 19 }}>
-              Your health, managed with care.
-            </Text>
-
+          <View style={styles.heroHeader}>
+            <Text style={styles.heroGreeting}>{getGreeting()}</Text>
+            <Text style={styles.heroName}>{displayName ? displayName : 'Welcome'}</Text>
+            <Text style={styles.heroTagline}>Your health, managed with care.</Text>
           </View>
 
           <View style={{ paddingHorizontal: spacing.lg }}>
 
             {/* ── Quick actions ── */}
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.grey500, marginTop: 24, marginBottom: 12, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+            <Text style={[styles.sectionLabel, { marginTop: 24, marginBottom: 12 }]}>
               Quick actions
             </Text>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={styles.quickActionsRow}>
               <QuickActionCard
                 icon="add-circle-outline"
                 label="New consultation"
@@ -235,7 +190,7 @@ export function HomeScreen({
             </View>
 
             {/* ── Health status ── */}
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.grey500, marginTop: 28, marginBottom: 12, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+            <Text style={[styles.sectionLabel, { marginTop: 28, marginBottom: 12 }]}>
               Health status
             </Text>
 
@@ -244,75 +199,40 @@ export function HomeScreen({
                 <ActivityIndicator color={colors.purple} />
               </View>
             ) : intake ? (
-              <View style={{
-                backgroundColor: '#fff',
-                borderRadius: 18,
-                padding: spacing.md,
-                borderWidth: 1,
-                borderColor: 'rgba(69,0,80,0.07)',
-                shadowColor: colors.purple,
-                shadowOffset: { width: 0, height: 3 },
-                shadowOpacity: 0.07,
-                shadowRadius: 10,
-                elevation: 2,
-                gap: 14,
-              }}>
+              <View style={styles.healthStatusCard}>
                 <UrgencyBanner intake={intake} />
 
                 {tags.length > 0 && (
                   <View>
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.grey500, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      Flagged symptoms
-                    </Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    <Text style={styles.symptomTagsLabel}>Flagged symptoms</Text>
+                    <View style={styles.symptomTagsRow}>
                       {tags.map((tag) => (
-                        <View key={tag.label} style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 5,
-                          backgroundColor: 'rgba(69,0,80,0.05)',
-                          borderRadius: 20,
-                          paddingHorizontal: 10,
-                          paddingVertical: 5,
-                        }}>
+                        <View key={tag.label} style={styles.symptomTag}>
                           <MaterialIcons name={tag.icon as any} size={12} color={colors.purple} />
-                          <Text style={{ fontSize: 12, color: colors.purple, fontWeight: '600' }}>{tag.label}</Text>
+                          <Text style={styles.symptomTagText}>{tag.label}</Text>
                         </View>
                       ))}
                     </View>
                   </View>
                 )}
 
-                <View style={{ height: 1, backgroundColor: 'rgba(69,0,80,0.06)' }} />
+                <View style={styles.thinDivider} />
 
                 <Text style={{ fontSize: 12, color: colors.grey500, lineHeight: 18 }}>
                   {t('home.impactDisclaimer')}
                 </Text>
               </View>
             ) : (
-              <TouchableOpacity
-                onPress={onGoProfile}
-                style={{
-                  backgroundColor: '#fff',
-                  borderRadius: 18,
-                  padding: spacing.md,
-                  borderWidth: 1.5,
-                  borderColor: 'rgba(69,0,80,0.1)',
-                  borderStyle: 'dashed',
-                  alignItems: 'center',
-                  gap: 8,
-                  paddingVertical: 24,
-                }}
-              >
-                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(69,0,80,0.06)', alignItems: 'center', justifyContent: 'center' }}>
+              <TouchableOpacity onPress={onGoProfile} style={styles.noIntakeCard}>
+                <View style={styles.noIntakeIconBox}>
                   <MaterialIcons name="assignment" size={22} color={colors.purple} />
                 </View>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.grey900 }}>No intake on file</Text>
-                <Text style={{ fontSize: 12, color: colors.grey500, textAlign: 'center' }}>
+                <Text style={styles.noIntakeTitle}>No intake on file</Text>
+                <Text style={styles.noIntakeBody}>
                   Complete a quick intake from your profile to get personalised health insights.
                 </Text>
-                <View style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={{ fontSize: 12, color: colors.purple, fontWeight: '700' }}>Go to Profile</Text>
+                <View style={styles.noIntakeAction}>
+                  <Text style={styles.noIntakeLinkText}>Go to Profile</Text>
                   <MaterialIcons name="arrow-forward" size={14} color={colors.purple} />
                 </View>
               </TouchableOpacity>
@@ -321,37 +241,19 @@ export function HomeScreen({
             {/* ── Why early care matters ── */}
             {intake && (
               <>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.grey500, marginTop: 28, marginBottom: 12, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+                <Text style={[styles.sectionLabel, { marginTop: 28, marginBottom: 12 }]}>
                   {t('home.impactTitle')}
                 </Text>
-                <View style={{
-                  backgroundColor: '#fff',
-                  borderRadius: 18,
-                  borderWidth: 1,
-                  borderColor: 'rgba(69,0,80,0.07)',
-                  overflow: 'hidden',
-                  shadowColor: colors.purple,
-                  shadowOffset: { width: 0, height: 3 },
-                  shadowOpacity: 0.07,
-                  shadowRadius: 10,
-                  elevation: 2,
-                }}>
+                <View style={styles.impactCard}>
                   {[
                     { icon: 'bolt' as const, text: (intake.urgency === 'emergency' || intake.urgency === 'urgent') ? t('home.impactUrgent1') : t('home.impactRoutine1') },
                     { icon: 'favorite' as const, text: (intake.urgency === 'emergency' || intake.urgency === 'urgent') ? t('home.impactUrgent2') : t('home.impactRoutine2') },
                   ].map((item, i) => (
-                    <View key={i} style={{
-                      flexDirection: 'row',
-                      alignItems: 'flex-start',
-                      gap: 12,
-                      padding: spacing.md,
-                      borderBottomWidth: i === 0 ? 1 : 0,
-                      borderBottomColor: 'rgba(69,0,80,0.05)',
-                    }}>
-                      <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(69,0,80,0.07)', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                    <View key={i} style={[styles.impactItem, i === 0 && styles.impactItemDivider]}>
+                      <View style={styles.impactItemIcon}>
                         <MaterialIcons name={item.icon} size={16} color={colors.purple} />
                       </View>
-                      <Text style={{ flex: 1, fontSize: 13, color: colors.grey700, lineHeight: 20 }}>{item.text}</Text>
+                      <Text style={styles.impactItemText}>{item.text}</Text>
                     </View>
                   ))}
                 </View>

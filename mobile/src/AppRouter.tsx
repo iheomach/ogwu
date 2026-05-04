@@ -416,7 +416,7 @@ export function AppRouter() {
       <View style={[styles.center, { backgroundColor: '#fff' }]}>
         <Image
           source={require('../assets/ogwu-ios.png')}
-          style={{ width: 72, height: 72, borderRadius: 16, marginBottom: 24 }}
+          style={styles.bootSplashLogo}
           resizeMode="contain"
         />
         <ActivityIndicator color={colors.purple} />
