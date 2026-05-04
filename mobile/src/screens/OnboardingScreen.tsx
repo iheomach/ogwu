@@ -13,6 +13,7 @@ import { Picker } from '@react-native-picker/picker';
 
 import type { OnboardingScreenProps } from '../types';
 import { colors, styles } from '../ui/styles';
+import { OgwuLogo } from '../ui/OgwuLogo';
 import { t } from '../i18n';
 
 function Field({
@@ -80,8 +81,7 @@ export function OnboardingScreen({
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* Brand */}
         <View style={styles.brandRow}>
-          <View style={styles.brandDot} />
-          <Text style={styles.brandName}>{t('common.appName')}</Text>
+<Text style={styles.brandName}>{t('common.appName')}</Text>
         </View>
 
         {/* Heading */}

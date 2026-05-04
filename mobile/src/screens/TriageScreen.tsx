@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { TriageScreenProps } from '../types';
 import { colors, styles } from '../ui/styles';
+import { OgwuLogo } from '../ui/OgwuLogo';
 import { t } from '../i18n';
 
 export function TriageScreen({
@@ -40,8 +41,7 @@ export function TriageScreen({
 
           {/* Brand */}
           <View style={styles.brandRow}>
-            <View style={styles.brandDot} />
-            <Text style={styles.brandName}>{t('common.appName')}</Text>
+<Text style={styles.brandName}>{t('common.appName')}</Text>
           </View>
 
           <Text style={styles.title}>{t('triage.title')}</Text>

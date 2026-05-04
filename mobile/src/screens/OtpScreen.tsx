@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { OtpScreenProps } from '../types';
 import { colors, styles } from '../ui/styles';
+import { OgwuLogo } from '../ui/OgwuLogo';
 import { t } from '../i18n';
 
 export function OtpScreen({ busy, phoneLabel, otp, setOtp, onBack, onVerify }: OtpScreenProps) {
@@ -26,8 +27,7 @@ export function OtpScreen({ busy, phoneLabel, otp, setOtp, onBack, onVerify }: O
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* Brand */}
         <View style={styles.brandRow}>
-          <View style={styles.brandDot} />
-          <Text style={styles.brandName}>{t('common.appName')}</Text>
+<Text style={styles.brandName}>{t('common.appName')}</Text>
         </View>
 
         {/* Heading */}
