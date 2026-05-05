@@ -60,6 +60,16 @@ async function getClinicCalendarAuth() {
   return { oauth2Client, calendarId };
 }
 
+// Module-level cache so the calendar timezone is fetched once per process lifetime.
+let _cachedCalendarTimeZone = null;
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms)),
+  ]);
+}
+
 async function fetchAvailableSlots(daysAhead = 5, timeZone = null) {
   const auth = await getClinicCalendarAuth();
   if (!auth) return [];
@@ -67,23 +77,32 @@ async function fetchAvailableSlots(daysAhead = 5, timeZone = null) {
   const { oauth2Client, calendarId } = auth;
   const cal = google.calendar({ version: 'v3', auth: oauth2Client });
 
-  // Use the calendar's own timezone if not explicitly provided
+  // Resolve timezone: prefer caller-supplied, then cached, then fetch once and cache.
   if (!timeZone) {
-    try {
-      const calMeta = await cal.calendars.get({ calendarId });
-      timeZone = calMeta.data.timeZone || 'UTC';
-    } catch {
-      timeZone = 'UTC';
+    if (_cachedCalendarTimeZone) {
+      timeZone = _cachedCalendarTimeZone;
+    } else {
+      try {
+        const calMeta = await withTimeout(cal.calendars.get({ calendarId }), 5000);
+        timeZone = calMeta.data.timeZone || 'UTC';
+        _cachedCalendarTimeZone = timeZone;
+      } catch {
+        timeZone = 'UTC';
+      }
     }
   }
+
   const now = DateTime.now().setZone(timeZone);
   const rangeEnd = now.plus({ days: daysAhead + 1 }).startOf('day');
 
   let busyTimes = [];
   try {
-    const fb = await cal.freebusy.query({
-      requestBody: { timeMin: now.toISO(), timeMax: rangeEnd.toISO(), items: [{ id: calendarId }] },
-    });
+    const fb = await withTimeout(
+      cal.freebusy.query({
+        requestBody: { timeMin: now.toISO(), timeMax: rangeEnd.toISO(), items: [{ id: calendarId }] },
+      }),
+      8000
+    );
     busyTimes = fb?.data?.calendars?.[calendarId]?.busy || [];
   } catch { busyTimes = []; }
 
