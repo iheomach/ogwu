@@ -308,6 +308,28 @@ router.post('/complete', authenticate, async (req, res) => {
     };
     const languageName = languageMap[localeSafe] || 'English';
 
+    // Compute age server-side so the LLM never infers it from a raw DOB
+    let patientAge = null;
+    if (profile?.dob) {
+      const dob = new Date(profile.dob);
+      if (!isNaN(dob.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - dob.getFullYear();
+        if (
+          today.getMonth() < dob.getMonth() ||
+          (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
+        ) age--;
+        patientAge = age;
+      }
+    }
+
+    const profileForLLM = {
+      ...(profile || {}),
+      ...(patientAge !== null ? { age: patientAge } : {}),
+    };
+    // Strip raw dob so the model uses the computed age only
+    delete profileForLLM.dob;
+
     // Ask the model for a short summary (still no advice)
     const locationLine = location ? ` The patient is located in ${location}.` : '';
     const messages = [
@@ -324,7 +346,7 @@ router.post('/complete', authenticate, async (req, res) => {
       },
       {
         role: 'user',
-        content: JSON.stringify({ locale, profile, location: location || undefined, answers: trimmed }),
+        content: JSON.stringify({ locale, profile: profileForLLM, location: location || undefined, answers: trimmed }),
       },
     ];
 
