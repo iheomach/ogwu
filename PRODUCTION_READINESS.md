@@ -7,8 +7,8 @@
 ### 🔴 Blocking (fix before launch)
 
 #### Security
-- [ ] Rotate Supabase keys — real keys are committed in `mobile/.env` (already in git history, must rotate in Supabase dashboard)
-- [ ] Move all secrets to environment managers — Expo secrets for mobile, Railway env vars for backend
+- [ ] Rotate Supabase keys — real keys are committed in `mobile/.env` git history; rotate them in the Supabase dashboard to invalidate the exposed ones (you can keep using a local `.env` file for Expo dev, just add `.env` to `.gitignore` so new keys are never committed again)
+- [ ] Add `mobile/.env` to `.gitignore` — the file itself is fine for local Expo testing, it just should never be tracked by git
 - [ ] Restrict CORS — `backend/src/index.js` calls `cors()` with no origin list; add `cors({ origin: process.env.ALLOWED_ORIGINS })`
 - [ ] Add rate limiting — `express-rate-limit` on auth, triage, and agent routes
 - [ ] Add `helmet` middleware to backend for security headers (CSP, HSTS, X-Frame-Options)
