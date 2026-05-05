@@ -90,10 +90,10 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
         const res = await threadsList();
         if (!mounted) return;
         setThreads(Array.isArray(res.threads) ? res.threads : []);
-      } catch {
+      } catch (e: any) {
         if (!mounted) return;
         setThreads([]);
-        setThreadsError(t('common.error'));
+        setThreadsError(e?.message ?? t('common.error'));
       } finally {
         if (mounted) setThreadsLoading(false);
       }
