@@ -6,7 +6,13 @@ Ogwu is an AI-powered healthcare platform for patients in Nigeria and emerging m
 
 ## Screenshots
 
-> Add screenshots here — see `SCREENSHOTS.md` for the full shot list.
+| Triage | AI Agent |
+|---|---|
+| ![Triage in progress](docs/screenshots/triage.png) | ![AI health assistant](docs/screenshots/agent.png) |
+
+| Booking confirmation | Records & consults |
+|---|---|
+| ![Appointment booked](docs/screenshots/booking.png) | ![Records screen](docs/screenshots/records.png) |
 
 ---
 
