@@ -70,29 +70,36 @@ function withTimeout(promise, ms) {
   ]);
 }
 
-async function fetchAvailableSlots(daysAhead = 5, timeZone = null) {
+// patientTimeZone: IANA zone from the patient's device — slots are displayed in this zone
+// providerTimeZone: overrides the calendar's own zone for working-hours logic (optional)
+async function fetchAvailableSlots(daysAhead = 5, patientTimeZone = null, providerTimeZone = null) {
   const auth = await getClinicCalendarAuth();
   if (!auth) return [];
 
   const { oauth2Client, calendarId } = auth;
   const cal = google.calendar({ version: 'v3', auth: oauth2Client });
 
-  // Resolve timezone: prefer caller-supplied, then cached, then fetch once and cache.
-  if (!timeZone) {
+  // Resolve the clinic/provider timezone for working-hours calculation.
+  // Prefer caller-supplied, then cached from a previous call, then fetch once and cache.
+  if (!providerTimeZone) {
     if (_cachedCalendarTimeZone) {
-      timeZone = _cachedCalendarTimeZone;
+      providerTimeZone = _cachedCalendarTimeZone;
     } else {
       try {
         const calMeta = await withTimeout(cal.calendars.get({ calendarId }), 5000);
-        timeZone = calMeta.data.timeZone || 'UTC';
-        _cachedCalendarTimeZone = timeZone;
+        providerTimeZone = calMeta.data.timeZone || 'UTC';
+        _cachedCalendarTimeZone = providerTimeZone;
       } catch {
-        timeZone = 'UTC';
+        providerTimeZone = 'UTC';
       }
     }
   }
 
-  const now = DateTime.now().setZone(timeZone);
+  // Patient display zone — fall back to provider zone if unknown
+  const displayZone = patientTimeZone || providerTimeZone;
+
+  // Working-hours window is always in the provider's timezone (8am–5pm clinic time)
+  const now = DateTime.now().setZone(providerTimeZone);
   const rangeEnd = now.plus({ days: daysAhead + 1 }).startOf('day');
 
   let busyTimes = [];
@@ -121,10 +128,13 @@ async function fetchAvailableSlots(daysAhead = 5, timeZone = null) {
         return cursor < bEnd && slotEnd > bStart;
       });
       if (!busy) {
+        // Convert the slot to the patient's local timezone for display
+        const inPatientZone = cursor.setZone(displayZone);
         slots.push({
-          starts_at_local: cursor.toFormat("yyyy-MM-dd'T'HH:mm"),
-          display: cursor.toFormat("ccc d MMM, h:mm a"),
-          time_zone: timeZone,
+          starts_at_local: inPatientZone.toFormat("yyyy-MM-dd'T'HH:mm"),
+          display: inPatientZone.toFormat("ccc d MMM, h:mm a"),
+          time_zone: displayZone,           // patient's timezone — used by bookAppointment to parse starts_at_local
+          provider_time_zone: providerTimeZone, // clinic's timezone — used for the calendar event
         });
       }
     }
@@ -169,6 +179,7 @@ router.post('/chat', authenticate, async (req, res) => {
     const liveLocation = safeText(req.body?.location, 100) || null;
     const patientLat = typeof req.body?.lat === 'number' ? req.body.lat : null;
     const patientLon = typeof req.body?.lon === 'number' ? req.body.lon : null;
+    const patientTimeZone = safeText(req.body?.time_zone, 100) || null;
     const [{ streamText, tool, stepCountIs }, { openai }, { z }] = await Promise.all([
       import('ai'),
       import('@ai-sdk/openai'),
@@ -180,6 +191,7 @@ router.post('/chat', authenticate, async (req, res) => {
       patientLat, patientLon, haversineKm,
       fetchAvailableSlots, getClinicCalendarAuth,
       safeText, normalizeUrgency,
+      patientTimeZone,
     };
 
     const tools = loadSkills(tool, skillCtx);

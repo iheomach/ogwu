@@ -554,6 +554,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
       ...(location ? { location } : {}),
       ...(lat != null ? { lat } : {}),
       ...(lon != null ? { lon } : {}),
+      time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
   });
 

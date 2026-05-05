@@ -6,10 +6,11 @@ module.exports = function bookAppointmentSkill({ z, supabase, profile, getClinic
     inputSchema: z.object({
       hospital_id: z.string().describe('UUID of the onboarded hospital'),
       starts_at_local: z.string().describe("Slot start from getHospitalBookingInfo, e.g. '2026-04-10T09:00'"),
-      time_zone: z.string().describe('IANA timezone from the slot, e.g. Africa/Lagos'),
+      time_zone: z.string().describe("Patient's IANA timezone from the slot — used to interpret starts_at_local"),
+      provider_time_zone: z.string().optional().describe("Clinic's IANA timezone from the slot — used for the calendar event"),
       reason: z.string().describe('Brief appointment reason'),
     }),
-    execute: async ({ hospital_id, starts_at_local, time_zone, reason }) => {
+    execute: async ({ hospital_id, starts_at_local, time_zone, provider_time_zone, reason }) => {
       try {
         const auth = await getClinicCalendarAuth();
         if (!auth) return { error: 'calendar_not_configured', message: 'Online booking is not available right now. Tell the patient to call the hospital directly.' };
@@ -35,10 +36,15 @@ module.exports = function bookAppointmentSkill({ z, supabase, profile, getClinic
         if (!hospital) return { error: 'hospital_not_found', message: `No hospital found with id: ${hospital_id}` };
         if (!hospital.is_onboarded) return { error: 'not_onboarded', message: 'This hospital does not support online booking. Tell the patient to call directly.' };
 
-        const tz = time_zone || 'Africa/Lagos';
-        const startDt = DateTime.fromISO(String(starts_at_local), { zone: tz });
-        if (!startDt.isValid) return { error: 'invalid_slot', message: 'The selected time slot is invalid. Ask the patient to pick a different slot.' };
-        const endDt = startDt.plus({ minutes: 30 });
+        // Parse the slot in the patient's local timezone
+        const patientTz = time_zone || 'UTC';
+        const providerTz = provider_time_zone || patientTz;
+        const startInPatientZone = DateTime.fromISO(String(starts_at_local), { zone: patientTz });
+        if (!startInPatientZone.isValid) return { error: 'invalid_slot', message: 'The selected time slot is invalid. Ask the patient to pick a different slot.' };
+
+        // Convert to provider timezone for the calendar event
+        const startInProviderZone = startInPatientZone.setZone(providerTz);
+        const endInProviderZone = startInProviderZone.plus({ minutes: 30 });
 
         const cal = google.calendar({ version: 'v3', auth: oauth2Client });
         const requestId = `ogwu-${profile.id}-${Date.now()}`;
@@ -51,8 +57,8 @@ module.exports = function bookAppointmentSkill({ z, supabase, profile, getClinic
             requestBody: {
               summary: `Ogwu consult — ${hospital.name}`,
               description: `Reason: ${reason}\nPatient ID: ${profile.id}`,
-              start: { dateTime: startDt.toISO(), timeZone: tz },
-              end: { dateTime: endDt.toISO(), timeZone: tz },
+              start: { dateTime: startInProviderZone.toISO(), timeZone: providerTz },
+              end: { dateTime: endInProviderZone.toISO(), timeZone: providerTz },
               conferenceData: { createRequest: { requestId, conferenceSolutionKey: { type: 'hangoutsMeet' } } },
             },
           });
@@ -72,10 +78,10 @@ module.exports = function bookAppointmentSkill({ z, supabase, profile, getClinic
             patient_id: profile.id,
             hospital_id: hospital.id,
             status: 'scheduled',
-            starts_at: startDt.toUTC().toISO(),
+            starts_at: startInPatientZone.toUTC().toISO(),
             duration_minutes: 30,
-            patient_time_zone: tz,
-            provider_time_zone: tz,
+            patient_time_zone: patientTz,
+            provider_time_zone: providerTz,
             calendar_event_id: created?.id || null,
             meeting_url: meetingUrl,
             reason: safeText(reason, 500),
