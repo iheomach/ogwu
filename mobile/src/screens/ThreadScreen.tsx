@@ -128,6 +128,20 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
             {displayMessages.map((m) => {
               const isPatient = m.sender_role === 'patient';
               const isSystem  = m.sender_role === 'system';
+
+              if (isSystem) {
+                return (
+                  <View key={m.id} style={{ alignItems: 'center', marginVertical: spacing.sm, paddingHorizontal: spacing.md }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(69,0,80,0.08)' }} />
+                      <Text style={{ fontSize: 12, color: colors.grey500, textAlign: 'center' }}>{m.body}</Text>
+                      <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(69,0,80,0.08)' }} />
+                    </View>
+                    <Text style={{ fontSize: 11, color: colors.grey300, marginTop: 4 }}>{formatTime(m.created_at)}</Text>
+                  </View>
+                );
+              }
+
               return (
                 <View
                   key={m.id}
@@ -147,7 +161,7 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
                       color: isPatient ? 'rgba(255,255,255,0.6)' : colors.grey500,
                       alignSelf: isPatient ? 'flex-end' : 'flex-start',
                     }}>
-                      {isSystem ? 'System' : isPatient ? 'You' : providerName} · {formatTime(m.created_at)}
+                      {isPatient ? 'You' : providerName} · {formatTime(m.created_at)}
                     </Text>
                   </View>
                 </View>
@@ -157,7 +171,7 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
         )}
       </ScrollView>
 
-      {/* Waiting status bar — provider response flow not yet live */}
+      {/* Bottom status bar */}
       <View style={{
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.md,
@@ -167,15 +181,21 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
         alignItems: 'center',
         gap: 10,
       }}>
-        <View style={{
-          width: 8,
-          height: 8,
-          borderRadius: 4,
-          backgroundColor: '#16A34A',
-        }} />
-        <Text style={{ fontSize: 13, color: colors.grey500, flex: 1 }}>
-          Summary delivered. {providerName} will respond here once they review it.
-        </Text>
+        {thread?.status === 'closed' ? (
+          <>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.error }} />
+            <Text style={{ fontSize: 13, color: colors.grey500, flex: 1 }}>
+              This conversation has ended.
+            </Text>
+          </>
+        ) : (
+          <>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success }} />
+            <Text style={{ fontSize: 13, color: colors.grey500, flex: 1 }}>
+              Summary delivered. {providerName} will respond here once they review it.
+            </Text>
+          </>
+        )}
       </View>
 
     </SafeAreaView>

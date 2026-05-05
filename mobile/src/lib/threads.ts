@@ -1,5 +1,5 @@
 import type { ConsultMessage, ConsultThread } from '../types';
-import { apiGet, apiPost } from './api';
+import { apiDelete, apiGet, apiPost } from './api';
 
 export async function threadsList(): Promise<{ threads: ConsultThread[] }> {
   return apiGet('/api/threads');
@@ -30,4 +30,12 @@ export async function threadMessageSend(
   payload: { body: string }
 ): Promise<{ message: ConsultMessage }> {
   return apiPost(`/api/threads/${encodeURIComponent(threadId)}/messages`, payload);
+}
+
+export async function threadsClose(threadId: string): Promise<{ thread: ConsultThread }> {
+  return apiPost(`/api/threads/${encodeURIComponent(threadId)}/close`, {});
+}
+
+export async function threadsDelete(threadId: string): Promise<{ ok: boolean }> {
+  return apiDelete(`/api/threads/${encodeURIComponent(threadId)}`);
 }

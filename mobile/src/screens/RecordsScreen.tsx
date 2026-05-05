@@ -3,25 +3,11 @@ import { ActivityIndicator, Alert, ScrollView, Share, Text, TouchableOpacity, Vi
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { RecordsScreenProps } from '../types';
-import type { ConsultThread, Encounter, UrgencyTier } from '../types';
-import { encountersList } from '../lib/encounters';
-import { threadsList } from '../lib/threads';
+import type { ConsultThread } from '../types';
+import { threadsList, threadsClose } from '../lib/threads';
 import { fetchReport, buildReportText } from '../lib/report';
 import { styles, colors } from '../ui/styles';
 import { t } from '../i18n';
-
-function urgencyColors(urgency: UrgencyTier) {
-  switch (urgency) {
-    case 'emergency':
-      return { bg: colors.errorLight, fg: colors.error };
-    case 'urgent':
-      return { bg: colors.urgentLight, fg: colors.urgent };
-    case 'soon':
-      return { bg: colors.warningLight, fg: colors.warning };
-    default:
-      return { bg: colors.successLight, fg: colors.success };
-  }
-}
 
 function formatDate(iso: string): string {
   try {
@@ -44,6 +30,7 @@ function toRoman(n: number): string {
 }
 
 function conditionBase(th: ConsultThread): string {
+  if (th.title) return th.title;
   const s = (th.intake_snapshot?.summary ?? '').trim();
   if (s) return s.split(/\s+/).slice(0, 6).join(' ');
   if (th.provider_type === 'external') return th.external_provider?.name ?? 'External provider';
@@ -52,7 +39,6 @@ function conditionBase(th: ConsultThread): string {
 }
 
 function buildThreadTitles(threads: ConsultThread[]): Map<string, string> {
-  // Patient's own threads — group by base condition title only
   const groups = new Map<string, ConsultThread[]>();
   for (const th of threads) {
     const base = conditionBase(th);
@@ -66,7 +52,6 @@ function buildThreadTitles(threads: ConsultThread[]): Map<string, string> {
     if (group.length === 1) {
       result.set(group[0].id, base);
     } else {
-      // threads arrive newest-first; sort ascending so oldest = I
       const sorted = [...group].sort((a, b) => a.created_at.localeCompare(b.created_at));
       sorted.forEach((th, i) => result.set(th.id, `${base} ${toRoman(i + 1)}`));
     }
@@ -75,14 +60,11 @@ function buildThreadTitles(threads: ConsultThread[]): Map<string, string> {
 }
 
 export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
-  const [loading, setLoading] = useState(true);
-  const [encounters, setEncounters] = useState<Encounter[]>([]);
-  const [encountersError, setEncountersError] = useState<string | null>(null);
-
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [threads, setThreads] = useState<ConsultThread[]>([]);
   const [threadsError, setThreadsError] = useState<string | null>(null);
-
+  const [closingId, setClosingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
   const [exportLoading, setExportLoading] = useState(false);
 
   const handleExport = async () => {
@@ -98,32 +80,6 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
       setExportLoading(false);
     }
   };
-
-  const [intakeLoading, setIntakeLoading] = useState(true);
-  const [intake, setIntake] = useState<TriageIntake | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setEncountersError(null);
-        const res = await encountersList();
-        if (!mounted) return;
-        setEncounters(Array.isArray(res.encounters) ? res.encounters : []);
-      } catch {
-        if (!mounted) return;
-        setEncounters([]);
-        setEncountersError(t('common.error'));
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -142,35 +98,37 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
         if (mounted) setThreadsLoading(false);
       }
     })();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setIntakeLoading(true);
-        const res = await triageGetIntake();
-        if (!mounted) return;
-        setIntake(res.intake);
-      } catch {
-        if (!mounted) return;
-        setIntake(null);
-      } finally {
-        if (mounted) setIntakeLoading(false);
-      }
-    })();
+  const handleCloseThread = (th: ConsultThread) => {
+    Alert.alert(
+      'End conversation?',
+      'This will close the thread for both you and the provider. Neither party will be able to send messages.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'End conversation',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setClosingId(th.id);
+              await threadsClose(th.id);
+              setThreads(prev => prev.map(t => t.id === th.id ? { ...t, status: 'closed' } : t));
+            } catch (e: any) {
+              Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+            } finally {
+              setClosingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const hasAny = useMemo(() => encounters.length > 0, [encounters.length]);
   const threadTitles = useMemo(() => buildThreadTitles(threads), [threads]);
+  const activeThreads = useMemo(() => threads.filter(t => t.status === 'open'), [threads]);
+  const inactiveThreads = useMemo(() => threads.filter(t => t.status === 'closed'), [threads]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -200,92 +158,115 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
             {threadsLoading ? <ActivityIndicator color={colors.purple} /> : null}
           </View>
 
+          {/* Active / Inactive tabs */}
+          {!threadsLoading && !threadsError && (
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+              {(['active', 'inactive'] as const).map(tab => {
+                const isSelected = activeTab === tab;
+                const count = tab === 'active' ? activeThreads.length : inactiveThreads.length;
+                const dotColor = tab === 'active' ? colors.success : colors.error;
+                return (
+                  <TouchableOpacity
+                    key={tab}
+                    onPress={() => setActiveTab(tab)}
+                    activeOpacity={0.8}
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      paddingVertical: 9,
+                      paddingHorizontal: 10,
+                      borderRadius: 10,
+                      borderWidth: 1.5,
+                      borderColor: isSelected ? dotColor : 'rgba(0,0,0,0.07)',
+                      backgroundColor: isSelected
+                        ? (tab === 'active' ? colors.successLight : colors.errorLight)
+                        : 'transparent',
+                    }}
+                  >
+                    <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: dotColor }} />
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? dotColor : colors.grey500, textTransform: 'capitalize' }}>
+                      {tab}
+                    </Text>
+                    {count > 0 && (
+                      <View style={{
+                        backgroundColor: dotColor,
+                        borderRadius: 8,
+                        minWidth: 18,
+                        height: 18,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        paddingHorizontal: 4,
+                      }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.white }}>{count}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
           {!threadsLoading && threadsError && (
             <Text style={[styles.helper, { marginBottom: 0, marginTop: 10 }]}>{threadsError}</Text>
           )}
 
-          {!threadsLoading && !threadsError && threads.length === 0 && (
-            <Text style={[styles.helper, { marginBottom: 0, marginTop: 16 }]}>{t('records.asyncEmpty')}</Text>
-          )}
-
-          {!threadsLoading && !threadsError && threads.length > 0 && (
-            <View style={styles.mt16}>
-              {threads.slice(0, 5).map((th, idx) => (
-                <TouchableOpacity
-                  key={th.id}
-                  style={[styles.card, idx > 0 && styles.mt16]}
-                  onPress={() => onOpenThread(th.id)}
-                  disabled={busy}
-                  activeOpacity={0.9}
-                >
-                  <Text style={styles.value}>
-                    {threadTitles.get(th.id) ?? conditionBase(th)}
-                  </Text>
-                  <Text style={[styles.helper, { marginBottom: 0, marginTop: 6 }]}>
-                    {formatDate(th.created_at)} • {t(`triageResults.urgency_${(th.urgency ?? 'routine') as any}`)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-
-        {loading && (
-          <View style={[styles.center, { paddingHorizontal: 0, paddingVertical: 24 }]}>
-            <ActivityIndicator color={colors.purple} />
-          </View>
-        )}
-
-        {!loading && encountersError && (
-          <View style={styles.card}>
-            <Text style={styles.value}>{t('common.error')}</Text>
-            <Text style={[styles.helper, { marginBottom: 0 }]}>{encountersError}</Text>
-          </View>
-        )}
-
-        {!loading && !encountersError && !hasAny && (
-          <View style={[styles.card, styles.mt16]}>
-            <Text style={styles.value}>{t('records.emptyTitle')}</Text>
-            <Text style={[styles.helper, { marginBottom: 0 }]}>{t('records.emptyBody')}</Text>
-          </View>
-        )}
-
-        {!loading && !encountersError && hasAny && (
-          <>
-            {encounters.map((e, idx) => (
-              <View key={e.id} style={[styles.card, idx > 0 && styles.mt16]}>
-                <View style={styles.rowBetween}>
-                  <Text style={styles.value}>{t('records.encounterLabel')}</Text>
-                  <View style={[styles.pill, { backgroundColor: urgencyColors(e.urgency).bg }]}>
-                    <Text style={[styles.pillText, { color: urgencyColors(e.urgency).fg }]}>
-                      {t(`triageResults.urgency_${(e.urgency ?? 'routine') as any}`)}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={[styles.helper, { marginBottom: 0, marginTop: 8 }]}>
-                  {formatDate(e.created_at)}
+          {!threadsLoading && !threadsError && (() => {
+            const list = activeTab === 'active' ? activeThreads : inactiveThreads;
+            if (list.length === 0) {
+              return (
+                <Text style={[styles.helper, { marginBottom: 0, marginTop: 16 }]}>
+                  {activeTab === 'active' ? 'No active consults.' : 'No past consults.'}
                 </Text>
+              );
+            }
+            return (
+              <View style={styles.mt16}>
+                {list.slice(0, 5).map((th, idx) => (
+                  <View
+                    key={th.id}
+                    style={[styles.card, idx > 0 && styles.mt16, { flexDirection: 'row', padding: 0, overflow: 'hidden' }]}
+                  >
+                    <TouchableOpacity
+                      style={{ flex: 1, padding: 14 }}
+                      onPress={() => onOpenThread(th.id)}
+                      disabled={busy || closingId === th.id}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.value}>
+                        {threadTitles.get(th.id) ?? conditionBase(th)}
+                      </Text>
+                      <Text style={[styles.helper, { marginBottom: 0, marginTop: 6 }]}>
+                        {formatDate(th.created_at)} • {t(`triageResults.urgency_${(th.urgency ?? 'routine') as any}`)}
+                      </Text>
+                    </TouchableOpacity>
 
-                {e.doctor?.name ? (
-                  <Text style={[styles.helper, { marginBottom: 0, marginTop: 6 }]}> 
-                    {e.doctor.name} • {e.doctor.hospital_name} • {e.doctor.location}
-                  </Text>
-                ) : (
-                  <Text style={[styles.helper, { marginBottom: 0, marginTop: 6 }]}> 
-                    {t('records.sharedIntake')}
-                  </Text>
-                )}
-
-                {e.summary ? (
-                  <Text style={[styles.helper, { marginBottom: 0, marginTop: 10, color: colors.grey900 }]}> 
-                    {e.summary}
-                  </Text>
-                ) : null}
+                    {activeTab === 'active' && (
+                      <>
+                        <View style={{ width: 1, backgroundColor: colors.purple }} />
+                        <TouchableOpacity
+                          style={{ paddingHorizontal: 18, justifyContent: 'center', alignItems: 'center' }}
+                          onPress={() => handleCloseThread(th)}
+                          disabled={busy || closingId === th.id}
+                          activeOpacity={0.7}
+                          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                        >
+                          {closingId === th.id ? (
+                            <ActivityIndicator size="small" color={colors.purple} />
+                          ) : (
+                            <Text style={{ fontSize: 16, fontWeight: '600', color: colors.purple }}>✕</Text>
+                          )}
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                ))}
               </View>
-            ))}
-          </>
-        )}
+            );
+          })()}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

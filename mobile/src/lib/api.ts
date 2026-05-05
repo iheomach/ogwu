@@ -52,6 +52,25 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   return (await res.json()) as T;
 }
 
+export async function apiDelete<T>(path: string): Promise<T> {
+  const token = await getAuthToken();
+  const baseUrl = await getBaseUrl();
+
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const detail = await readError(res);
+    throw new Error(detail || `Request failed (${res.status})`);
+  }
+
+  return (await res.json()) as T;
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const token = await getAuthToken();
   const baseUrl = await getBaseUrl();

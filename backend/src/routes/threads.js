@@ -1,8 +1,25 @@
 const express = require('express');
 const router = express.Router();
 
+const { generateText } = require('ai');
+const { openai } = require('@ai-sdk/openai');
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
+
+async function generateThreadTitle(summary) {
+  if (!summary) return null;
+  try {
+    const { text } = await generateText({
+      model: openai('gpt-4o-mini'),
+      prompt: `Summarize this patient's medical concern in 6 words or fewer. Be direct and clinical. No punctuation at the end. Only output the summary, nothing else.\n\nConcern: ${summary}`,
+      maxTokens: 24,
+    });
+    return text.trim().replace(/[.\n].*$/s, '').trim() || null;
+  } catch (e) {
+    console.error('Thread title generation failed:', e.message);
+    return null;
+  }
+}
 
 function safeText(s, maxLen) {
   const out = typeof s === 'string' ? s.trim() : '';
@@ -57,7 +74,7 @@ router.get('/', authenticate, async (req, res) => {
     const { data: threads, error } = await supabase
       .from('consult_threads')
       .select(
-        'id, patient_id, provider_type, doctor_id, hospital_id, external_provider, locale, urgency, status, intake_snapshot, created_at, updated_at, doctor:doctors(id, name, primary_specialty, hospital_name, location)'
+        'id, patient_id, provider_type, doctor_id, hospital_id, external_provider, locale, urgency, status, title, intake_snapshot, created_at, updated_at, doctor:doctors(id, name, primary_specialty, hospital_name, location)'
       )
       .eq('patient_id', req.user.id)
       .order('created_at', { ascending: false });
@@ -104,6 +121,7 @@ router.post('/', authenticate, async (req, res) => {
 
     const locale = intake?.locale ?? null;
     const urgency = intake?.urgency ?? 'routine';
+    const title = await generateThreadTitle(intake?.summary ?? null);
 
     const { data, error } = await supabase
       .from('consult_threads')
@@ -115,11 +133,12 @@ router.post('/', authenticate, async (req, res) => {
         external_provider,
         locale,
         urgency,
+        title,
         intake_snapshot: intake,
         status: 'open',
       })
       .select(
-        'id, patient_id, provider_type, doctor_id, hospital_id, external_provider, locale, urgency, status, created_at, updated_at'
+        'id, patient_id, provider_type, doctor_id, hospital_id, external_provider, locale, urgency, status, title, created_at, updated_at'
       )
       .single();
 
@@ -214,6 +233,72 @@ router.post('/:id/messages', authenticate, async (req, res) => {
     return res.status(201).json({ message: data });
   } catch (err) {
     return res.status(400).json({ error: err.message || 'Failed to send message' });
+  }
+});
+
+// Close a thread (patient only) — marks read-only + inserts system message
+router.post('/:id/close', authenticate, async (req, res) => {
+  try {
+    const threadId = String(req.params.id);
+
+    const { data: thread, error: threadError } = await supabase
+      .from('consult_threads')
+      .select('id, status, patient_id')
+      .eq('id', threadId)
+      .eq('patient_id', req.user.id)
+      .maybeSingle();
+
+    if (threadError) return res.status(400).json({ error: threadError.message });
+    if (!thread) return res.status(404).json({ error: 'Thread not found' });
+    if (thread.status === 'closed') return res.status(400).json({ error: 'Thread is already closed' });
+
+    const { data: updated, error: updateError } = await supabase
+      .from('consult_threads')
+      .update({ status: 'closed' })
+      .eq('id', threadId)
+      .select('id, status')
+      .single();
+
+    if (updateError) return res.status(400).json({ error: updateError.message });
+
+    // Insert system message so both parties know who ended it
+    await supabase.from('consult_messages').insert({
+      thread_id: threadId,
+      sender_role: 'system',
+      body: 'This conversation was ended by the patient.',
+    });
+
+    return res.json({ thread: updated });
+  } catch (err) {
+    return res.status(400).json({ error: err.message || 'Failed to close thread' });
+  }
+});
+
+// Delete a thread (patient only, cascades messages)
+router.delete('/:id', authenticate, async (req, res) => {
+  try {
+    const threadId = String(req.params.id);
+
+    // Ensure ownership before deleting
+    const { data: thread, error: threadError } = await supabase
+      .from('consult_threads')
+      .select('id')
+      .eq('id', threadId)
+      .eq('patient_id', req.user.id)
+      .maybeSingle();
+
+    if (threadError) return res.status(400).json({ error: threadError.message });
+    if (!thread) return res.status(404).json({ error: 'Thread not found' });
+
+    const { error } = await supabase
+      .from('consult_threads')
+      .delete()
+      .eq('id', threadId);
+
+    if (error) return res.status(400).json({ error: error.message });
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    return res.status(400).json({ error: err.message || 'Failed to delete thread' });
   }
 });
 

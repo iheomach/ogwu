@@ -153,6 +153,7 @@ export type ConsultThread = {
   doctor_id: string | null;
   hospital_id: string | null;
   hospital_name: string | null;
+  title: string | null;
   external_provider: ExternalProvider | null;
   locale: string | null;
   urgency: UrgencyTier;

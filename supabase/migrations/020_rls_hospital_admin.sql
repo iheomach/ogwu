@@ -1,4 +1,9 @@
 -- Comprehensive hospital admin RLS setup (idempotent)
+-- Also adds title column to consult_threads for GPT-generated 6-word summaries
+
+alter table public.consult_threads
+  add column if not exists title text;
+
 -- Run this to ensure all hospital admin policies are correct.
 
 -- ----------------------------------------------------------------
@@ -37,6 +42,15 @@ create policy "Hospital admins can view patient triage intakes"
       where admin_user_id = auth.uid()
     )
   );
+
+-- ----------------------------------------------------------------
+-- 2b. consult_threads: patients can delete their own threads
+--     (messages cascade via ON DELETE CASCADE)
+-- ----------------------------------------------------------------
+drop policy if exists "Patients can delete their own consult threads" on public.consult_threads;
+create policy "Patients can delete their own consult threads"
+  on public.consult_threads for delete
+  using (auth.uid() = patient_id);
 
 -- ----------------------------------------------------------------
 -- 3. consult_threads: hospital admins can read their threads
