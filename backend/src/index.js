@@ -1,6 +1,9 @@
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
+
+const authenticate = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,24 +25,52 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Health check
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+
+// Level 1: global — 300 requests per IP per 15 minutes across all routes
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+// Level 2: per-user — 20 requests per user per minute on expensive routes
+// keyGenerator reads req.user.id set by authenticate middleware
+const userLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Rate limit exceeded. Please slow down.' },
+});
+
+app.use(globalLimiter);
+
+// ── Health check ──────────────────────────────────────────────────────────────
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/users', require('./routes/users'));
-app.use('/api/triage', require('./routes/triage'));
-app.use('/api/doctors', require('./routes/doctors'));
-app.use('/api/encounters', require('./routes/encounters'));
-app.use('/api/threads', require('./routes/threads'));
-app.use('/api/providers', require('./routes/providers'));
+// ── Routes ────────────────────────────────────────────────────────────────────
+
+app.use('/api/auth',                require('./routes/auth'));
+app.use('/api/users',               require('./routes/users'));
+app.use('/api/doctors',             require('./routes/doctors'));
+app.use('/api/encounters',          require('./routes/encounters'));
+app.use('/api/providers',           require('./routes/providers'));
+app.use('/api/hospitals',           require('./routes/hospitals'));
 app.use('/api/integrations/google', require('./routes/google'));
-app.use('/api/appointments', require('./routes/appointments'));
-app.use('/api/agent', require('./routes/agent'));
-app.use('/api/report', require('./routes/report'));
-app.use('/api/hospitals', require('./routes/hospitals'));
+
+// Expensive routes — per-user limiter applied after authenticate
+app.use('/api/triage',       authenticate, userLimiter, require('./routes/triage'));
+app.use('/api/threads',      authenticate, userLimiter, require('./routes/threads'));
+app.use('/api/appointments', authenticate, userLimiter, require('./routes/appointments'));
+app.use('/api/agent',        authenticate, userLimiter, require('./routes/agent'));
+app.use('/api/report',       authenticate, userLimiter, require('./routes/report'));
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
