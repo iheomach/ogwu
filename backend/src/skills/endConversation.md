@@ -1,1 +1,0 @@
-Ends the conversation and signals the app to show the patient a button to send their health summary to the hospital. Call this ONLY after the patient explicitly confirms they are done (e.g. "yes", "sure", "go ahead", "ok"). Pass the hospital_id and hospital_name from the bookAppointment result. Do not call this speculatively — wait for the patient's confirmation.
