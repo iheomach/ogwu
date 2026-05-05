@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3000;
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',  // web admin dev
   'http://localhost:4173',  // web admin preview
-  'https://ogwu-web-admin-client.vercel.app',
+  process.env.ADMIN_ORIGIN, // https://ogwu-web-admin-client.vercel.app
 ].filter(Boolean);
 
 app.use(cors({
