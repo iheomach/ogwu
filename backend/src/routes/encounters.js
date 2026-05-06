@@ -1,3 +1,4 @@
+const serverError = require('../lib/serverError');
 const express = require('express');
 const router = express.Router();
 
@@ -38,10 +39,10 @@ router.get('/', authenticate, async (req, res) => {
       error = retry.error;
     }
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return serverError(res, error, 'Failed to load encounters.');
     return res.json({ encounters: data || [] });
   } catch (e) {
-    return res.status(500).json({ error: e?.message || 'Failed to load encounters' });
+    return serverError(res, e, 'Failed to load encounters.');
   }
 });
 
@@ -56,7 +57,7 @@ router.post('/share', authenticate, async (req, res) => {
       .eq('user_id', req.user.id)
       .maybeSingle();
 
-    if (intakeErr) return res.status(400).json({ error: intakeErr.message });
+    if (intakeErr) return serverError(res, intakeErr, 'Failed to load intake.');
     if (!intake) return res.status(400).json({ error: 'No intake found to share' });
 
     const payload = {
@@ -90,10 +91,10 @@ router.post('/share', authenticate, async (req, res) => {
       )
       .single();
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return serverError(res, error, 'Failed to create encounter.');
     return res.json({ encounter: data });
   } catch (e) {
-    return res.status(500).json({ error: e?.message || 'Failed to create encounter' });
+    return serverError(res, e, 'Failed to create encounter.');
   }
 });
 

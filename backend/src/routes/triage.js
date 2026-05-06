@@ -1,3 +1,4 @@
+const serverError = require('../lib/serverError');
 const express = require('express');
 const router = express.Router();
 
@@ -275,7 +276,7 @@ router.post('/next', authenticate, async (req, res) => {
     // step === 4 (final question)
     return res.json({ done: false, question: q(locale, 'meds'), summary: null, safety_note: null });
   } catch (err) {
-    return res.status(400).json({ error: err.message || 'Failed to generate triage question' });
+    return serverError(res, err, 'Failed to generate triage question.', 400);
   }
 });
 
@@ -376,10 +377,10 @@ router.post('/complete', authenticate, async (req, res) => {
       .select('user_id, locale, answers, urgency, summary, safety_note, created_at, updated_at')
       .single();
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return serverError(res, error, 'An error occurred.', 400);
     return res.json({ intake: data, safety_note });
   } catch (err) {
-    return res.status(400).json({ error: err.message || 'Failed to save triage intake' });
+    return serverError(res, err, 'Failed to save triage intake.', 400);
   }
 });
 
@@ -392,10 +393,10 @@ router.get('/status', authenticate, async (req, res) => {
       .eq('user_id', req.user.id)
       .maybeSingle();
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return serverError(res, error, 'An error occurred.', 400);
     return res.json({ completed: !!data });
   } catch (err) {
-    return res.status(400).json({ error: err.message || 'Failed to load triage status' });
+    return serverError(res, err, 'Failed to load triage status.', 400);
   }
 });
 
@@ -408,10 +409,10 @@ router.get('/intake', authenticate, async (req, res) => {
       .eq('user_id', req.user.id)
       .maybeSingle();
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return serverError(res, error, 'An error occurred.', 400);
     return res.json({ intake: data ?? null });
   } catch (err) {
-    return res.status(400).json({ error: err.message || 'Failed to load triage intake' });
+    return serverError(res, err, 'Failed to load triage intake.', 400);
   }
 });
 

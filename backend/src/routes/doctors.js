@@ -1,3 +1,4 @@
+const serverError = require('../lib/serverError');
 const express = require('express');
 const router = express.Router();
 
@@ -30,13 +31,10 @@ router.get('/', authenticate, async (req, res) => {
       .order('sort_rank', { ascending: true })
       .order('created_at', { ascending: false });
 
-    if (error) {
-      return res.status(500).json({ error: error.message || 'Failed to load doctors' });
-    }
-
+    if (error) return serverError(res, error, 'Failed to load doctors.');
     return res.json({ doctors: data || [] });
   } catch (e) {
-    return res.status(500).json({ error: e?.message || 'Failed to load doctors' });
+    return serverError(res, e, 'Failed to load doctors.');
   }
 });
 

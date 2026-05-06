@@ -1,3 +1,4 @@
+const serverError = require('../lib/serverError');
 const express = require('express');
 const router = express.Router();
 
@@ -121,7 +122,7 @@ router.post('/lookup', authenticate, async (req, res) => {
     const result = await serpapiLookup(query);
     return res.json(result);
   } catch (err) {
-    return res.status(400).json({ error: err.message || 'Failed to lookup provider contact info' });
+    return serverError(res, err, 'Failed to lookup provider contact info.', 400);
   }
 });
 

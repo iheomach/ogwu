@@ -1,3 +1,4 @@
+const serverError = require('../lib/serverError');
 const express = require('express');
 const { google } = require('googleapis');
 const { DateTime } = require('luxon');
@@ -98,7 +99,7 @@ router.post('/', authenticate, async (req, res) => {
       .eq('id', hospitalId)
       .maybeSingle();
 
-    if (hospitalErr) return res.status(500).json({ error: hospitalErr.message });
+    if (hospitalErr) return serverError(res, hospitalErr, 'An error occurred.');
     if (!hospital) return res.status(404).json({ error: 'Hospital not found' });
     if (hospital.is_onboarded === false) {
       return res.status(400).json({ error: 'Hospital is not onboarded for scheduling yet' });
@@ -197,12 +198,12 @@ router.post('/', authenticate, async (req, res) => {
       } catch {
         // ignore
       }
-      return res.status(500).json({ error: apptErr.message || 'Failed to create appointment' });
+      return serverError(res, apptErr, 'Failed to create appointment.');
     }
 
     return res.json({ appointment: appt });
   } catch (e) {
-    return res.status(400).json({ error: e?.message || 'Failed to schedule appointment' });
+    return serverError(res, e, 'Failed to schedule appointment.', 400);
   }
 });
 
@@ -215,10 +216,10 @@ router.get('/', authenticate, async (req, res) => {
       .eq('patient_id', req.user.id)
       .order('starts_at', { ascending: true });
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return serverError(res, error, 'An error occurred.');
     return res.json({ appointments: data || [] });
   } catch (e) {
-    return res.status(500).json({ error: e?.message || 'Failed to load appointments' });
+    return serverError(res, e, 'Failed to load appointments.');
   }
 });
 

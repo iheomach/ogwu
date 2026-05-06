@@ -1,3 +1,4 @@
+const serverError = require('../lib/serverError');
 const express = require('express');
 const router = express.Router();
 const supabase = require('../lib/supabase');
@@ -24,10 +25,10 @@ router.get('/:id', authenticate, async (req, res) => {
       .select('*')
       .eq('id', req.params.id)
       .single();
-    if (error) return res.status(404).json({ error: error.message });
+    if (error) return res.status(404).json({ error: 'Profile not found.' });
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return serverError(res, err, 'Failed to load profile.');
   }
 });
 
@@ -55,10 +56,10 @@ router.put('/:id', authenticate, async (req, res) => {
       .eq('id', req.params.id)
       .select()
       .single();
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return res.status(400).json({ error: 'Failed to update profile.' });
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return serverError(res, err, 'Failed to update profile.');
   }
 });
 

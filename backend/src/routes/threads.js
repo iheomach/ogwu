@@ -1,3 +1,4 @@
+const serverError = require('../lib/serverError');
 const express = require('express');
 const router = express.Router();
 
@@ -79,7 +80,7 @@ router.get('/', authenticate, async (req, res) => {
       .eq('patient_id', req.user.id)
       .order('created_at', { ascending: false });
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return serverError(res, error, 'An error occurred.');
 
     // Enrich hospital threads with hospital name
     const hospitalIds = [...new Set((threads ?? []).filter(t => t.hospital_id).map(t => t.hospital_id))];
@@ -99,7 +100,7 @@ router.get('/', authenticate, async (req, res) => {
 
     return res.json({ threads: enriched });
   } catch (err) {
-    return res.status(400).json({ error: err.message || 'Failed to load consult threads' });
+    return serverError(res, err, 'Failed to load consult threads.');
   }
 });
 
@@ -142,7 +143,7 @@ router.post('/', authenticate, async (req, res) => {
       )
       .single();
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return serverError(res, error, 'An error occurred.');
 
     // Auto-insert health summary as the first message in the thread
     const summaryBody = formatIntakeSummaryMessage(intake);
@@ -167,7 +168,7 @@ router.post('/', authenticate, async (req, res) => {
 
     return res.status(201).json({ thread: { ...data, hospital_name } });
   } catch (err) {
-    return res.status(400).json({ error: err.message || 'Failed to create consult thread' });
+    return serverError(res, err, 'Failed to create consult thread.');
   }
 });
 
@@ -193,10 +194,10 @@ router.get('/:id/messages', authenticate, async (req, res) => {
       .eq('thread_id', threadId)
       .order('created_at', { ascending: true });
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return serverError(res, error, 'An error occurred.');
     return res.json({ messages: data ?? [] });
   } catch (err) {
-    return res.status(400).json({ error: err.message || 'Failed to load messages' });
+    return serverError(res, err, 'Failed to load messages.');
   }
 });
 
@@ -229,10 +230,10 @@ router.post('/:id/messages', authenticate, async (req, res) => {
       .select('id, thread_id, sender_role, body, created_at')
       .single();
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return serverError(res, error, 'An error occurred.');
     return res.status(201).json({ message: data });
   } catch (err) {
-    return res.status(400).json({ error: err.message || 'Failed to send message' });
+    return serverError(res, err, 'Failed to send message.');
   }
 });
 
@@ -270,7 +271,7 @@ router.post('/:id/close', authenticate, async (req, res) => {
 
     return res.json({ thread: updated });
   } catch (err) {
-    return res.status(400).json({ error: err.message || 'Failed to close thread' });
+    return serverError(res, err, 'Failed to close thread.');
   }
 });
 
@@ -295,10 +296,10 @@ router.delete('/:id', authenticate, async (req, res) => {
       .delete()
       .eq('id', threadId);
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return serverError(res, error, 'An error occurred.');
     return res.status(200).json({ ok: true });
   } catch (err) {
-    return res.status(400).json({ error: err.message || 'Failed to delete thread' });
+    return serverError(res, err, 'Failed to delete thread.');
   }
 });
 

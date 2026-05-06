@@ -1,3 +1,4 @@
+const serverError = require('../lib/serverError');
 const express = require('express');
 const router = express.Router();
 const supabase = require('../lib/supabase');
@@ -22,10 +23,10 @@ router.post('/signup', async (req, res) => {
       password,
       ...(fullName ? { user_metadata: { name: fullName } } : {}),
     });
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return res.status(400).json({ error: 'Could not create account. Check your details and try again.' });
     res.status(201).json({ user: data.user });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return serverError(res, err, 'Sign up failed.');
   }
 });
 
@@ -37,10 +38,10 @@ router.post('/signin', async (req, res) => {
       return res.status(400).json({ error: 'email and password are required' });
     }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return res.status(401).json({ error: error.message });
+    if (error) return res.status(401).json({ error: 'Invalid email or password.' });
     res.json({ session: data.session, user: data.user });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return serverError(res, err, 'Sign in failed.');
   }
 });
 

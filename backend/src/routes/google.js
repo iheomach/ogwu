@@ -1,3 +1,4 @@
+const serverError = require('../lib/serverError');
 const express = require('express');
 const crypto = require('crypto');
 const { google } = require('googleapis');
@@ -61,7 +62,7 @@ router.get('/connect', authenticate, async (req, res) => {
 
     return res.json({ auth_url: authUrl });
   } catch (e) {
-    return res.status(500).json({ error: e?.message || 'Failed to start Google OAuth' });
+    return serverError(res, e, 'Failed to start Google OAuth.');
   }
 });
 
@@ -136,7 +137,7 @@ router.get('/callback', async (req, res) => {
         `Google Calendar connected${connectedEmail ? ` for ${connectedEmail}` : ''}. You can close this tab.`
       );
   } catch (e) {
-    return res.status(500).send(e?.message || 'Failed to complete Google OAuth');
+    return serverError(res, e, 'Failed to complete Google OAuth.');
   }
 });
 
