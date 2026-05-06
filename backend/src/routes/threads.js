@@ -20,7 +20,7 @@ async function generateThreadTitle(intake) {
   try {
     const { text } = await generateText({
       model: openai('gpt-4o-mini'),
-      prompt: `Summarize this patient's medical concern in 6 words or fewer. Focus only on the clinical issue — no names, ages, or locations. Be direct and clinical. No punctuation at the end. Only output the summary, nothing else.\n\nConcern: ${concern}`,
+      prompt: `Summarize this patient's medical concern in 6 words or fewer. Focus only on the clinical issue — no names, ages, or locations. Be direct and clinical. No punctuation at the end. Never use em dashes. Only output the summary, nothing else.\n\nConcern: ${concern}`,
       maxTokens: 24,
     });
     return text.trim().replace(/[.\n].*$/s, '').trim() || null;

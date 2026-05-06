@@ -58,7 +58,7 @@ function messageText(m: any): string {
 function renderToolInvocation(part: any): ReactNode {
   if (!part || !part.type?.startsWith('tool-')) return null;
 
-  const toolName = part.type.replace('tool-', '');
+  const toolName = part.toolName ?? part.toolInvocation?.toolName ?? part.type.replace('tool-', '');
   const state = part.state;
   const errorText = part.errorText;
 
@@ -597,7 +597,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     const hasRenderedUI = messages.some((m: any) => {
       if (m.role !== 'assistant') return false;
       return ((m as any).parts ?? []).some((p: any) => {
-        const tn = p.toolInvocation?.toolName ?? (p.type ?? '').replace('tool-', '');
+        const tn = p.toolInvocation?.toolName ?? p.toolName ?? (p.type ?? '').replace('tool-', '');
         const state = p.state ?? p.toolInvocation?.state ?? '';
         return UI_RENDERING_TOOLS.has(tn) && (state === 'output-available' || state === 'result');
       });
@@ -623,7 +623,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
       if ((m as any).role !== 'assistant') continue;
       const parts: any[] = (m as any).parts ?? [];
       for (const part of parts) {
-        const toolName = (part.toolInvocation?.toolName) ?? (part.type ?? '').replace('tool-', '');
+        const toolName = part.toolInvocation?.toolName ?? part.toolName ?? (part.type ?? '').replace('tool-', '');
         const state = part.state ?? part.toolInvocation?.state ?? '';
         if (toolName === 'bookAppointment' && (state === 'output-available' || state === 'result')) {
           const output = part.output ?? part.result ?? part.toolInvocation?.result ?? part.toolInvocation?.output;
@@ -714,14 +714,14 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
               // "Ready"  = tool has a usable result (used to render the UI widget).
 
               const searchHospitalsCalled = toolParts.some((p: any) =>
-                (p.toolInvocation?.toolName ?? (p.type ?? '').replace('tool-', '')) === 'searchHospitals'
+                (p.toolInvocation?.toolName ?? p.toolName ?? (p.type ?? '').replace('tool-', '')) === 'searchHospitals'
               );
               const hasHospitalCards = searchHospitalsCalled && toolParts.some((part: any) => {
                 const invocation = part.toolInvocation;
-                const toolName = invocation?.toolName ?? (part.type ?? '').replace('tool-', '');
+                const toolName = invocation?.toolName ?? part.toolName ?? (part.type ?? '').replace('tool-', '');
                 const invState = part.state ?? invocation?.state ?? '';
                 if (toolName !== 'searchHospitals') return false;
-                if (invState !== 'output-available' && invState !== 'result') return false;
+                if (invState !== 'output-available' && invState !== 'result' && !part.output && !part.result) return false;
                 const hospitals =
                   part.output?.hospitals ?? part.result?.hospitals ??
                   invocation?.result?.hospitals ?? invocation?.output?.hospitals ??
@@ -732,27 +732,27 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
 
               // Suppress slot list in streaming text as soon as getHospitalBookingInfo is called.
               const slotPickerCalled = toolParts.some((p: any) =>
-                (p.toolInvocation?.toolName ?? (p.type ?? '').replace('tool-', '')) === 'getHospitalBookingInfo'
+                (p.toolInvocation?.toolName ?? p.toolName ?? (p.type ?? '').replace('tool-', '')) === 'getHospitalBookingInfo'
               );
               const hasSlotPicker = slotPickerCalled && toolParts.some((part: any) => {
                 const invocation = part.toolInvocation;
-                const toolName = invocation?.toolName ?? (part.type ?? '').replace('tool-', '');
+                const toolName = invocation?.toolName ?? part.toolName ?? (part.type ?? '').replace('tool-', '');
                 const invState = part.state ?? invocation?.state ?? '';
                 if (toolName !== 'getHospitalBookingInfo') return false;
-                if (invState !== 'output-available' && invState !== 'result') return false;
+                if (invState !== 'output-available' && invState !== 'result' && !part.output && !part.result) return false;
                 const output = part.output ?? part.result ?? invocation?.result ?? invocation?.output;
                 return output?.type === 'onboarded' && Array.isArray(output?.available_slots) && output.available_slots.length > 0;
               });
 
               const bookAppointmentCalled = toolParts.some((p: any) =>
-                (p.toolInvocation?.toolName ?? (p.type ?? '').replace('tool-', '')) === 'bookAppointment'
+                (p.toolInvocation?.toolName ?? p.toolName ?? (p.type ?? '').replace('tool-', '')) === 'bookAppointment'
               );
               const hasCalendarButton = bookAppointmentCalled && toolParts.some((part: any) => {
                 const invocation = part.toolInvocation;
-                const toolName = invocation?.toolName ?? (part.type ?? '').replace('tool-', '');
+                const toolName = invocation?.toolName ?? part.toolName ?? (part.type ?? '').replace('tool-', '');
                 const invState = part.state ?? invocation?.state ?? '';
                 if (toolName !== 'bookAppointment') return false;
-                if (invState !== 'output-available' && invState !== 'result') return false;
+                if (invState !== 'output-available' && invState !== 'result' && !part.output && !part.result) return false;
                 const output = part.output ?? part.result ?? invocation?.result ?? invocation?.output;
                 return output?.success && output?.meeting_url;
               });
@@ -775,7 +775,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
               if (hasCalendarButton) {
                 for (const part of toolParts) {
                   const inv = part.toolInvocation;
-                  const tn = inv?.toolName ?? (part.type ?? '').replace('tool-', '');
+                  const tn = inv?.toolName ?? part.toolName ?? (part.type ?? '').replace('tool-', '');
                   if (tn !== 'bookAppointment') continue;
                   const output = part.output ?? part.result ?? inv?.result ?? inv?.output;
                   if (output?.success && output?.meeting_url && output?.starts_at) {
@@ -821,13 +821,15 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                     // Detect searchHospitals result across SDK format variants
                     const partType = part.type ?? '';
                     const invocation = part.toolInvocation;
-                    const toolName = invocation?.toolName ?? partType.replace('tool-', '');
+                    const toolName = invocation?.toolName ?? part.toolName ?? partType.replace('tool-', '');
                     const invState = part.state ?? invocation?.state ?? '';
                     const isHospitalResult =
                       toolName === 'searchHospitals' &&
-                      (invState === 'output-available' || invState === 'result');
+                      (invState === 'output-available' || invState === 'result' || !!part.output || !!part.result);
 
                     if (isHospitalResult) {
+                      // Never render cards until the prompt text has arrived
+                      if (!displayText) return null;
                       // Try every possible field path across SDK versions
                       const hospitals =
                         part.output?.hospitals ??
@@ -836,7 +838,6 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                         invocation?.output?.hospitals ??
                         (Array.isArray(part.output) ? part.output : null) ??
                         (Array.isArray(part.result) ? part.result : null);
-
 
                       if (Array.isArray(hospitals) && hospitals.length > 0) {
                         return (
@@ -852,7 +853,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                     // Detect getHospitalBookingInfo result with slots
                     const isSlotResult =
                       toolName === 'getHospitalBookingInfo' &&
-                      (invState === 'output-available' || invState === 'result');
+                      (invState === 'output-available' || invState === 'result' || !!part.output || !!part.result);
 
                     if (isSlotResult) {
                       const output = part.output ?? part.result ?? invocation?.result ?? invocation?.output;
@@ -873,7 +874,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                     // Detect bookAppointment success result
                     const isBookingResult =
                       toolName === 'bookAppointment' &&
-                      (invState === 'output-available' || invState === 'result');
+                      (invState === 'output-available' || invState === 'result' || !!part.output || !!part.result);
 
                     if (isBookingResult) return null; // rendered inside bubble above
 

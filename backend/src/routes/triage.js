@@ -343,7 +343,8 @@ router.post('/complete', authenticate, async (req, res) => {
           `Return ONLY JSON: { "summary": string, "safety_note": string|null }. ` +
           `Write in ${languageName}. ` +
           `If you include a safety_note, address the user directly in second person ("you"), e.g. ` +
-          `"It is recommended that you ... due to your symptoms" (do not say "the patient").`,
+          `"It is recommended that you ... due to your symptoms" (do not say "the patient"). ` +
+          `Never use em dashes (—) in any output. Use a comma or rewrite the phrase instead.`,
       },
       {
         role: 'user',
