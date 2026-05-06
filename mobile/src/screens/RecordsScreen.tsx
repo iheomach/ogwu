@@ -31,10 +31,10 @@ function toRoman(n: number): string {
 
 function conditionBase(th: ConsultThread): string {
   if (th.title) return th.title;
-  const s = (th.intake_snapshot?.summary ?? '').trim();
-  if (s) return s.split(/\s+/).slice(0, 6).join(' ');
   if (th.provider_type === 'external') return th.external_provider?.name ?? 'External provider';
   if (th.doctor?.name) return th.doctor.name;
+  const urgency = th.urgency ?? th.intake_snapshot?.urgency;
+  if (urgency && urgency !== 'routine') return `${urgency.charAt(0).toUpperCase() + urgency.slice(1)} consult`;
   return 'Async consult';
 }
 

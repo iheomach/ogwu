@@ -8,10 +8,9 @@
 
 #### Security
 - [x] Supabase anon key in `mobile/.env` — anon key is safe to expose; RLS enforces access. `mobile/.env` added to `.gitignore` so it won't be tracked going forward.
-- [ ] Restrict CORS — `backend/src/index.js` calls `cors()` with no origin list; add `cors({ origin: process.env.ALLOWED_ORIGINS })`
-- [ ] Add rate limiting — `express-rate-limit` on auth, triage, and agent routes
-- [ ] Add `helmet` middleware to backend for security headers (CSP, HSTS, X-Frame-Options)
-- [ ] Sanitize error responses — never send `err.message` directly to clients; log internally, return generic message externally
+- [x] Restrict CORS — `backend/src/index.js` now uses `cors({ origin: allowlist })` scoped to `localhost:5173`, `localhost:4173`, and `process.env.ADMIN_ORIGIN`. Set `ADMIN_ORIGIN=https://ogwu-web-admin-client.vercel.app` in Railway.
+- [x] Add rate limiting — two-level: global IP limiter (300 req / 15 min) + per-user limiter (20 req / 1 min) on triage, agent, threads, appointments, and report routes via `express-rate-limit`
+- [x] Sanitize error responses — `lib/serverError.js` helper logs internally and returns a generic message; applied across all 12 route files
 
 #### Auth
 - [ ] Add token refresh logic — handle Supabase session expiry mid-operation on both web and mobile
@@ -26,7 +25,6 @@
 ### 🟡 Important (ship soon after)
 
 #### Reliability
-- [ ] Add centralized Express error handler middleware
 - [ ] Add React error boundaries to web admin
 - [ ] Add graceful shutdown to backend — handle `SIGTERM` to drain in-flight requests before Railway redeploys
 - [ ] Add structured logging (Winston or Pino) for audit trails and production debugging
@@ -35,6 +33,7 @@
 - [ ] Write a `Dockerfile` for the backend
 - [ ] Add EAS build profiles to mobile `app.json` (staging vs. production)
 - [ ] Add `.env.example` files to all three packages documenting required variables
+- [ ] Set `ADMIN_ORIGIN=https://ogwu-web-admin-client.vercel.app` as a Railway environment variable
 
 #### Notifications
 - [ ] Implement push notifications on mobile — patients currently have no signal that a provider replied to their consult thread; the async loop breaks without this
@@ -44,6 +43,7 @@
 ### 🟢 Nice to Have (polish)
 
 - [ ] Add automated tests — currently zero; focus on backend auth routes and data mutations first
+- [ ] Add `helmet` middleware for additional security headers (CSP, HSTS, X-Frame-Options) — low priority; not blocking
 - [ ] Integrate Sentry or equivalent for error tracking and alerting
 - [ ] Add read receipts / typing indicators to consult thread UI
 - [ ] Strengthen password policy beyond `length >= 8`
@@ -136,9 +136,9 @@ These are the five pillars that separate a true agent from a linear LLM chain. E
 
 | Category | Status |
 |---|---|
-| Security | ❌ Blocking issues |
+| Security | ✅ CORS, rate limiting, error sanitization done |
 | Auth | ❌ Token refresh missing |
-| Validation & pagination | ❌ Gaps |
+| Validation & pagination | 🟡 Validation done, pagination missing |
 | Reliability & logging | 🟡 Partial |
 | Deployment config | 🟡 Incomplete |
 | Push notifications | ❌ Missing |

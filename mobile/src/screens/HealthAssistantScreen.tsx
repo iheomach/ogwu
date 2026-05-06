@@ -196,12 +196,18 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
   onSelect: (slot: Slot, hospitalId: string) => void;
   disabled: boolean;
 }) {
-  // Build map: 'yyyy-MM-dd' -> Slot[], deduped by starts_at_local
+  // Build map: 'yyyy-MM-dd' -> Slot[], deduped and filtered to future slots only.
+  // Slots are stored with starts_at_local in the patient's local timezone, so we
+  // compare directly against the device's local clock — no UTC conversion needed.
   const slotsByDate = useMemo(() => {
     const map = new Map<string, Slot[]>();
     const seen = new Set<string>();
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const nowLocalStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
     for (const s of slots) {
       if (seen.has(s.starts_at_local)) continue;
+      if (s.starts_at_local <= nowLocalStr) continue; // skip slots that have already passed
       seen.add(s.starts_at_local);
       const dateKey = s.starts_at_local.split('T')[0];
       if (!map.has(dateKey)) map.set(dateKey, []);
@@ -336,7 +342,7 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
           ) : (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {timesForDate.map((slot) => {
-                const timeLabel = slot.display.split(', ')[1];
+                const timePart = slot.display.split(', ')[1];
                 const active = selectedSlot?.starts_at_local === slot.starts_at_local;
                 return (
                   <TouchableOpacity
@@ -355,7 +361,7 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
                     }}
                   >
                     <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? '#fff' : colors.grey700 }}>
-                      {timeLabel}
+                      {timePart}
                     </Text>
                   </TouchableOpacity>
                 );

@@ -7,12 +7,20 @@ const { openai } = require('@ai-sdk/openai');
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
 
-async function generateThreadTitle(summary) {
-  if (!summary) return null;
+async function generateThreadTitle(intake) {
+  // Build the best available description of the medical concern
+  let concern = (intake?.summary ?? '').trim();
+  if (!concern && Array.isArray(intake?.answers) && intake.answers.length > 0) {
+    concern = intake.answers
+      .filter(({ q, a }) => q && a)
+      .map(({ q, a }) => `${q}: ${a}`)
+      .join('. ');
+  }
+  if (!concern) return null;
   try {
     const { text } = await generateText({
       model: openai('gpt-4o-mini'),
-      prompt: `Summarize this patient's medical concern in 6 words or fewer. Be direct and clinical. No punctuation at the end. Only output the summary, nothing else.\n\nConcern: ${summary}`,
+      prompt: `Summarize this patient's medical concern in 6 words or fewer. Focus only on the clinical issue — no names, ages, or locations. Be direct and clinical. No punctuation at the end. Only output the summary, nothing else.\n\nConcern: ${concern}`,
       maxTokens: 24,
     });
     return text.trim().replace(/[.\n].*$/s, '').trim() || null;
@@ -98,6 +106,19 @@ router.get('/', authenticate, async (req, res) => {
       hospital_name: t.hospital_id ? (hospitalNames[t.hospital_id] ?? null) : null,
     }));
 
+    // Backfill titles for old threads that never got one — fire-and-forget
+    const untitled = enriched.filter(t => !t.title && t.intake_snapshot);
+    if (untitled.length > 0) {
+      Promise.all(
+        untitled.map(async (t) => {
+          const title = await generateThreadTitle(t.intake_snapshot);
+          if (!title) return;
+          await supabase.from('consult_threads').update({ title }).eq('id', t.id);
+          t.title = title; // update in-place so this response already has the title
+        })
+      ).catch(() => {});
+    }
+
     return res.json({ threads: enriched });
   } catch (err) {
     return serverError(res, err, 'Failed to load consult threads.');
@@ -122,7 +143,7 @@ router.post('/', authenticate, async (req, res) => {
 
     const locale = intake?.locale ?? null;
     const urgency = intake?.urgency ?? 'routine';
-    const title = await generateThreadTitle(intake?.summary ?? null);
+    const title = await generateThreadTitle(intake);
 
     const { data, error } = await supabase
       .from('consult_threads')
