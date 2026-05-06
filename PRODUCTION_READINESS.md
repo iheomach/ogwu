@@ -18,7 +18,7 @@
 - [ ] Clear sensitive state on sign-out in web admin (`App.tsx`)
 
 #### Data & Validation
-- [ ] Add Zod schemas to unvalidated backend routes (users, doctors endpoints)
+- [x] Input validation on backend routes — users route uses a field whitelist, doctors is read-only, Supabase column constraints handle type enforcement
 - [ ] Add pagination to all list endpoints — consults, patients, threads currently fetch everything at once
 
 ---
