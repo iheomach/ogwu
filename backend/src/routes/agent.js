@@ -3,7 +3,8 @@ const express = require('express');
 const { google } = require('googleapis');
 const { DateTime } = require('luxon');
 const z = require('zod');
-const { HumanMessage, AIMessage, ToolMessage } = require('@langchain/core/messages');
+const { HumanMessage, AIMessage, ToolMessage, SystemMessage } = require('@langchain/core/messages');
+const { ChatOpenAI } = require('@langchain/openai');
 
 const router = express.Router();
 
@@ -258,6 +259,72 @@ function toLangChainMessages(uiMessages) {
   return result;
 }
 
+// ── Session summary ───────────────────────────────────────────────────────────
+
+async function summarizeMessages(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) return null;
+
+  const lines = [];
+  for (const m of messages.slice(-10)) {
+    const type = typeof m._getType === 'function' ? m._getType() : null;
+    const raw = m.content;
+    const content = typeof raw === 'string' ? raw.trim()
+      : Array.isArray(raw) ? raw.filter((p) => p.type === 'text').map((p) => p.text || '').join('').trim()
+      : '';
+    if (!content || !type) continue;
+    if (type === 'human') lines.push(`User: ${content.slice(0, 400)}`);
+    else if (type === 'ai') lines.push(`Assistant: ${content.slice(0, 400)}`);
+  }
+
+  if (lines.length === 0) return null;
+
+  const llm = new ChatOpenAI({ model: 'gpt-4o-mini', temperature: 0, maxTokens: 120 });
+  const result = await llm.invoke([
+    new SystemMessage('Summarize where this health assistant conversation left off. In 1–4 sentences, state what the user was trying to accomplish, what step they stopped at, and who spoke last. Fewer sentences is better when the situation is clear. Be direct and natural.'),
+    new HumanMessage(lines.join('\n')),
+  ]);
+
+  return typeof result.content === 'string' ? result.content.trim() : null;
+}
+
+router.get('/context', authenticate, async (req, res) => {
+  try {
+    const checkpointer = await getCheckpointer();
+    if (!checkpointer) return res.json({ summary: null });
+
+    // Find the most recent session thread for this user.
+    // thread_id format: `${userId}-${Date.now()}` — timestamp suffix sorts lexicographically.
+    const { data: row } = await supabase
+      .from('checkpoints')
+      .select('thread_id')
+      .like('thread_id', `${req.user.id}-%`)
+      .order('thread_id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!row?.thread_id) return res.json({ summary: null });
+
+    const profile = await loadPatientProfile(req.user.id);
+    const skillCtx = {
+      z, supabase, profile,
+      patientLat: null, patientLon: null, haversineKm,
+      fetchAvailableSlots, getClinicCalendarAuth,
+      safeText, normalizeUrgency,
+      patientTimeZone: null,
+    };
+
+    const agent = buildGraph(skillCtx, '', checkpointer);
+    const state = await agent.getState({ configurable: { thread_id: row.thread_id } });
+    const msgs = state?.values?.messages ?? [];
+
+    const summary = await summarizeMessages(msgs);
+    res.json({ summary });
+  } catch (err) {
+    console.error('[agent] context summary error:', err?.message);
+    res.json({ summary: null });
+  }
+});
+
 // ── Route ────────────────────────────────────────────────────────────────────
 
 router.post('/chat', authenticate, async (req, res) => {
@@ -286,7 +353,8 @@ router.post('/chat', authenticate, async (req, res) => {
     const checkpointer = await getCheckpointer();
     const agent = buildGraph(skillCtx, system, checkpointer);
     const langChainMessages = toLangChainMessages(messages);
-    const threadConfig = { configurable: { thread_id: req.user.id } };
+    const sessionId = safeText(req.body?.session_id, 64) || 'default';
+    const threadConfig = { configurable: { thread_id: `${req.user.id}-${sessionId}` } };
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('X-Vercel-AI-Data-Stream', 'v1');
@@ -429,7 +497,8 @@ router.post('/resume', authenticate, async (req, res) => {
 
     const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake, lastHospital });
     const agent = buildGraph(skillCtx, system, checkpointer);
-    const threadConfig = { configurable: { thread_id: req.user.id } };
+    const sessionId = safeText(req.body?.session_id, 64) || 'default';
+    const threadConfig = { configurable: { thread_id: `${req.user.id}-${sessionId}` } };
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('X-Vercel-AI-Data-Stream', 'v1');
@@ -520,11 +589,11 @@ router.post('/resume', authenticate, async (req, res) => {
 
 router.delete('/history', authenticate, async (req, res) => {
   try {
-    const threadId = req.user.id;
+    const prefix = `${req.user.id}-%`;
     await Promise.all([
-      supabase.from('checkpoints').delete().eq('thread_id', threadId),
-      supabase.from('checkpoint_writes').delete().eq('thread_id', threadId),
-      supabase.from('checkpoint_blobs').delete().eq('thread_id', threadId),
+      supabase.from('checkpoints').delete().like('thread_id', prefix),
+      supabase.from('checkpoint_writes').delete().like('thread_id', prefix),
+      supabase.from('checkpoint_blobs').delete().like('thread_id', prefix),
     ]);
     res.json({ ok: true });
   } catch (err) {

@@ -537,6 +537,9 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     pendingInterrupt,
     confirmBooking,
     resetState,
+    startNewSession,
+    contextSummary,
+    fetchContextSummary,
   } = useAgentChat({ apiBase, location, lat, lon });
 
   const handleSelectHospital = (h: any) => {
@@ -548,7 +551,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
   };
 
   const handleNewSession = async () => {
-    resetState();
+    startNewSession();
     try {
       await AsyncStorage.setItem('assistantMessages', '[]');
     } catch {
@@ -577,7 +580,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                   headers: { Authorization: `Bearer ${token}` },
                 });
               }
-              resetState();
+              startNewSession(false);
               await AsyncStorage.setItem('assistantMessages', '[]');
             } catch {
               // Non-fatal — checkpoint may already be empty
@@ -646,14 +649,21 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     (async () => {
       try {
         const saved = await AsyncStorage.getItem('assistantMessages');
-        if (saved) setMessages(JSON.parse(saved));
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setMessages(parsed);
+          if (parsed.length === 0) fetchContextSummary();
+        } else {
+          fetchContextSummary();
+        }
       } catch (err) {
         console.error('Failed to restore assistant messages:', err);
+        fetchContextSummary();
       } finally {
         setIsInitialized(true);
       }
     })();
-  }, [setMessages]);
+  }, [setMessages, fetchContextSummary]);
 
   useEffect(() => {
     if (!isInitialized) return;
@@ -709,10 +719,10 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
             contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 80 }}
             showsVerticalScrollIndicator={false}
           >
-            {/* Greeting bubble */}
+            {/* Greeting bubble — shows prior session summary when available */}
             <View style={styles.assistantBubble}>
               <Text style={{ color: colors.grey700, lineHeight: 20, fontSize: 14 }}>
-                {t('assistant.helper')}
+                {contextSummary ?? t('assistant.helper')}
               </Text>
             </View>
 

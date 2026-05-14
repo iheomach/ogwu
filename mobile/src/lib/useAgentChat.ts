@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { fetch as expoFetch } from 'expo/fetch';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../lib/supabase';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -101,7 +102,6 @@ async function parseSSEStream(response: Response, handlers: SSEHandler) {
 }
 
 // ── Serialise messages for the backend ────────────────────────────────────────
-// Converts AgentMessage[] → the format toLangChainMessages in agent.js expects.
 
 function serialiseMessages(messages: AgentMessage[]) {
   return messages.map((m) => {
@@ -125,6 +125,14 @@ function serialiseMessages(messages: AgentMessage[]) {
   });
 }
 
+// ── Session ID ────────────────────────────────────────────────────────────────
+
+const SESSION_ID_KEY = 'assistantSessionId';
+
+function newSessionId() {
+  return Date.now().toString();
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 type UseAgentChatOptions = {
@@ -140,24 +148,38 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [pendingInterrupt, setPendingInterrupt] = useState<BookingInterrupt | null>(null);
+  const [contextSummary, setContextSummary] = useState<string | null>(null);
 
   // Stable ref to latest messages for closures inside stream
   const messagesRef = useRef<AgentMessage[]>([]);
   messagesRef.current = messages;
 
-  const sharedBody = {
-    ...(location ? { location } : {}),
-    ...(lat != null ? { lat } : {}),
-    ...(lon != null ? { lon } : {}),
-    time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  };
+  // Session ID — persisted across app restarts, changes on startNewSession
+  const sessionIdRef = useRef<string>(newSessionId());
+
+  useEffect(() => {
+    AsyncStorage.getItem(SESSION_ID_KEY).then((saved) => {
+      if (saved) {
+        sessionIdRef.current = saved;
+      } else {
+        AsyncStorage.setItem(SESSION_ID_KEY, sessionIdRef.current).catch(() => {});
+      }
+    });
+  }, []);
 
   const runStream = useCallback(async (url: string, extraBody: object) => {
     if (!apiBase) throw new Error('API URL not configured');
 
     const response = await authedFetch(url, {
       method: 'POST',
-      body: JSON.stringify({ ...sharedBody, ...extraBody }),
+      body: JSON.stringify({
+        session_id: sessionIdRef.current,
+        ...(location ? { location } : {}),
+        ...(lat != null ? { lat } : {}),
+        ...(lon != null ? { lon } : {}),
+        time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        ...extraBody,
+      }),
     });
 
     if (!response.ok) {
@@ -207,8 +229,22 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     });
   }, [apiBase, location, lat, lon]);
 
+  const fetchContextSummary = useCallback(async () => {
+    if (!apiBase) return;
+    try {
+      const resp = await authedFetch(`${apiBase}/context`);
+      if (resp.ok) {
+        const json = await (resp as any).json();
+        if (json?.summary) setContextSummary(json.summary);
+      }
+    } catch {
+      // non-fatal — fall back to default greeting
+    }
+  }, [apiBase]);
+
   const append = useCallback(async (msg: { role: 'user'; content: string }) => {
     if (isLoading) return;
+    setContextSummary(null); // clear once user starts talking
 
     const userMsg: AgentMessage = {
       id: `user-${Date.now()}`,
@@ -273,6 +309,19 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     setPendingInterrupt(null);
   }, []);
 
+  // Generates a new session — old checkpoint preserved in DB but no longer active
+  const startNewSession = useCallback((fetchSummary = true) => {
+    const id = newSessionId();
+    sessionIdRef.current = id;
+    AsyncStorage.setItem(SESSION_ID_KEY, id).catch(() => {});
+    setMessages([]);
+    setInput('');
+    setError(null);
+    setPendingInterrupt(null);
+    setContextSummary(null);
+    if (fetchSummary) fetchContextSummary();
+  }, [fetchContextSummary]);
+
   return {
     messages,
     setMessages,
@@ -285,5 +334,8 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     pendingInterrupt,
     confirmBooking,
     resetState,
+    startNewSession,
+    contextSummary,
+    fetchContextSummary,
   };
 }
