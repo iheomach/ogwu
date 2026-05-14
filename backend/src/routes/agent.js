@@ -404,6 +404,60 @@ router.get('/context', authenticate, async (req, res) => {
   }
 });
 
+router.get('/session', authenticate, async (req, res) => {
+  try {
+    const checkpointer = await getCheckpointer();
+    if (!checkpointer) return res.json({ messages: [] });
+
+    const { data: row } = await supabase
+      .from('checkpoints')
+      .select('thread_id')
+      .like('thread_id', `${req.user.id}-%`)
+      .order('thread_id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!row?.thread_id) return res.json({ messages: [] });
+
+    const profile = await loadPatientProfile(req.user.id);
+    const skillCtx = {
+      z, supabase, profile,
+      patientLat: null, patientLon: null, haversineKm,
+      fetchAvailableSlots, getClinicCalendarAuth,
+      safeText, normalizeUrgency,
+      patientTimeZone: null,
+    };
+
+    const agent = buildGraph(skillCtx, '', checkpointer);
+    const state = await agent.getState({ configurable: { thread_id: row.thread_id } });
+    const msgs = state?.values?.messages ?? [];
+
+    const messages = msgs
+      .filter((m) => {
+        const type = typeof m._getType === 'function' ? m._getType() : null;
+        return type === 'human' || type === 'ai';
+      })
+      .map((m, i) => {
+        const type = typeof m._getType === 'function' ? m._getType() : null;
+        const raw = m.content;
+        const content = typeof raw === 'string' ? raw
+          : Array.isArray(raw) ? raw.filter((p) => p.type === 'text').map((p) => p.text || '').join('')
+          : '';
+        return {
+          id: m.id || `msg-${i}`,
+          role: type === 'human' ? 'user' : 'assistant',
+          content,
+          parts: [],
+        };
+      });
+
+    res.json({ messages });
+  } catch (err) {
+    console.error('[agent] session load error:', err?.message);
+    res.json({ messages: [] });
+  }
+});
+
 // ── Route ────────────────────────────────────────────────────────────────────
 
 router.post('/chat', authenticate, async (req, res) => {
