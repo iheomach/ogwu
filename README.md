@@ -49,8 +49,9 @@ ogwu/
 - Multi-language UI: English, Spanish, French, Igbo, Yoruba, Hausa
 
 ### Backend / AI agent
-- AI SDK v5 streaming with multi-step tool orchestration
-- 7 tools: hospital search, slot availability, appointment booking, drug interactions, emergency flag, consult history, send-to-hospital
+- LangGraph stateful directed graph — one node per tool, conditional emergency routing, Postgres checkpointing for fault tolerance
+- Human-in-the-loop interrupt before booking confirmation — graph pauses, patient confirms, then resumes from saved state
+- 8 tools: hospital search, slot availability, appointment booking, drug interactions, emergency flag, consult history, consult creation, end-conversation
 - GPT-generated thread titles from triage summaries
 - Triage pipeline: question generation → urgency classification → summary → context injection
 - Google Calendar + Meet integration per hospital
@@ -69,8 +70,8 @@ ogwu/
 | Layer | Technology |
 |---|---|
 | Mobile | React Native (Expo), TypeScript |
-| Backend | Node.js, Express, AI SDK v5 |
-| AI | OpenAI GPT-4o-mini, multi-step tool orchestration |
+| Backend | Node.js, Express, LangGraph |
+| AI | OpenAI GPT-4o-mini, LangGraph ReAct agent with per-tool nodes |
 | Database | Supabase (Postgres + pgvector + Auth) |
 | Integrations | Google Calendar API, Google Meet |
 | Admin dashboard | React, TypeScript, Vite, Tailwind CSS |
@@ -79,7 +80,7 @@ ogwu/
 
 ## Current limitations
 
-- Agent has no error recovery — a failed tool call breaks the entire flow with no retry or fallback
+- No retry or fallback logic — tool errors surface to the patient with no exponential backoff or alternative path
 - No guardrails or evals on urgency output; emergency triage produces a badge but no provider alert
 - Zero automated tests; no auth token refresh; missing HTTP security headers (CSP, HSTS)
 
@@ -90,7 +91,7 @@ ogwu/
 See [`FUTURE_IMPLEMENTATION.md`](./FUTURE_IMPLEMENTATION.md) for full implementation details and priority scores.
 
 **Agent & AI**
-- [ ] LangGraph agentic orchestration — stateful graphs, Postgres checkpointing, human-in-the-loop before booking
+- [x] LangGraph agentic orchestration — stateful graphs, Postgres checkpointing, human-in-the-loop before booking
 - [ ] AWS Comprehend Medical — medical entity extraction (ICD-10-CM, RxNorm) to ground urgency classification
 - [ ] AWS HealthLake (FHIR R4) — versioned clinical data store replacing raw Supabase JSON
 - [ ] Evaluation & guardrails — urgency output validation, content safety filter, provider alert on emergency
@@ -141,6 +142,7 @@ OPENAI_API_KEY
 GOOGLE_OAUTH_CLIENT_ID
 GOOGLE_OAUTH_CLIENT_SECRET
 GOOGLE_OAUTH_REDIRECT_URI
+DATABASE_URL          # Supabase Postgres connection string — used by LangGraph checkpointer
 OPENAI_MODEL          # optional, defaults to gpt-4o-mini
 ```
 

@@ -16,32 +16,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
-import { useChat } from '@ai-sdk/react';
-import { fetch as expoFetch } from 'expo/fetch';
-
 import { Calendar } from 'react-native-calendars';
-import { supabase } from '../../lib/supabase';
 import { threadsCreate } from '../lib/threads';
 import type { ScreenPropsBase } from '../types';
 import { colors, spacing, styles } from '../ui/styles';
 import { t } from '../i18n';
-
-async function authedFetch(input: string, init?: RequestInit) {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) throw new Error('Not authenticated');
-
-  const headers = new Headers(init?.headers || {});
-  headers.set('Authorization', `Bearer ${token}`);
-  if (init?.body && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json');
-  }
-
-  return expoFetch(input, {
-    ...init,
-    headers,
-  } as any);
-}
+import { useAgentChat } from '../lib/useAgentChat';
 
 function messageText(m: any): string {
   const c = (m as any)?.content;
@@ -537,10 +517,10 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
 export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospital, onOpenThread }: ScreenPropsBase & { onSendToHospital?: () => void; onOpenThread?: (threadId: string) => void }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [sendingToHospital, setSendingToHospital] = useState(false);
-  const apiUrl = useMemo(() => {
+  const apiBase = useMemo(() => {
     const base = process.env.EXPO_PUBLIC_API_URL;
     if (!base) return null;
-    return `${base.replace(/\/$/, '')}/api/agent/chat`;
+    return `${base.replace(/\/$/, '')}/api/agent`;
   }, []);
 
   const {
@@ -548,23 +528,13 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     input,
     handleSubmit,
     append,
-    status,
+    isLoading,
     error,
     setInput,
     setMessages,
-  } = useChat({
-    api: apiUrl || '/api/agent/chat',
-    fetch: authedFetch as any,
-    streamProtocol: 'data',
-    body: {
-      ...(location ? { location } : {}),
-      ...(lat != null ? { lat } : {}),
-      ...(lon != null ? { lon } : {}),
-      time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    },
-  });
-
-  const isLoading = status === 'submitted' || status === 'streaming';
+    pendingInterrupt,
+    confirmBooking,
+  } = useAgentChat({ apiBase, location, lat, lon });
 
   const handleSelectHospital = (h: any) => {
     append({ role: 'user', content: `I'd like to go with ${h.name} (hospital_id: ${h.id}).` });
@@ -893,6 +863,43 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
               </View>
             )}
 
+            {/* Booking confirmation interrupt */}
+            {pendingInterrupt && (
+              <View style={[styles.slotPickerContainer, { marginBottom: spacing.md }]}>
+                <View style={styles.slotPickerHeader}>
+                  <Text style={styles.slotPickerHospitalName}>Confirm your booking</Text>
+                  <Text style={styles.slotPickerSubtitle}>{pendingInterrupt.slot}</Text>
+                  {!!pendingInterrupt.reason && (
+                    <Text style={[styles.slotPickerSubtitle, { marginTop: 4 }]}>
+                      Reason: {pendingInterrupt.reason}
+                    </Text>
+                  )}
+                </View>
+                <View style={{ flexDirection: 'row', gap: 10, padding: spacing.md }}>
+                  <TouchableOpacity
+                    onPress={() => confirmBooking(false)}
+                    disabled={isLoading}
+                    style={{
+                      flex: 1, paddingVertical: 13, borderRadius: 12, alignItems: 'center',
+                      borderWidth: 1.5, borderColor: 'rgba(69,0,80,0.25)',
+                    }}
+                  >
+                    <Text style={{ fontWeight: '600', color: colors.grey700 }}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => confirmBooking(true)}
+                    disabled={isLoading}
+                    style={{
+                      flex: 2, paddingVertical: 13, borderRadius: 12, alignItems: 'center',
+                      backgroundColor: colors.purple,
+                    }}
+                  >
+                    <Text style={styles.slotConfirmBtnText}>Confirm booking</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             {!!error && (
               <View style={[styles.assistantBubble, { backgroundColor: 'rgba(239, 68, 68, 0.06)', borderColor: 'rgba(239, 68, 68, 0.2)' }]}>
                 <Text style={{ color: colors.error, fontSize: 14, lineHeight: 20 }}>
@@ -948,10 +955,10 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                 <TouchableOpacity
                   style={[
                     styles.chatSendButton,
-                    { backgroundColor: (busy || isLoading || !apiUrl) ? 'rgba(69, 0, 80, 0.35)' : 'rgba(69, 0, 80, 0.6)' },
+                    { backgroundColor: (busy || isLoading || !apiBase) ? 'rgba(69, 0, 80, 0.35)' : 'rgba(69, 0, 80, 0.6)' },
                   ]}
                   onPress={() => handleSubmit()}
-                  disabled={busy || isLoading || !apiUrl}
+                  disabled={busy || isLoading || !apiBase}
                   accessibilityRole="button"
                   activeOpacity={0.8}
                 >
