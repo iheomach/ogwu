@@ -172,6 +172,26 @@ async function loadTriageIntake(userId) {
   return data || null;
 }
 
+async function loadLastHospital(userId) {
+  const { data: appt } = await supabase
+    .from('appointments')
+    .select('hospital_id')
+    .eq('patient_id', userId)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!appt?.hospital_id) return null;
+
+  const { data: hospital } = await supabase
+    .from('hospitals_directory')
+    .select('id, name, is_onboarded')
+    .eq('id', appt.hospital_id)
+    .maybeSingle();
+
+  return hospital || null;
+}
+
 // ── Message conversion ────────────────────────────────────────────────────────
 
 function getToolInvocations(msg) {
@@ -242,9 +262,10 @@ function toLangChainMessages(uiMessages) {
 
 router.post('/chat', authenticate, async (req, res) => {
   try {
-    const [profile, triageIntake] = await Promise.all([
+    const [profile, triageIntake, lastHospital] = await Promise.all([
       loadPatientProfile(req.user.id),
       loadTriageIntake(req.user.id),
+      loadLastHospital(req.user.id),
     ]);
 
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
@@ -261,7 +282,7 @@ router.post('/chat', authenticate, async (req, res) => {
       patientTimeZone,
     };
 
-    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake });
+    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake, lastHospital });
     const checkpointer = await getCheckpointer();
     const agent = buildGraph(skillCtx, system, checkpointer);
     const langChainMessages = toLangChainMessages(messages);
@@ -387,9 +408,10 @@ router.post('/resume', authenticate, async (req, res) => {
     const checkpointer = await getCheckpointer();
     if (!checkpointer) return res.status(400).json({ error: 'Checkpointer not configured' });
 
-    const [profile, triageIntake] = await Promise.all([
+    const [profile, triageIntake, lastHospital] = await Promise.all([
       loadPatientProfile(req.user.id),
       loadTriageIntake(req.user.id),
+      loadLastHospital(req.user.id),
     ]);
 
     const liveLocation = safeText(req.body?.location, 100) || null;
@@ -405,7 +427,7 @@ router.post('/resume', authenticate, async (req, res) => {
       patientTimeZone,
     };
 
-    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake });
+    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake, lastHospital });
     const agent = buildGraph(skillCtx, system, checkpointer);
     const threadConfig = { configurable: { thread_id: req.user.id } };
 
@@ -491,6 +513,22 @@ router.post('/resume', authenticate, async (req, res) => {
     if (!res.headersSent) {
       res.status(400).json({ error: err?.message || 'Failed to resume agent' });
     }
+  }
+});
+
+// ── Clear checkpoint history ──────────────────────────────────────────────────
+
+router.delete('/history', authenticate, async (req, res) => {
+  try {
+    const threadId = req.user.id;
+    await Promise.all([
+      supabase.from('checkpoints').delete().eq('thread_id', threadId),
+      supabase.from('checkpoint_writes').delete().eq('thread_id', threadId),
+      supabase.from('checkpoint_blobs').delete().eq('thread_id', threadId),
+    ]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err?.message || 'Failed to clear history' });
   }
 });
 

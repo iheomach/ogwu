@@ -22,6 +22,7 @@ import type { ScreenPropsBase } from '../types';
 import { colors, spacing, styles } from '../ui/styles';
 import { t } from '../i18n';
 import { useAgentChat } from '../lib/useAgentChat';
+import { supabase } from '../../lib/supabase';
 
 function messageText(m: any): string {
   const c = (m as any)?.content;
@@ -517,6 +518,7 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
 export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospital, onOpenThread }: ScreenPropsBase & { onSendToHospital?: () => void; onOpenThread?: (threadId: string) => void }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [sendingToHospital, setSendingToHospital] = useState(false);
+  const [clearingHistory, setClearingHistory] = useState(false);
   const apiBase = useMemo(() => {
     const base = process.env.EXPO_PUBLIC_API_URL;
     if (!base) return null;
@@ -534,6 +536,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     setMessages,
     pendingInterrupt,
     confirmBooking,
+    resetState,
   } = useAgentChat({ apiBase, location, lat, lon });
 
   const handleSelectHospital = (h: any) => {
@@ -545,13 +548,46 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
   };
 
   const handleNewSession = async () => {
-    setMessages([]);
-    setInput('');
+    resetState();
     try {
-      await AsyncStorage.removeItem('assistantMessages');
+      await AsyncStorage.setItem('assistantMessages', '[]');
     } catch {
       // Non-fatal
     }
+  };
+
+  const handleClearHistory = () => {
+    Alert.alert(
+      'Clear agent history',
+      'This removes all conversation memory. The agent will have no recollection of previous sessions. Your profile and triage data are not affected.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            if (!apiBase) return;
+            setClearingHistory(true);
+            try {
+              const { data } = await supabase.auth.getSession();
+              const token = data.session?.access_token;
+              if (token) {
+                await fetch(`${apiBase}/history`, {
+                  method: 'DELETE',
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+              }
+              resetState();
+              await AsyncStorage.setItem('assistantMessages', '[]');
+            } catch {
+              // Non-fatal — checkpoint may already be empty
+            } finally {
+              setClearingHistory(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Tools that render their own interactive UI — suppress the spinner while
@@ -642,17 +678,30 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
           {/* Toolbar */}
           <View style={styles.assistantToolbar}>
             <Text style={styles.assistantToolbarTitle}>{t('assistant.title')}</Text>
-            <TouchableOpacity
-              onPress={handleNewSession}
-              disabled={isLoading || messages.length === 0}
-              style={[styles.newChatButton, { opacity: messages.length === 0 ? 0.35 : 1 }]}
-              accessibilityRole="button"
-              accessibilityLabel="Start new session"
-              activeOpacity={0.7}
-            >
-              <MaterialIcons name="add-comment" size={16} color={colors.purple} />
-              <Text style={styles.newChatButtonText}>New chat</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity
+                onPress={handleClearHistory}
+                disabled={isLoading || clearingHistory}
+                style={[styles.newChatButton, { opacity: (isLoading || clearingHistory) ? 0.35 : 1 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Clear agent history"
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="history" size={16} color={colors.purple} />
+                <Text style={styles.newChatButtonText}>Clear history</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleNewSession}
+                disabled={isLoading || messages.length === 0}
+                style={[styles.newChatButton, { opacity: messages.length === 0 ? 0.35 : 1 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Start new session"
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="add-comment" size={16} color={colors.purple} />
+                <Text style={styles.newChatButtonText}>New chat</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
 

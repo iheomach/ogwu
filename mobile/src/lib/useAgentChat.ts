@@ -266,6 +266,13 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     }
   }, [apiBase, runStream]);
 
+  const resetState = useCallback(() => {
+    setMessages([]);
+    setInput('');
+    setError(null);
+    setPendingInterrupt(null);
+  }, []);
+
   return {
     messages,
     setMessages,
@@ -277,5 +284,6 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     error,
     pendingInterrupt,
     confirmBooking,
+    resetState,
   };
 }
