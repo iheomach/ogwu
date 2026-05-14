@@ -1,0 +1,11 @@
+const { Annotation, messagesStateReducer } = require('@langchain/langgraph');
+
+const AgentState = Annotation.Root({
+  messages:      Annotation({ reducer: messagesStateReducer }),
+  urgency:       Annotation({ reducer: (_, next) => next, default: () => null }),
+  patient_id:    Annotation({ reducer: (_, next) => next, default: () => null }),
+  booking_state: Annotation({ reducer: (_, next) => next, default: () => null }),
+  tool_results:  Annotation({ reducer: (_, next) => next, default: () => ({}) }),
+});
+
+module.exports = { AgentState };

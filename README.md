@@ -77,15 +77,48 @@ ogwu/
 
 ---
 
+## Current limitations
+
+- Agent has no error recovery — a failed tool call breaks the entire flow with no retry or fallback
+- No guardrails or evals on urgency output; emergency triage produces a badge but no provider alert
+- Zero automated tests; no auth token refresh; missing HTTP security headers (CSP, HSTS)
+
+---
+
 ## Roadmap
 
-- [ ] **Push notifications** — notify patients when a provider replies or an appointment is approaching
-- [ ] **RAG pipeline** — hospital-specific knowledge base (formularies, care protocols, policies) via pgvector; powers both triage agent grounding and a regulatory assistant on the admin dashboard
-- [ ] **Payments** — Paystack integration for consultation fees before booking confirmation
-- [ ] **Prescription + referral flow** — structured provider output that feeds back into the patient's record
-- [ ] **Guardrails + evals** — confidence thresholds, content safety filter, automated triage regression suite
-- [ ] **Error recovery** — retry/fallback/escalation logic in the agent tool chain
-- [ ] **App Store / Play Store release** — currently distributed via TestFlight and APK
+See [`FUTURE_IMPLEMENTATION.md`](./FUTURE_IMPLEMENTATION.md) for full implementation details and priority scores.
+
+**Agent & AI**
+- [ ] LangGraph agentic orchestration — stateful graphs, Postgres checkpointing, human-in-the-loop before booking
+- [ ] AWS Comprehend Medical — medical entity extraction (ICD-10-CM, RxNorm) to ground urgency classification
+- [ ] AWS HealthLake (FHIR R4) — versioned clinical data store replacing raw Supabase JSON
+- [ ] Evaluation & guardrails — urgency output validation, content safety filter, provider alert on emergency
+- [ ] Tool use hardening — Zod schemas on all tool I/O, scoped permissions, tool call logging
+- [ ] Error recovery — exponential backoff, fallback booking paths, escalation on repeated failures
+- [ ] Context & memory management — sliding-window trim to prevent silent token-limit truncation
+
+**Features**
+- [ ] Push notifications — patient alerts when a provider replies
+- [ ] Payments — Paystack integration for consultation fees before booking confirmation
+- [ ] Prescription + referral flow — structured provider output fed back into the patient record
+- [ ] Voice input — OpenAI Whisper transcription on the triage screen mic button
+- [ ] Quick reply chips — contextual short-answer chips per triage question
+- [ ] Bedrock Data Automation — extract structured data from uploaded health records and policy documents
+- [ ] Hospital knowledge base + regulatory assistant — pgvector RAG powering agent grounding and admin document Q&A
+- [ ] Read receipts & typing indicators — Supabase Realtime presence on consult threads
+
+**Infrastructure**
+- [ ] Automated test suite — Jest + Supertest integration tests, GitHub Actions CI
+- [ ] Structured logging — pino with request context, shipped to CloudWatch or Datadog
+- [ ] Sentry error tracking — unhandled exceptions and slow transactions on backend and mobile
+- [ ] Kafka (AWS MSK) — event-driven booking architecture decoupling confirmation from downstream consumers
+- [ ] Auth token refresh — silent re-auth interceptor; clear sensitive state on sign-out
+- [ ] Dockerfile + EAS build profiles — reproducible builds, per-environment config
+- [ ] Helmet middleware, pagination, password policy, `.env.example` files
+
+**Release**
+- [ ] App Store / Play Store release — currently distributed via TestFlight and APK
 
 ---
 

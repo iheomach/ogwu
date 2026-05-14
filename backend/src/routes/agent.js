@@ -2,13 +2,18 @@ const serverError = require('../lib/serverError');
 const express = require('express');
 const { google } = require('googleapis');
 const { DateTime } = require('luxon');
+const z = require('zod');
+const { HumanMessage, AIMessage, ToolMessage } = require('@langchain/core/messages');
 
 const router = express.Router();
 
 const authenticate = require('../middleware/auth');
 const supabase = require('../lib/supabase');
 const { buildSystemPrompt } = require('../lib/buildSystemPrompt');
-const { loadSkills } = require('../lib/loadSkills');
+const { buildGraph } = require('../lib/buildGraph');
+const { SKILL_NAMES } = require('../lib/buildToolNodes');
+const { getCheckpointer } = require('../lib/checkpointer');
+const { Command } = require('@langchain/langgraph');
 
 function safeText(s, maxLen) {
   const out = typeof s === 'string' ? s.trim() : '';
@@ -167,6 +172,72 @@ async function loadTriageIntake(userId) {
   return data || null;
 }
 
+// ── Message conversion ────────────────────────────────────────────────────────
+
+function getToolInvocations(msg) {
+  // v5 parts format: parts[].type === 'tool-invocation' with state === 'result'
+  if (Array.isArray(msg.parts)) {
+    const fromParts = msg.parts
+      .filter((p) => p.type === 'tool-invocation' && p.toolInvocation?.state === 'result')
+      .map((p) => p.toolInvocation);
+    if (fromParts.length > 0) return fromParts;
+  }
+  // legacy toolInvocations array
+  if (Array.isArray(msg.toolInvocations)) {
+    return msg.toolInvocations.filter((i) => i.state === 'result');
+  }
+  return [];
+}
+
+function extractText(content) {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) return content.filter((p) => p.type === 'text').map((p) => p.text || '').join('');
+  return '';
+}
+
+function toLangChainMessages(uiMessages) {
+  const result = [];
+  for (const msg of uiMessages) {
+    if (msg.role === 'system') continue;
+
+    if (msg.role === 'user') {
+      const text = extractText(msg.content);
+      if (text.trim()) result.push(new HumanMessage(text));
+      continue;
+    }
+
+    if (msg.role === 'assistant') {
+      const text = extractText(msg.content);
+      const invocations = getToolInvocations(msg);
+
+      if (invocations.length > 0) {
+        result.push(new AIMessage({
+          content: text || '',
+          tool_calls: invocations.map((inv) => ({ id: inv.toolCallId, name: inv.toolName, args: inv.args || {} })),
+        }));
+        for (const inv of invocations) {
+          const r = typeof inv.result === 'string' ? inv.result : JSON.stringify(inv.result ?? '');
+          result.push(new ToolMessage({ content: r, tool_call_id: inv.toolCallId }));
+        }
+      } else if (text.trim()) {
+        result.push(new AIMessage(text));
+      }
+      continue;
+    }
+
+    // CoreMessage format: role === 'tool'
+    if (msg.role === 'tool' && Array.isArray(msg.content)) {
+      for (const part of msg.content) {
+        if (part.type === 'tool-result') {
+          const r = typeof part.result === 'string' ? part.result : JSON.stringify(part.result ?? '');
+          result.push(new ToolMessage({ content: r, tool_call_id: part.toolCallId }));
+        }
+      }
+    }
+  }
+  return result;
+}
+
 // ── Route ────────────────────────────────────────────────────────────────────
 
 router.post('/chat', authenticate, async (req, res) => {
@@ -181,11 +252,6 @@ router.post('/chat', authenticate, async (req, res) => {
     const patientLat = typeof req.body?.lat === 'number' ? req.body.lat : null;
     const patientLon = typeof req.body?.lon === 'number' ? req.body.lon : null;
     const patientTimeZone = safeText(req.body?.time_zone, 100) || null;
-    const [{ streamText, tool, stepCountIs }, { openai }, { z }] = await Promise.all([
-      import('ai'),
-      import('@ai-sdk/openai'),
-      import('zod'),
-    ]);
 
     const skillCtx = {
       z, supabase, profile,
@@ -195,16 +261,11 @@ router.post('/chat', authenticate, async (req, res) => {
       patientTimeZone,
     };
 
-    const tools = loadSkills(tool, skillCtx);
     const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake });
-
-    const result = streamText({
-      model: openai(process.env.OPENAI_MODEL || 'gpt-4o-mini'),
-      system,
-      messages,
-      stopWhen: stepCountIs(20),
-      tools,
-    });
+    const checkpointer = await getCheckpointer();
+    const agent = buildGraph(skillCtx, system, checkpointer);
+    const langChainMessages = toLangChainMessages(messages);
+    const threadConfig = { configurable: { thread_id: req.user.id } };
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('X-Vercel-AI-Data-Stream', 'v1');
@@ -216,68 +277,219 @@ router.post('/chat', authenticate, async (req, res) => {
     }
 
     let hasText = false;
-    let finishPart = null;
     let stepCount = 0;
+    const totalUsage = { promptTokens: 0, completionTokens: 0 };
+    // run_id → { toolCallId, toolName } — matched across on_chain_start/end for tool nodes
+    const pendingTools = new Map();
+    const skillNameSet = new Set(SKILL_NAMES);
 
     try {
-      for await (const part of result.fullStream) {
-        switch (part.type) {
-          case 'text-delta':
+      const eventStream = agent.streamEvents(
+        { messages: langChainMessages },
+        { version: 'v2', recursionLimit: 40, ...threadConfig },
+      );
+
+      for await (const event of eventStream) {
+        const { event: eventName, name, run_id, data } = event;
+
+        if (eventName === 'on_chat_model_stream') {
+          const content = data?.chunk?.content;
+          if (typeof content === 'string' && content) {
             hasText = true;
-            writePart('0', part.text);
-            break;
-          case 'tool-input-start': writePart('b', { toolCallId: part.id, toolName: part.toolName }); break;
-          case 'tool-input-delta': writePart('c', { toolCallId: part.id, argsTextDelta: part.delta }); break;
-          case 'tool-call':
-            console.log(`[agent] tool-call: ${part.toolName}`);
-            writePart('9', { toolCallId: part.toolCallId, toolName: part.toolName, args: part.input });
-            break;
-          case 'tool-result':
-            console.log(`[agent] tool-result: ${JSON.stringify(part.output).slice(0, 200)}`);
-            writePart('a', { toolCallId: part.toolCallId, result: part.output });
-            break;
-          case 'start-step':
-            stepCount++;
-            writePart('f', { messageId: `step-${Date.now()}` });
-            break;
-          case 'finish-step':
-            writePart('e', {
-              finishReason: part.finishReason,
-              usage: { promptTokens: part.usage?.promptTokens ?? 0, completionTokens: part.usage?.completionTokens ?? 0 },
-              isContinued: false,
-            });
-            break;
-          case 'finish':
-            finishPart = part;
-            break;
-          case 'error':
-            console.error(`[agent] stream error:`, part.error);
-            writePart('3', String(part.error?.message ?? part.error ?? 'Unknown error'));
-            break;
+            writePart('0', content);
+          } else if (Array.isArray(content)) {
+            for (const part of content) {
+              if (part.type === 'text' && part.text) {
+                hasText = true;
+                writePart('0', part.text);
+              }
+            }
+          }
+        } else if (eventName === 'on_chat_model_start') {
+          stepCount++;
+          writePart('f', { messageId: `step-${Date.now()}` });
+        } else if (eventName === 'on_chat_model_end') {
+          const usage = data?.output?.response_metadata?.token_usage;
+          const promptTokens = usage?.prompt_tokens ?? 0;
+          const completionTokens = usage?.completion_tokens ?? 0;
+          totalUsage.promptTokens += promptTokens;
+          totalUsage.completionTokens += completionTokens;
+          writePart('e', {
+            finishReason: data?.output?.response_metadata?.finish_reason ?? 'stop',
+            usage: { promptTokens, completionTokens },
+            isContinued: false,
+          });
+        } else if (eventName === 'on_chain_start' && skillNameSet.has(name)) {
+          // Tool node started — extract tool call info from the agent's last message
+          const state = data?.input;
+          const lastMsg = state?.messages?.[state.messages.length - 1];
+          const toolCall = lastMsg?.tool_calls?.find((tc) => tc.name === name);
+          if (toolCall) {
+            pendingTools.set(run_id, { toolCallId: toolCall.id, toolName: name });
+            console.log(`[agent] tool-call: ${name}`);
+            writePart('9', { toolCallId: toolCall.id, toolName: name, args: toolCall.args ?? {} });
+          }
+        } else if (eventName === 'on_chain_end' && skillNameSet.has(name)) {
+          // Tool node finished — emit result using the ToolMessage added to state
+          const pending = pendingTools.get(run_id);
+          if (pending) {
+            const toolMessages = data?.output?.messages ?? [];
+            const toolMsg = toolMessages.find((m) => m.tool_call_id === pending.toolCallId);
+            if (toolMsg) {
+              const raw = toolMsg.content;
+              let result;
+              try { result = typeof raw === 'string' ? JSON.parse(raw) : (raw ?? ''); } catch { result = raw ?? ''; }
+              console.log(`[agent] tool-result: ${JSON.stringify(result).slice(0, 200)}`);
+              writePart('a', { toolCallId: pending.toolCallId, result });
+            }
+            pendingTools.delete(run_id);
+          }
         }
       }
     } catch (streamErr) {
-      console.error(`[agent] stream caught:`, streamErr?.message);
+      console.error('[agent] stream caught:', streamErr?.message);
       writePart('3', String(streamErr?.message ?? 'Stream error'));
     }
 
+    // Check if the graph paused for human-in-the-loop confirmation
+    if (checkpointer) {
+      const graphState = await agent.getState(threadConfig);
+      const pendingInterrupts = (graphState.tasks ?? []).flatMap((t) => t.interrupts ?? []);
+      if (pendingInterrupts.length > 0) {
+        hasText = true; // suppress the fallback error message
+        writePart('2', [{ type: 'booking_interrupt', data: pendingInterrupts[0].value }]);
+      }
+    }
+
     if (!hasText) {
-      console.error(`[agent] no text emitted. finishReason=${finishPart?.finishReason} steps=${stepCount} userId=${req.user?.id}`);
+      console.error(`[agent] no text emitted. steps=${stepCount} userId=${req.user?.id}`);
       writePart('0', "I'm sorry, something went wrong on my end. Please try sending your message again.");
     }
 
     writePart('d', {
-      finishReason: finishPart?.finishReason ?? 'stop',
-      usage: {
-        promptTokens: finishPart?.totalUsage?.promptTokens ?? 0,
-        completionTokens: finishPart?.totalUsage?.completionTokens ?? 0,
-      },
+      finishReason: 'stop',
+      usage: totalUsage,
     });
 
     res.end();
   } catch (err) {
     if (!res.headersSent) {
       res.status(400).json({ error: err?.message || 'Failed to run agent' });
+    }
+  }
+});
+
+// ── Resume endpoint (human-in-the-loop) ──────────────────────────────────────
+
+router.post('/resume', authenticate, async (req, res) => {
+  try {
+    const confirmed = req.body?.confirmed === true;
+    const checkpointer = await getCheckpointer();
+    if (!checkpointer) return res.status(400).json({ error: 'Checkpointer not configured' });
+
+    const [profile, triageIntake] = await Promise.all([
+      loadPatientProfile(req.user.id),
+      loadTriageIntake(req.user.id),
+    ]);
+
+    const liveLocation = safeText(req.body?.location, 100) || null;
+    const patientLat = typeof req.body?.lat === 'number' ? req.body.lat : null;
+    const patientLon = typeof req.body?.lon === 'number' ? req.body.lon : null;
+    const patientTimeZone = safeText(req.body?.time_zone, 100) || null;
+
+    const skillCtx = {
+      z, supabase, profile,
+      patientLat, patientLon, haversineKm,
+      fetchAvailableSlots, getClinicCalendarAuth,
+      safeText, normalizeUrgency,
+      patientTimeZone,
+    };
+
+    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake });
+    const agent = buildGraph(skillCtx, system, checkpointer);
+    const threadConfig = { configurable: { thread_id: req.user.id } };
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('X-Vercel-AI-Data-Stream', 'v1');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.flushHeaders();
+
+    function writePart(code, value) {
+      res.write(`${code}:${JSON.stringify(value)}\n`);
+    }
+
+    let hasText = false;
+    const totalUsage = { promptTokens: 0, completionTokens: 0 };
+    const pendingTools = new Map();
+    const skillNameSet = new Set(SKILL_NAMES);
+
+    try {
+      const eventStream = agent.streamEvents(
+        new Command({ resume: confirmed }),
+        { version: 'v2', recursionLimit: 40, ...threadConfig },
+      );
+
+      for await (const event of eventStream) {
+        const { event: eventName, name, run_id, data } = event;
+
+        if (eventName === 'on_chat_model_stream') {
+          const content = data?.chunk?.content;
+          if (typeof content === 'string' && content) {
+            hasText = true;
+            writePart('0', content);
+          } else if (Array.isArray(content)) {
+            for (const part of content) {
+              if (part.type === 'text' && part.text) { hasText = true; writePart('0', part.text); }
+            }
+          }
+        } else if (eventName === 'on_chat_model_start') {
+          writePart('f', { messageId: `step-${Date.now()}` });
+        } else if (eventName === 'on_chat_model_end') {
+          const usage = data?.output?.response_metadata?.token_usage;
+          totalUsage.promptTokens += usage?.prompt_tokens ?? 0;
+          totalUsage.completionTokens += usage?.completion_tokens ?? 0;
+          writePart('e', {
+            finishReason: data?.output?.response_metadata?.finish_reason ?? 'stop',
+            usage: { promptTokens: usage?.prompt_tokens ?? 0, completionTokens: usage?.completion_tokens ?? 0 },
+            isContinued: false,
+          });
+        } else if (eventName === 'on_chain_start' && skillNameSet.has(name)) {
+          const state = data?.input;
+          const lastMsg = state?.messages?.[state.messages.length - 1];
+          const toolCall = lastMsg?.tool_calls?.find((tc) => tc.name === name);
+          if (toolCall) {
+            pendingTools.set(run_id, { toolCallId: toolCall.id, toolName: name });
+            writePart('9', { toolCallId: toolCall.id, toolName: name, args: toolCall.args ?? {} });
+          }
+        } else if (eventName === 'on_chain_end' && skillNameSet.has(name)) {
+          const pending = pendingTools.get(run_id);
+          if (pending) {
+            const toolMessages = data?.output?.messages ?? [];
+            const toolMsg = toolMessages.find((m) => m.tool_call_id === pending.toolCallId);
+            if (toolMsg) {
+              const raw = toolMsg.content;
+              let result;
+              try { result = typeof raw === 'string' ? JSON.parse(raw) : (raw ?? ''); } catch { result = raw ?? ''; }
+              writePart('a', { toolCallId: pending.toolCallId, result });
+            }
+            pendingTools.delete(run_id);
+          }
+        }
+      }
+    } catch (streamErr) {
+      console.error('[agent] resume stream caught:', streamErr?.message);
+      writePart('3', String(streamErr?.message ?? 'Stream error'));
+    }
+
+    if (!hasText) writePart('0', confirmed
+      ? "I'm sorry, something went wrong with the booking. Please try again."
+      : 'Booking cancelled. Let me know if you\'d like to pick a different time.');
+
+    writePart('d', { finishReason: 'stop', usage: totalUsage });
+    res.end();
+  } catch (err) {
+    if (!res.headersSent) {
+      res.status(400).json({ error: err?.message || 'Failed to resume agent' });
     }
   }
 });
