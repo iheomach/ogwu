@@ -538,8 +538,10 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     confirmBooking,
     resetState,
     startNewSession,
+    resumePreviousSession,
     contextSummary,
     fetchContextSummary,
+    hasPreviousSession,
   } = useAgentChat({ apiBase, location, lat, lon });
 
   const handleSelectHospital = (h: any) => {
@@ -719,12 +721,32 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
             contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 80 }}
             showsVerticalScrollIndicator={false}
           >
-            {/* Greeting bubble — shows prior session summary when available */}
-            <View style={styles.assistantBubble}>
-              <Text style={{ color: colors.grey700, lineHeight: 20, fontSize: 14 }}>
-                {contextSummary ?? t('assistant.helper')}
-              </Text>
-            </View>
+            {/* Greeting — last session card or default bubble */}
+            {contextSummary ? (
+              <View style={styles.lastSessionCard}>
+                <View style={styles.lastSessionHeader}>
+                  <MaterialIcons name="history" size={13} color={colors.purple} />
+                  <Text style={styles.lastSessionLabel}>Last session</Text>
+                </View>
+                <Text style={styles.lastSessionSummary}>{contextSummary}</Text>
+                {hasPreviousSession && (
+                  <TouchableOpacity
+                    onPress={resumePreviousSession}
+                    activeOpacity={0.8}
+                    style={styles.lastSessionContinueBtn}
+                  >
+                    <Text style={styles.lastSessionContinueBtnText}>Continue conversation</Text>
+                    <MaterialIcons name="arrow-forward" size={14} color="#fff" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <View style={styles.assistantBubble}>
+                <Text style={{ color: colors.grey700, lineHeight: 20, fontSize: 14 }}>
+                  {t('assistant.helper')}
+                </Text>
+              </View>
+            )}
 
             {messages.map((m: any, idx: number) => {
               const role = (m as any)?.role;

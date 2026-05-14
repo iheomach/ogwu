@@ -280,7 +280,7 @@ async function summarizeMessages(messages) {
 
   const llm = new ChatOpenAI({ model: 'gpt-4o-mini', temperature: 0, maxTokens: 120 });
   const result = await llm.invoke([
-    new SystemMessage('Summarize where this health assistant conversation left off. In 1–4 sentences, state what the user was trying to accomplish, what step they stopped at, and who spoke last. Fewer sentences is better when the situation is clear. Be direct and natural.'),
+    new SystemMessage('Summarize where this health assistant conversation left off, addressing the patient directly in second person (use "you", not "the user"). In 1–4 sentences, state what you were trying to accomplish, what step you stopped at, and who spoke last. Fewer sentences is better when the situation is clear. Be direct and natural.'),
     new HumanMessage(lines.join('\n')),
   ]);
 

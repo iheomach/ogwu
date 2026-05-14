@@ -149,10 +149,15 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
   const [error, setError] = useState<Error | null>(null);
   const [pendingInterrupt, setPendingInterrupt] = useState<BookingInterrupt | null>(null);
   const [contextSummary, setContextSummary] = useState<string | null>(null);
+  const [hasPreviousSession, setHasPreviousSession] = useState(false);
 
   // Stable ref to latest messages for closures inside stream
   const messagesRef = useRef<AgentMessage[]>([]);
   messagesRef.current = messages;
+
+  // Saved state from the session before the last startNewSession call
+  const previousSessionIdRef = useRef<string | null>(null);
+  const previousMessagesRef = useRef<AgentMessage[]>([]);
 
   // Session ID — persisted across app restarts, changes on startNewSession
   const sessionIdRef = useRef<string>(newSessionId());
@@ -309,8 +314,19 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     setPendingInterrupt(null);
   }, []);
 
-  // Generates a new session — old checkpoint preserved in DB but no longer active
+  // Generates a new session — old checkpoint preserved in DB but no longer active.
+  // When fetchSummary=true, saves the old session so resumePreviousSession can restore it.
   const startNewSession = useCallback((fetchSummary = true) => {
+    if (fetchSummary) {
+      previousSessionIdRef.current = sessionIdRef.current;
+      previousMessagesRef.current = messagesRef.current;
+      setHasPreviousSession(true);
+    } else {
+      previousSessionIdRef.current = null;
+      previousMessagesRef.current = [];
+      setHasPreviousSession(false);
+    }
+
     const id = newSessionId();
     sessionIdRef.current = id;
     AsyncStorage.setItem(SESSION_ID_KEY, id).catch(() => {});
@@ -321,6 +337,24 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     setContextSummary(null);
     if (fetchSummary) fetchContextSummary();
   }, [fetchContextSummary]);
+
+  // Restores the session that existed before the last startNewSession call.
+  const resumePreviousSession = useCallback(() => {
+    const prevId = previousSessionIdRef.current;
+    const prevMessages = previousMessagesRef.current;
+    if (!prevId) return;
+
+    sessionIdRef.current = prevId;
+    AsyncStorage.setItem(SESSION_ID_KEY, prevId).catch(() => {});
+    setMessages(prevMessages);
+    setInput('');
+    setError(null);
+    setPendingInterrupt(null);
+    setContextSummary(null);
+    setHasPreviousSession(false);
+    previousSessionIdRef.current = null;
+    previousMessagesRef.current = [];
+  }, []);
 
   return {
     messages,
@@ -335,7 +369,9 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     confirmBooking,
     resetState,
     startNewSession,
+    resumePreviousSession,
     contextSummary,
     fetchContextSummary,
+    hasPreviousSession,
   };
 }

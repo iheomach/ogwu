@@ -613,6 +613,50 @@ export const styles = StyleSheet.create({
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
+
+  // ─── Assistant — last session recap card ──────────────────────────────────
+  lastSessionCard: {
+    backgroundColor: '#F4EFF5',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(69,0,80,0.09)',
+  },
+  lastSessionHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    marginBottom: 10,
+  },
+  lastSessionLabel: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    color: colors.purple,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.9,
+  },
+  lastSessionSummary: {
+    fontSize: 14,
+    color: colors.grey700,
+    lineHeight: 21,
+  },
+  lastSessionContinueBtn: {
+    marginTop: 14,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    backgroundColor: colors.purple,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    alignSelf: 'flex-start' as const,
+  },
+  lastSessionContinueBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
   newChatButton: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
