@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 require('dotenv').config();
 
 const authenticate = require('./middleware/auth');
@@ -13,6 +14,8 @@ const ALLOWED_ORIGINS = [
   'http://localhost:4173',  // web admin preview
   process.env.ADMIN_ORIGIN, // https://ogwu-web-admin-client.vercel.app
 ].filter(Boolean);
+
+app.set('trust proxy', 1); // Railway sits behind a proxy — needed for rate limiting and IP detection
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -41,7 +44,7 @@ const globalLimiter = rateLimit({
 const userLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
-  keyGenerator: (req) => req.user?.id || req.ip,
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Rate limit exceeded. Please slow down.' },
