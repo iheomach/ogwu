@@ -234,6 +234,18 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     });
   }, [apiBase, location, lat, lon]);
 
+  const loadPastSession = useCallback(async (): Promise<AgentMessage[]> => {
+    if (!apiBase) return [];
+    try {
+      const resp = await authedFetch(`${apiBase}/session`);
+      if (!resp.ok) return [];
+      const json = await (resp as any).json();
+      return Array.isArray(json.messages) ? json.messages : [];
+    } catch {
+      return [];
+    }
+  }, [apiBase]);
+
   const fetchContextSummary = useCallback(async () => {
     if (!apiBase) return;
     try {
@@ -373,5 +385,6 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     contextSummary,
     fetchContextSummary,
     hasPreviousSession,
+    loadPastSession,
   };
 }

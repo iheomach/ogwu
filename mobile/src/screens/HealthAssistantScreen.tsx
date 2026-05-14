@@ -525,6 +525,10 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     return `${base.replace(/\/$/, '')}/api/agent`;
   }, []);
 
+  const [pastSessionMessages, setPastSessionMessages] = useState<any[]>([]);
+  const [isPastSession, setIsPastSession] = useState(false);
+  const [pastSessionLoading, setPastSessionLoading] = useState(false);
+
   const {
     messages,
     input,
@@ -542,7 +546,21 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     contextSummary,
     fetchContextSummary,
     hasPreviousSession,
+    loadPastSession,
   } = useAgentChat({ apiBase, location, lat, lon });
+
+  const handleOpenPastSession = async () => {
+    setPastSessionLoading(true);
+    const loaded = await loadPastSession();
+    setPastSessionMessages(loaded);
+    setIsPastSession(true);
+    setPastSessionLoading(false);
+  };
+
+  const handleClosePastSession = () => {
+    setIsPastSession(false);
+    setPastSessionMessages([]);
+  };
 
   const handleSelectHospital = (h: any) => {
     append({ role: 'user', content: `I'd like to go with ${h.name} (hospital_id: ${h.id}).` });
@@ -552,7 +570,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     append({ role: 'user', content: `I'd like to book the ${slot.display} slot (hospital_id: ${hospitalId}, starts_at_local: ${slot.starts_at_local}, time_zone: ${slot.time_zone}).` });
   };
 
-  const handleNewSession = async () => {
+  const handleClearChat = async () => {
     startNewSession();
     try {
       await AsyncStorage.setItem('assistantMessages', '[]');
@@ -702,14 +720,14 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                 <MaterialIcons name="delete-sweep" size={14} color={colors.purple} />
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={handleNewSession}
+                onPress={handleClearChat}
                 disabled={isLoading || messages.length === 0}
                 style={[styles.toolbarIconBtn, { opacity: messages.length === 0 ? 0.35 : 1 }]}
                 accessibilityRole="button"
-                accessibilityLabel="Start new session"
+                accessibilityLabel="Clear chat"
                 activeOpacity={0.7}
               >
-                <MaterialIcons name="add-comment" size={14} color={colors.purple} />
+                <MaterialIcons name="clear-all" size={14} color={colors.purple} />
               </TouchableOpacity>
             </View>
           </View>
@@ -722,16 +740,25 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
             showsVerticalScrollIndicator={false}
           >
             {/* Greeting — last session card or default bubble */}
-            {contextSummary ? (
-              <View style={styles.lastSessionCard}>
+            {contextSummary && !isPastSession ? (
+              <TouchableOpacity
+                onPress={handleOpenPastSession}
+                activeOpacity={0.85}
+                disabled={pastSessionLoading}
+                style={styles.lastSessionCard}
+              >
                 <View style={styles.lastSessionHeader}>
                   <MaterialIcons name="history" size={13} color={colors.purple} />
                   <Text style={styles.lastSessionLabel}>Last session</Text>
+                  {pastSessionLoading
+                    ? <ActivityIndicator size="small" color={colors.purple} style={{ marginLeft: 'auto' }} />
+                    : <MaterialIcons name="chevron-right" size={16} color={colors.purple} style={{ marginLeft: 'auto' } as any} />
+                  }
                 </View>
                 <Text style={styles.lastSessionSummary}>{contextSummary}</Text>
                 {hasPreviousSession && (
                   <TouchableOpacity
-                    onPress={resumePreviousSession}
+                    onPress={(e) => { e.stopPropagation?.(); resumePreviousSession(); }}
                     activeOpacity={0.8}
                     style={styles.lastSessionContinueBtn}
                   >
@@ -739,15 +766,144 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                     <MaterialIcons name="arrow-forward" size={14} color="#fff" />
                   </TouchableOpacity>
                 )}
-              </View>
-            ) : (
+              </TouchableOpacity>
+            ) : !isPastSession ? (
               <View style={styles.assistantBubble}>
                 <Text style={{ color: colors.grey700, lineHeight: 20, fontSize: 14 }}>
                   {t('assistant.helper')}
                 </Text>
               </View>
+            ) : null}
+
+            {/* ── Past session view ─────────────────────────────────────────── */}
+            {isPastSession && (
+              <>
+                <View style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 6,
+                  backgroundColor: 'rgba(69,0,80,0.05)', borderRadius: 10,
+                  paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16,
+                }}>
+                  <MaterialIcons name="history" size={14} color={colors.purple} />
+                  <Text style={{ fontSize: 12, color: colors.purple, fontWeight: '600', flex: 1 }}>
+                    Past session
+                  </Text>
+                  <TouchableOpacity onPress={handleClosePastSession} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <MaterialIcons name="close" size={16} color={colors.grey500} />
+                  </TouchableOpacity>
+                </View>
+
+                {pastSessionMessages.map((m: any, idx: number) => {
+                  const role = m?.role;
+                  const text = messageText(m);
+                  const toolParts = (m?.parts ?? []).filter((p: any) => p.type?.startsWith('tool-'));
+
+                  // Hospital selection message → choice chip
+                  if (role === 'user' && text.startsWith("I'd like to go with ")) {
+                    const match = text.match(/^I'd like to go with (.+?) \(hospital_id:/);
+                    const name = match?.[1] ?? 'Hospital';
+                    return (
+                      <View key={`ps-${idx}`} style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 10,
+                        backgroundColor: 'rgba(69,0,80,0.05)', borderRadius: 12,
+                        borderWidth: 1, borderColor: 'rgba(69,0,80,0.12)',
+                        padding: 12, marginBottom: 8, alignSelf: 'flex-end', maxWidth: '85%',
+                      }}>
+                        <View style={{
+                          width: 28, height: 28, borderRadius: 8,
+                          backgroundColor: 'rgba(69,0,80,0.1)', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <MaterialIcons name="local-hospital" size={15} color={colors.purple} />
+                        </View>
+                        <View>
+                          <Text style={{ fontSize: 10, color: colors.grey500, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            Hospital selected
+                          </Text>
+                          <Text style={{ fontSize: 14, color: colors.grey900, fontWeight: '600', marginTop: 1 }}>
+                            {name}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  }
+
+                  // Slot selection message → booking chip
+                  if (role === 'user' && text.startsWith("I'd like to book the ")) {
+                    const match = text.match(/^I'd like to book the (.+?) slot/);
+                    const slot = match?.[1] ?? 'Appointment';
+                    return (
+                      <View key={`ps-${idx}`} style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 10,
+                        backgroundColor: 'rgba(69,0,80,0.05)', borderRadius: 12,
+                        borderWidth: 1, borderColor: 'rgba(69,0,80,0.12)',
+                        padding: 12, marginBottom: 8, alignSelf: 'flex-end', maxWidth: '85%',
+                      }}>
+                        <View style={{
+                          width: 28, height: 28, borderRadius: 8,
+                          backgroundColor: 'rgba(69,0,80,0.1)', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <MaterialIcons name="event" size={15} color={colors.purple} />
+                        </View>
+                        <View>
+                          <Text style={{ fontSize: 10, color: colors.grey500, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            Appointment booked
+                          </Text>
+                          <Text style={{ fontSize: 14, color: colors.grey900, fontWeight: '600', marginTop: 1 }}>
+                            {slot}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  }
+
+                  // Assistant message — show text only, skip interactive widgets
+                  if (role === 'assistant' && text) {
+                    return (
+                      <View key={`ps-${idx}`} style={[styles.assistantBubble, { opacity: 0.85 }]}>
+                        <MessageText text={text} color={colors.grey900} />
+                      </View>
+                    );
+                  }
+
+                  // Regular user message
+                  if (role === 'user' && text) {
+                    return (
+                      <View key={`ps-${idx}`} style={[styles.userBubble, { opacity: 0.85 }]}>
+                        <MessageText text={text} color={colors.white} />
+                      </View>
+                    );
+                  }
+
+                  // Skip tool-only assistant messages with no text
+                  const hasVisibleTool = toolParts.some((p: any) => {
+                    const tn = p.toolName ?? (p.type ?? '').replace('tool-', '');
+                    return tn === 'bookAppointment';
+                  });
+                  if (role === 'assistant' && hasVisibleTool) {
+                    for (const part of toolParts) {
+                      const tn = part.toolName ?? (part.type ?? '').replace('tool-', '');
+                      if (tn === 'bookAppointment') {
+                        const output = part.output ?? part.result;
+                        if (output?.success && output?.meeting_url) {
+                          return (
+                            <View key={`ps-${idx}`} style={[styles.assistantBubble, { opacity: 0.85 }]}>
+                              <AddToCalendarButton
+                                startsAt={output.starts_at}
+                                meetingUrl={output.meeting_url}
+                                hospitalName={output.hospital_name ?? 'Hospital'}
+                              />
+                            </View>
+                          );
+                        }
+                      }
+                    }
+                  }
+
+                  return null;
+                })}
+              </>
             )}
 
+            {/* ── Current session messages ───────────────────────────────── */}
             {messages.map((m: any, idx: number) => {
               const role = (m as any)?.role;
               const text = messageText(m);

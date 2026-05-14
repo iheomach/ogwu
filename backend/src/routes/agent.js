@@ -287,6 +287,85 @@ async function summarizeMessages(messages) {
   return typeof result.content === 'string' ? result.content.trim() : null;
 }
 
+router.get('/session', authenticate, async (req, res) => {
+  try {
+    const checkpointer = await getCheckpointer();
+    if (!checkpointer) return res.json({ messages: [] });
+
+    const { data: row } = await supabase
+      .from('checkpoints')
+      .select('thread_id')
+      .like('thread_id', `${req.user.id}-%`)
+      .order('thread_id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!row?.thread_id) return res.json({ messages: [] });
+
+    const profile = await loadPatientProfile(req.user.id);
+    const skillCtx = {
+      z, supabase, profile,
+      patientLat: null, patientLon: null, haversineKm,
+      fetchAvailableSlots, getClinicCalendarAuth,
+      safeText, normalizeUrgency, patientTimeZone: null,
+    };
+
+    const agent = buildGraph(skillCtx, '', checkpointer);
+    const state = await agent.getState({ configurable: { thread_id: row.thread_id } });
+    const langChainMsgs = state?.values?.messages ?? [];
+
+    // Convert LangChain messages → AgentMessage[] for the frontend.
+    // ToolMessages are folded into the preceding AIMessage as tool-result parts.
+    const messages = [];
+    let i = 0;
+    while (i < langChainMsgs.length) {
+      const m = langChainMsgs[i];
+      const type = typeof m._getType === 'function' ? m._getType() : null;
+
+      const extractText = (raw) =>
+        typeof raw === 'string' ? raw.trim()
+          : Array.isArray(raw) ? raw.filter((p) => p?.type === 'text').map((p) => p.text || '').join('').trim()
+          : '';
+
+      if (type === 'human') {
+        messages.push({ id: `u-${i}`, role: 'user', content: extractText(m.content), parts: [] });
+        i++;
+      } else if (type === 'ai') {
+        const toolCalls = Array.isArray(m.tool_calls) ? m.tool_calls : [];
+        const parts = toolCalls.map((tc) => ({
+          type: 'tool-call', toolCallId: tc.id, toolName: tc.name,
+          args: tc.args ?? {}, state: 'input-available',
+        }));
+
+        // Consume all immediately following ToolMessages
+        let j = i + 1;
+        while (j < langChainMsgs.length) {
+          const next = langChainMsgs[j];
+          const nextType = typeof next._getType === 'function' ? next._getType() : null;
+          if (nextType !== 'tool') break;
+          let result;
+          try { result = typeof next.content === 'string' ? JSON.parse(next.content) : next.content; } catch { result = next.content; }
+          const idx = parts.findIndex((p) => p.toolCallId === next.tool_call_id);
+          if (idx !== -1) {
+            parts[idx] = { ...parts[idx], type: 'tool-result', result, output: result, state: 'output-available' };
+          }
+          j++;
+        }
+
+        messages.push({ id: `a-${i}`, role: 'assistant', content: extractText(m.content), parts });
+        i = j;
+      } else {
+        i++;
+      }
+    }
+
+    res.json({ messages });
+  } catch (err) {
+    console.error('[agent] session load error:', err?.message);
+    res.json({ messages: [] });
+  }
+});
+
 router.get('/context', authenticate, async (req, res) => {
   try {
     const checkpointer = await getCheckpointer();
