@@ -758,7 +758,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                 <Text style={styles.lastSessionSummary}>{contextSummary}</Text>
                 {hasPreviousSession && (
                   <TouchableOpacity
-                    onPress={(e) => { e.stopPropagation?.(); resumePreviousSession(); }}
+                    onPress={(e) => { e.stopPropagation?.(); resumePreviousSession(); handleClosePastSession(); }}
                     activeOpacity={0.8}
                     style={styles.lastSessionContinueBtn}
                   >
@@ -900,6 +900,26 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
 
                   return null;
                 })}
+
+                {/* Exit past-session mode — becomes a live session */}
+                <TouchableOpacity
+                  onPress={() => { resumePreviousSession(); handleClosePastSession(); }}
+                  activeOpacity={0.8}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    backgroundColor: colors.purple,
+                    borderRadius: 12,
+                    paddingVertical: 12,
+                    marginTop: 8,
+                    marginBottom: 4,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Continue conversation</Text>
+                  <MaterialIcons name="arrow-forward" size={15} color="#fff" />
+                </TouchableOpacity>
               </>
             )}
 
