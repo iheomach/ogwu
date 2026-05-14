@@ -1,4 +1,4 @@
-# Ogwu — Production Readiness & Agentic Experience Checklist
+# Ogwu — Future Implementation & Production Readiness
 
 ---
 
@@ -305,3 +305,72 @@ create policy "hospital sees own chunks"
 - [ ] Cap injected context at ~2000 tokens to avoid crowding out patient context in the triage agent
 - [ ] Add a "no relevant documents found" fallback so the agent doesn't fabricate policy answers
 - [ ] Log every retrieval query and which chunks were returned for auditability
+
+---
+
+## Part 4: Quick Intake UX Improvements
+
+### Quick Reply Chips
+
+Each triage question now shows 2–3 contextual chip options (like Google Chat smart replies) that patients can tap to instantly populate their answer — while still allowing free-text input.
+
+**Current state:** ✅ Implemented — client-side chip generation based on question keyword matching
+
+**How it works:**
+- `suggestionsForQuestion(question)` in `AppRouter.tsx` matches question text against patterns (duration, severity, allergies, fever, medications, conditions) and returns 2–3 relevant short answers
+- Chips render as a horizontal scroll row above the text input in `TriageScreen.tsx`
+- Tapping a chip populates the answer field; tapping again with different text overrides it
+- Selected chip highlights in brand purple to give clear feedback
+
+**Implementation checklist:**
+- [x] `suggestionsForQuestion` helper with 7 question-type patterns
+- [x] Chip row UI in `TriageScreen` (horizontal `ScrollView`, pill style)
+- [x] Active chip state highlighted in purple
+- [x] Compatible with free-text input (chips and text input coexist)
+- [ ] Move suggestion logic to backend so the LLM generates context-aware chips alongside each question (better accuracy for edge-case questions)
+- [ ] Localize chip labels — currently English-only regardless of locale
+
+---
+
+### Voice Input
+
+Patients can tap a microphone button during triage to speak their answer instead of typing. Audio is recorded on-device, sent to the backend, and transcribed via OpenAI Whisper before populating the answer field.
+
+**Current state:** ✅ Implemented — `expo-av` recording + Whisper transcription via `/api/triage/transcribe`
+
+**Architecture:**
+```
+Patient taps mic → expo-av starts recording (m4a, HIGH_QUALITY preset)
+       ↓
+Patient taps stop → recording stopped, URI retrieved
+       ↓
+expo-file-system reads file as base64
+       ↓
+POST /api/triage/transcribe { audio: base64, mimeType: 'audio/m4a' }
+       ↓
+Backend converts base64 → Blob → multipart FormData
+       ↓
+OpenAI Whisper API (whisper-1) transcribes
+       ↓
+Transcribed text returned and populated into answer field
+```
+
+**Mobile implementation checklist:**
+- [x] `expo-av` audio recording with `HIGH_QUALITY` preset
+- [x] Microphone permission request with user-facing alert on denial
+- [x] Recording state reflected in UI (mic icon ↔ stop icon, red border while recording)
+- [x] `expo-file-system` base64 read + POST to `/api/triage/transcribe`
+- [x] Transcribed text auto-populates answer field
+- [x] All 6 locale strings added (`tapToSpeak`, `stopRecording`, `micPermTitle`, `micPermBody`, `voiceErrorTitle`, `voiceErrorBody`)
+- [ ] Run `npx expo install expo-av expo-file-system` and update `app.json` with `NSMicrophoneUsageDescription` (iOS) and `android.permissions` (Android)
+- [ ] Test on physical device — microphone recording does not work in Expo Go simulator
+- [ ] Add max recording duration (e.g. 60s) to prevent accidental long recordings
+- [ ] Waveform animation while recording to improve UX feedback
+
+**Backend implementation checklist:**
+- [x] `POST /api/triage/transcribe` endpoint in `backend/src/routes/triage.js`
+- [x] Base64 → `Blob` → `FormData` → Whisper API pipeline (no extra npm deps, uses Node 20 native `Blob`/`FormData`)
+- [x] Reuses existing `OPENAI_API_KEY` env var
+- [x] Auth-protected via `authenticate` middleware
+- [ ] Add request size limit for audio payload (recommend 10 MB cap via `express.json({ limit: '10mb' })` scoped to this route)
+- [ ] Log transcription latency and failure rate for monitoring
