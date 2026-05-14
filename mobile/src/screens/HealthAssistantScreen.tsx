@@ -682,24 +682,22 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
               <TouchableOpacity
                 onPress={handleClearHistory}
                 disabled={isLoading || clearingHistory}
-                style={[styles.newChatButton, { opacity: (isLoading || clearingHistory) ? 0.35 : 1 }]}
+                style={[styles.toolbarIconBtn, { opacity: (isLoading || clearingHistory) ? 0.35 : 1 }]}
                 accessibilityRole="button"
                 accessibilityLabel="Clear agent history"
                 activeOpacity={0.7}
               >
-                <MaterialIcons name="history" size={16} color={colors.purple} />
-                <Text style={styles.newChatButtonText}>Clear history</Text>
+                <MaterialIcons name="delete-sweep" size={14} color={colors.purple} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleNewSession}
                 disabled={isLoading || messages.length === 0}
-                style={[styles.newChatButton, { opacity: messages.length === 0 ? 0.35 : 1 }]}
+                style={[styles.toolbarIconBtn, { opacity: messages.length === 0 ? 0.35 : 1 }]}
                 accessibilityRole="button"
                 accessibilityLabel="Start new session"
                 activeOpacity={0.7}
               >
-                <MaterialIcons name="add-comment" size={16} color={colors.purple} />
-                <Text style={styles.newChatButtonText}>New chat</Text>
+                <MaterialIcons name="add-comment" size={14} color={colors.purple} />
               </TouchableOpacity>
             </View>
           </View>
