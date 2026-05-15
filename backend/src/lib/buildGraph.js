@@ -5,6 +5,7 @@ const { AgentState } = require('./agentState');
 const { buildToolNodes, SKILL_NAMES } = require('./buildToolNodes');
 const { loadLangGraphSkills } = require('./loadLangGraphSkills');
 const { checkWithLlamaGuard, INPUT_SAFE_FALLBACK } = require('./llamaGuard');
+const { notifyEmergency } = require('./notify');
 
 // ── Input guard node ──────────────────────────────────────────────────────────
 // Runs before the agent. Blocks harmful user messages via Llama Guard.
@@ -34,10 +35,13 @@ function routeFromInputGuard(state) {
 }
 
 // ── Escalate node ─────────────────────────────────────────────────────────────
-// Triggered when urgency = emergency. Placeholder for provider notification
-// (push alert, paging, etc.) — wired to the future push notification feature.
+// Triggered when urgency = emergency. Inserts an emergency_alerts row so the
+// provider's admin dashboard receives a Supabase Realtime push immediately.
 async function escalateNode(state) {
-  console.log(`[agent] EMERGENCY escalated — patient ${state.patient_id}`);
+  const patientId = state.patient_id;
+  const reason = state.tool_results?.flagEmergency?.reason ?? null;
+  console.warn(`[agent] EMERGENCY escalated — patient ${patientId}`);
+  await notifyEmergency({ patientId, reason });
   return {};
 }
 
