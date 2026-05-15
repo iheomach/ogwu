@@ -63,7 +63,6 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [threads, setThreads] = useState<ConsultThread[]>([]);
   const [threadsError, setThreadsError] = useState<string | null>(null);
-  const [closingId, setClosingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
   const [exportLoading, setExportLoading] = useState(false);
 
@@ -111,14 +110,12 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
           text: 'End conversation',
           style: 'destructive',
           onPress: async () => {
+            setThreads(prev => prev.map(t => t.id === th.id ? { ...t, status: 'closed' } : t));
             try {
-              setClosingId(th.id);
               await threadsClose(th.id);
-              setThreads(prev => prev.map(t => t.id === th.id ? { ...t, status: 'closed' } : t));
             } catch (e: any) {
+              setThreads(prev => prev.map(t => t.id === th.id ? { ...t, status: 'open' } : t));
               Alert.alert(t('common.error'), e?.message ?? t('common.error'));
-            } finally {
-              setClosingId(null);
             }
           },
         },
@@ -232,7 +229,7 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
                     <TouchableOpacity
                       style={{ flex: 1, padding: 14 }}
                       onPress={() => onOpenThread(th.id)}
-                      disabled={busy || closingId === th.id}
+                      disabled={busy}
                       activeOpacity={0.8}
                     >
                       <Text style={styles.value}>
@@ -249,15 +246,11 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
                         <TouchableOpacity
                           style={{ paddingHorizontal: 18, justifyContent: 'center', alignItems: 'center' }}
                           onPress={() => handleCloseThread(th)}
-                          disabled={busy || closingId === th.id}
+                          disabled={busy}
                           activeOpacity={0.7}
                           hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                         >
-                          {closingId === th.id ? (
-                            <ActivityIndicator size="small" color={colors.purple} />
-                          ) : (
-                            <Text style={{ fontSize: 16, fontWeight: '600', color: colors.purple }}>✕</Text>
-                          )}
+                          <Text style={{ fontSize: 16, fontWeight: '600', color: colors.purple }}>✕</Text>
                         </TouchableOpacity>
                       </>
                     )}
