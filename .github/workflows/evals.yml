@@ -1,0 +1,77 @@
+name: Eval Suite
+
+on:
+  push:
+    paths:
+      - 'backend/src/lib/buildSystemPrompt.js'
+      - 'backend/src/lib/buildGraph.js'
+      - 'backend/src/lib/buildToolNodes.js'
+      - 'backend/src/lib/loadLangGraphSkills.js'
+      - 'backend/src/skills/**'
+      - 'evals/**'
+  pull_request:
+    paths:
+      - 'backend/src/lib/buildSystemPrompt.js'
+      - 'backend/src/lib/buildGraph.js'
+      - 'backend/src/lib/buildToolNodes.js'
+      - 'backend/src/lib/loadLangGraphSkills.js'
+      - 'backend/src/skills/**'
+      - 'evals/**'
+  workflow_dispatch:
+    inputs:
+      category:
+        description: 'Filter to a single category (leave blank for all)'
+        required: false
+        default: ''
+
+jobs:
+  evals:
+    name: Run Eval Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Check test cases exist
+        run: |
+          if [ ! -f evals/test-cases.json ]; then
+            echo "::error::evals/test-cases.json not found."
+            echo "Generate it by running the prompt in evals/generate-test-cases.md with Claude and saving the output as evals/test-cases.json"
+            exit 1
+          fi
+
+      - name: Run eval suite
+        working-directory: backend
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-4o-mini
+          PASS_THRESHOLD: '0.75'
+          EVAL_CONCURRENCY: '3'
+          # Allow eval runner files (outside backend/) to resolve packages from backend/node_modules
+          NODE_PATH: node_modules
+        run: |
+          CATEGORY="${{ github.event.inputs.category }}"
+          if [ -n "$CATEGORY" ]; then
+            node ../evals/runner/index.js --cases ../evals/test-cases.json --category "$CATEGORY"
+          else
+            node ../evals/runner/index.js --cases ../evals/test-cases.json
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-${{ github.run_number }}
+          path: evals/results/
+          retention-days: 30
