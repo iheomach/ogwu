@@ -36,6 +36,7 @@
     "luxon": "^3.6.1",
     "node-fetch": "^2.7.0",
     "pg": "^8.20.0",
+    "web-push": "^3.6.7",
     "zod": "^3.25.76"
   },
   "devDependencies": {
