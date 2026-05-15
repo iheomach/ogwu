@@ -6,6 +6,7 @@ const { generateText } = require('ai');
 const { openai } = require('@ai-sdk/openai');
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
+const { parseTriageUrgency } = require('../lib/urgency');
 
 async function generateThreadTitle(intake) {
   // Build the best available description of the medical concern
@@ -142,7 +143,7 @@ router.post('/', authenticate, async (req, res) => {
     const intake = await snapshotLatestIntake(req.user.id);
 
     const locale = intake?.locale ?? null;
-    const urgency = intake?.urgency ?? 'routine';
+    const urgency = parseTriageUrgency(intake?.urgency ?? 'routine');
     const title = await generateThreadTitle(intake);
 
     const { data, error } = await supabase

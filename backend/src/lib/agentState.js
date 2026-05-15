@@ -6,6 +6,7 @@ const AgentState = Annotation.Root({
   patient_id:    Annotation({ reducer: (_, next) => next, default: () => null }),
   booking_state: Annotation({ reducer: (_, next) => next, default: () => null }),
   tool_results:  Annotation({ reducer: (_, next) => next, default: () => ({}) }),
+  input_blocked: Annotation({ reducer: (_, next) => next, default: () => false }),
 });
 
 module.exports = { AgentState };

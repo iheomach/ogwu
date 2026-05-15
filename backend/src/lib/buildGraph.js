@@ -1,9 +1,37 @@
 const { StateGraph, END } = require('@langchain/langgraph');
-const { SystemMessage } = require('@langchain/core/messages');
+const { SystemMessage, AIMessage } = require('@langchain/core/messages');
 const { ChatOpenAI } = require('@langchain/openai');
 const { AgentState } = require('./agentState');
 const { buildToolNodes, SKILL_NAMES } = require('./buildToolNodes');
 const { loadLangGraphSkills } = require('./loadLangGraphSkills');
+const { checkWithLlamaGuard, INPUT_SAFE_FALLBACK } = require('./llamaGuard');
+
+// ── Input guard node ──────────────────────────────────────────────────────────
+// Runs before the agent. Blocks harmful user messages via Llama Guard.
+
+async function inputGuardNode(state) {
+  const lastHuman = [...state.messages].reverse().find((m) => m._getType?.() === 'human');
+  if (!lastHuman) return {};
+
+  const content = typeof lastHuman.content === 'string'
+    ? lastHuman.content
+    : Array.isArray(lastHuman.content)
+      ? lastHuman.content.filter((p) => p.type === 'text').map((p) => p.text).join('')
+      : '';
+
+  if (!content.trim()) return {};
+
+  const result = await checkWithLlamaGuard([{ role: 'user', content }], 'User');
+  if (!result.safe) {
+    console.warn(`[guard] input blocked — category: ${result.category}`);
+    return { messages: [new AIMessage(INPUT_SAFE_FALLBACK)], input_blocked: true };
+  }
+  return {};
+}
+
+function routeFromInputGuard(state) {
+  return state.input_blocked ? END : 'agent';
+}
 
 // ── Escalate node ─────────────────────────────────────────────────────────────
 // Triggered when urgency = emergency. Placeholder for provider notification
@@ -53,6 +81,7 @@ function buildGraph(skillCtx, systemPrompt, checkpointer = null) {
   const toolNodes = buildToolNodes(skillCtx);
 
   const graph = new StateGraph(AgentState)
+    .addNode('input_guard', inputGuardNode)
     .addNode('agent', agentNode)
     .addNode('escalate', escalateNode);
 
@@ -60,7 +89,8 @@ function buildGraph(skillCtx, systemPrompt, checkpointer = null) {
     graph.addNode(name, node);
   }
 
-  graph.addEdge('__start__', 'agent');
+  graph.addEdge('__start__', 'input_guard');
+  graph.addConditionalEdges('input_guard', routeFromInputGuard, ['agent', END]);
 
   graph.addConditionalEdges('agent', routeFromAgent, [
     ...SKILL_NAMES,

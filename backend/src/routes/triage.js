@@ -4,6 +4,7 @@ const router = express.Router();
 
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
+const { parseTriageUrgency } = require('../lib/urgency');
 
 const fetchImpl = global.fetch || require('node-fetch');
 
@@ -296,7 +297,7 @@ router.post('/complete', authenticate, async (req, res) => {
         a: typeof x.a === 'string' ? String(x.a).slice(0, 2000) : '',
       }));
 
-    const urgency = computeUrgency(trimmed);
+    const urgency = parseTriageUrgency(computeUrgency(trimmed));
 
     const localeSafe = safeLocale(locale);
     const languageMap = {

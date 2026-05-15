@@ -15,6 +15,8 @@ const { buildGraph } = require('../lib/buildGraph');
 const { SKILL_NAMES } = require('../lib/buildToolNodes');
 const { getCheckpointer } = require('../lib/checkpointer');
 const { Command } = require('@langchain/langgraph');
+const { parseAgentUrgency } = require('../lib/urgency');
+const { checkWithLlamaGuard, OUTPUT_SAFE_FALLBACK } = require('../lib/llamaGuard');
 
 function safeText(s, maxLen) {
   const out = typeof s === 'string' ? s.trim() : '';
@@ -35,9 +37,7 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 }
 
 function normalizeUrgency(u) {
-  const v = String(u || '').toLowerCase();
-  if (['emergency', 'urgent', 'routine', 'self_care'].includes(v)) return v;
-  return 'routine';
+  return parseAgentUrgency(String(u || '').toLowerCase());
 }
 
 function getOAuthClient() {
@@ -504,6 +504,8 @@ router.post('/chat', authenticate, async (req, res) => {
     // run_id → { toolCallId, toolName } — matched across on_chain_start/end for tool nodes
     const pendingTools = new Map();
     const skillNameSet = new Set(SKILL_NAMES);
+    // Buffer text chunks — moderated before sending to the patient
+    const textChunks = [];
 
     try {
       const eventStream = agent.streamEvents(
@@ -518,12 +520,12 @@ router.post('/chat', authenticate, async (req, res) => {
           const content = data?.chunk?.content;
           if (typeof content === 'string' && content) {
             hasText = true;
-            writePart('0', content);
+            textChunks.push(content);
           } else if (Array.isArray(content)) {
             for (const part of content) {
               if (part.type === 'text' && part.text) {
                 hasText = true;
-                writePart('0', part.text);
+                textChunks.push(part.text);
               }
             }
           }
@@ -573,19 +575,44 @@ router.post('/chat', authenticate, async (req, res) => {
       writePart('3', String(streamErr?.message ?? 'Stream error'));
     }
 
-    // Check if the graph paused for human-in-the-loop confirmation
+    // Single getState call covers: booking interrupt + input_blocked check
     if (checkpointer) {
       const graphState = await agent.getState(threadConfig);
+
       const pendingInterrupts = (graphState.tasks ?? []).flatMap((t) => t.interrupts ?? []);
       if (pendingInterrupts.length > 0) {
-        hasText = true; // suppress the fallback error message
+        hasText = true;
         writePart('2', [{ type: 'booking_interrupt', data: pendingInterrupts[0].value }]);
+      }
+
+      if (!hasText && graphState.values?.input_blocked) {
+        const lastMsg = graphState.values.messages[graphState.values.messages.length - 1];
+        const raw = lastMsg?.content;
+        const blocked = typeof raw === 'string' ? raw
+          : Array.isArray(raw) ? raw.filter((p) => p.type === 'text').map((p) => p.text).join('') : OUTPUT_SAFE_FALLBACK;
+        writePart('0', blocked);
+        hasText = true;
       }
     }
 
     if (!hasText) {
       console.error(`[agent] no text emitted. steps=${stepCount} userId=${req.user?.id}`);
       writePart('0', "I'm sorry, something went wrong on my end. Please try sending your message again.");
+    } else if (textChunks.length > 0) {
+      // Run Llama Guard on the agent's response before sending it to the patient
+      const lastUserMsg = messages.filter((m) => m.role === 'user').pop();
+      const lastUserText = extractText(lastUserMsg?.content ?? '');
+      const turns = lastUserText
+        ? [{ role: 'user', content: lastUserText }, { role: 'assistant', content: textChunks.join('') }]
+        : [{ role: 'assistant', content: textChunks.join('') }];
+
+      const guardResult = await checkWithLlamaGuard(turns, 'Agent');
+      if (!guardResult.safe) {
+        console.warn(`[agent] output blocked for user=${req.user?.id} category=${guardResult.category}`);
+        writePart('0', OUTPUT_SAFE_FALLBACK);
+      } else {
+        for (const chunk of textChunks) writePart('0', chunk);
+      }
     }
 
     writePart('d', {
@@ -646,6 +673,7 @@ router.post('/resume', authenticate, async (req, res) => {
     const totalUsage = { promptTokens: 0, completionTokens: 0 };
     const pendingTools = new Map();
     const skillNameSet = new Set(SKILL_NAMES);
+    const textChunks = [];
 
     try {
       const eventStream = agent.streamEvents(
@@ -660,10 +688,10 @@ router.post('/resume', authenticate, async (req, res) => {
           const content = data?.chunk?.content;
           if (typeof content === 'string' && content) {
             hasText = true;
-            writePart('0', content);
+            textChunks.push(content);
           } else if (Array.isArray(content)) {
             for (const part of content) {
-              if (part.type === 'text' && part.text) { hasText = true; writePart('0', part.text); }
+              if (part.type === 'text' && part.text) { hasText = true; textChunks.push(part.text); }
             }
           }
         } else if (eventName === 'on_chat_model_start') {
@@ -705,9 +733,22 @@ router.post('/resume', authenticate, async (req, res) => {
       writePart('3', String(streamErr?.message ?? 'Stream error'));
     }
 
-    if (!hasText) writePart('0', confirmed
-      ? "I'm sorry, something went wrong with the booking. Please try again."
-      : 'Booking cancelled. Let me know if you\'d like to pick a different time.');
+    if (!hasText) {
+      writePart('0', confirmed
+        ? "I'm sorry, something went wrong with the booking. Please try again."
+        : 'Booking cancelled. Let me know if you\'d like to pick a different time.');
+    } else if (textChunks.length > 0) {
+      const guardResult = await checkWithLlamaGuard(
+        [{ role: 'assistant', content: textChunks.join('') }],
+        'Agent',
+      );
+      if (!guardResult.safe) {
+        console.warn(`[agent] resume output blocked for user=${req.user?.id} category=${guardResult.category}`);
+        writePart('0', OUTPUT_SAFE_FALLBACK);
+      } else {
+        for (const chunk of textChunks) writePart('0', chunk);
+      }
+    }
 
     writePart('d', { finishReason: 'stop', usage: totalUsage });
     res.end();

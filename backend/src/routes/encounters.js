@@ -4,6 +4,7 @@ const router = express.Router();
 
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
+const { parseTriageUrgency } = require('../lib/urgency');
 
 // List encounters for the signed-in patient
 router.get('/', authenticate, async (req, res) => {
@@ -66,7 +67,7 @@ router.post('/share', authenticate, async (req, res) => {
       source: 'share',
       status: 'shared',
       locale: intake.locale,
-      urgency: intake.urgency,
+      urgency: parseTriageUrgency(intake.urgency),
       summary: intake.summary,
       safety_note: intake.safety_note,
       answers: intake.answers,

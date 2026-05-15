@@ -6,7 +6,12 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "eval": "NODE_PATH=node_modules node ../evals/runner/index.js --cases ../evals/test-cases.json",
+    "eval:urgency": "NODE_PATH=node_modules node ../evals/runner/index.js --cases ../evals/test-cases.json --category urgency_classification",
+    "eval:tools": "NODE_PATH=node_modules node ../evals/runner/index.js --cases ../evals/test-cases.json --category tool_selection",
+    "eval:drugs": "NODE_PATH=node_modules node ../evals/runner/index.js --cases ../evals/test-cases.json --category drug_interaction",
+    "eval:refusal": "NODE_PATH=node_modules node ../evals/runner/index.js --cases ../evals/test-cases.json --category refusal_boundary"
   },
   "keywords": [],
   "author": "",
