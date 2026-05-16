@@ -25,6 +25,10 @@ on:
         description: 'Filter to a single category (leave blank for all)'
         required: false
         default: ''
+      skip_eval:
+        description: 'Skip the eval run and only commit existing results (true/false)'
+        required: false
+        default: 'false'
 
 jobs:
   evals:
@@ -56,6 +60,7 @@ jobs:
           fi
 
       - name: Run eval suite
+        if: ${{ github.event.inputs.skip_eval != 'true' }}
         working-directory: backend
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
