@@ -178,17 +178,21 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
   disabled: boolean;
 }) {
   // Build map: 'yyyy-MM-dd' -> Slot[], deduped and filtered to future slots only.
-  // Slots are stored with starts_at_local in the patient's local timezone, so we
-  // compare directly against the device's local clock — no UTC conversion needed.
+  // Slots are in the clinic's timezone (slot.time_zone), so we compare against
+  // the current time expressed in that same timezone — not the device clock.
   const slotsByDate = useMemo(() => {
     const map = new Map<string, Slot[]>();
     const seen = new Set<string>();
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const nowLocalStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const tz = slots[0]?.time_zone ?? 'UTC';
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(new Date());
+    const get = (type: string) => parts.find(p => p.type === type)?.value ?? '00';
+    const nowClinicStr = `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
     for (const s of slots) {
       if (seen.has(s.starts_at_local)) continue;
-      if (s.starts_at_local <= nowLocalStr) continue; // skip slots that have already passed
+      if (s.starts_at_local <= nowClinicStr) continue; // skip slots that have already passed
       seen.add(s.starts_at_local);
       const dateKey = s.starts_at_local.split('T')[0];
       if (!map.has(dateKey)) map.set(dateKey, []);
@@ -281,7 +285,13 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
       {/* Header */}
       <View style={styles.slotPickerHeader}>
         <Text style={styles.slotPickerHospitalName}>{hospitalName}</Text>
-        <Text style={styles.slotPickerSubtitle}>Select an available date and time</Text>
+        <Text style={styles.slotPickerSubtitle}>
+          {'Select an available date and time · '}
+          {new Intl.DateTimeFormat('en-US', {
+            timeZone: slots[0]?.time_zone ?? 'UTC',
+            timeZoneName: 'short',
+          }).formatToParts(new Date()).find(p => p.type === 'timeZoneName')?.value ?? slots[0]?.time_zone}
+        </Text>
       </View>
 
       {/* Date text input */}
