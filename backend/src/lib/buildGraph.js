@@ -67,7 +67,7 @@ function routeFromTool(state) {
 
 function buildGraph(skillCtx, systemPrompt, checkpointer = null) {
   const llmWithTools = new ChatOpenAI({
-    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    model: process.env.OPENAI_MODEL || 'gpt-4o',
     streaming: true,
   }).bindTools(loadLangGraphSkills(skillCtx));
 

@@ -60,7 +60,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          OPENAI_MODEL: gpt-4o-mini
+          OPENAI_MODEL: gpt-4o
           PASS_THRESHOLD: '0.95'
           EVAL_CONCURRENCY: '3'
           # Allow eval runner files (outside backend/) to resolve packages from backend/node_modules
