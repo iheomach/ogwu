@@ -475,7 +475,11 @@ router.post('/chat', authenticate, async (req, res) => {
       patientTimeZone,
     };
 
-    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake, lastHospital });
+    // Only surface lastHospital once there's prior conversation context.
+    // On a fresh/cleared session messages contains only the new user message,
+    // so injecting it there would make the agent volunteer the old hospital
+    // unprompted — defeating the history clear.
+    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake, lastHospital: messages.length > 1 ? lastHospital : null });
     const checkpointer = await getCheckpointer();
     const agent = buildGraph(skillCtx, system, checkpointer);
     const langChainMessages = toLangChainMessages(messages);
