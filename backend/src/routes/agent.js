@@ -543,28 +543,34 @@ router.post('/chat', authenticate, async (req, res) => {
             usage: { promptTokens, completionTokens },
             isContinued: false,
           });
-        } else if (eventName === 'on_chain_start' && skillNameSet.has(name)) {
-          // Tool node started — extract tool call info from the agent's last message
+        } else if (eventName === 'on_chain_start' && name === 'tools') {
+          // Unified dispatcher started — register all tool calls from the agent's last message
           const state = data?.input;
           const lastMsg = state?.messages?.[state.messages.length - 1];
-          const toolCall = lastMsg?.tool_calls?.find((tc) => tc.name === name);
-          if (toolCall) {
-            pendingTools.set(run_id, { toolCallId: toolCall.id, toolName: name });
-            console.log(`[agent] tool-call: ${name}`);
-            writePart('9', { toolCallId: toolCall.id, toolName: name, args: toolCall.args ?? {} });
+          const toolCalls = lastMsg?.tool_calls ?? [];
+          const pending = [];
+          for (const tc of toolCalls) {
+            if (skillNameSet.has(tc.name)) {
+              pending.push({ toolCallId: tc.id, toolName: tc.name });
+              console.log(`[agent] tool-call: ${tc.name}`);
+              writePart('9', { toolCallId: tc.id, toolName: tc.name, args: tc.args ?? {} });
+            }
           }
-        } else if (eventName === 'on_chain_end' && skillNameSet.has(name)) {
-          // Tool node finished — emit result using the ToolMessage added to state
+          if (pending.length > 0) pendingTools.set(run_id, pending);
+        } else if (eventName === 'on_chain_end' && name === 'tools') {
+          // Dispatcher finished — emit results for all tool calls that completed
           const pending = pendingTools.get(run_id);
           if (pending) {
             const toolMessages = data?.output?.messages ?? [];
-            const toolMsg = toolMessages.find((m) => m.tool_call_id === pending.toolCallId);
-            if (toolMsg) {
-              const raw = toolMsg.content;
-              let result;
-              try { result = typeof raw === 'string' ? JSON.parse(raw) : (raw ?? ''); } catch { result = raw ?? ''; }
-              console.log(`[agent] tool-result: ${JSON.stringify(result).slice(0, 200)}`);
-              writePart('a', { toolCallId: pending.toolCallId, result });
+            for (const p of pending) {
+              const toolMsg = toolMessages.find((m) => m.tool_call_id === p.toolCallId);
+              if (toolMsg) {
+                const raw = toolMsg.content;
+                let result;
+                try { result = typeof raw === 'string' ? JSON.parse(raw) : (raw ?? ''); } catch { result = raw ?? ''; }
+                console.log(`[agent] tool-result: ${JSON.stringify(result).slice(0, 200)}`);
+                writePart('a', { toolCallId: p.toolCallId, result });
+              }
             }
             pendingTools.delete(run_id);
           }
@@ -705,24 +711,30 @@ router.post('/resume', authenticate, async (req, res) => {
             usage: { promptTokens: usage?.prompt_tokens ?? 0, completionTokens: usage?.completion_tokens ?? 0 },
             isContinued: false,
           });
-        } else if (eventName === 'on_chain_start' && skillNameSet.has(name)) {
+        } else if (eventName === 'on_chain_start' && name === 'tools') {
           const state = data?.input;
           const lastMsg = state?.messages?.[state.messages.length - 1];
-          const toolCall = lastMsg?.tool_calls?.find((tc) => tc.name === name);
-          if (toolCall) {
-            pendingTools.set(run_id, { toolCallId: toolCall.id, toolName: name });
-            writePart('9', { toolCallId: toolCall.id, toolName: name, args: toolCall.args ?? {} });
+          const toolCalls = lastMsg?.tool_calls ?? [];
+          const pending = [];
+          for (const tc of toolCalls) {
+            if (skillNameSet.has(tc.name)) {
+              pending.push({ toolCallId: tc.id, toolName: tc.name });
+              writePart('9', { toolCallId: tc.id, toolName: tc.name, args: tc.args ?? {} });
+            }
           }
-        } else if (eventName === 'on_chain_end' && skillNameSet.has(name)) {
+          if (pending.length > 0) pendingTools.set(run_id, pending);
+        } else if (eventName === 'on_chain_end' && name === 'tools') {
           const pending = pendingTools.get(run_id);
           if (pending) {
             const toolMessages = data?.output?.messages ?? [];
-            const toolMsg = toolMessages.find((m) => m.tool_call_id === pending.toolCallId);
-            if (toolMsg) {
-              const raw = toolMsg.content;
-              let result;
-              try { result = typeof raw === 'string' ? JSON.parse(raw) : (raw ?? ''); } catch { result = raw ?? ''; }
-              writePart('a', { toolCallId: pending.toolCallId, result });
+            for (const p of pending) {
+              const toolMsg = toolMessages.find((m) => m.tool_call_id === p.toolCallId);
+              if (toolMsg) {
+                const raw = toolMsg.content;
+                let result;
+                try { result = typeof raw === 'string' ? JSON.parse(raw) : (raw ?? ''); } catch { result = raw ?? ''; }
+                writePart('a', { toolCallId: p.toolCallId, result });
+              }
             }
             pendingTools.delete(run_id);
           }
