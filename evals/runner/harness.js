@@ -60,6 +60,7 @@ async function runTestCase(testCase) {
   const toolsCalled = [];
   let fullText = '';
   let interrupted = false;
+  let urgency = null;
 
   try {
     const stream = agent.streamEvents(
@@ -84,6 +85,11 @@ async function runTestCase(testCase) {
           toolsCalled.push(name);
         }
       }
+
+      if (eventName === 'on_chain_end') {
+        const output = data?.output;
+        if (output?.urgency) urgency = output.urgency;
+      }
     }
   } catch (err) {
     // LangGraph throws GraphInterrupt when bookAppointment hits interrupt()
@@ -99,15 +105,6 @@ async function runTestCase(testCase) {
         error: err?.message ?? String(err),
       };
     }
-  }
-
-  // Read final graph state (works even without a persistent checkpointer for the last run)
-  let urgency = null;
-  try {
-    const state = await agent.getState(config);
-    urgency = state?.values?.urgency ?? null;
-  } catch {
-    // non-fatal
   }
 
   return {
