@@ -79,10 +79,13 @@ async function runTestCase(testCase) {
         }
       }
 
-      if (eventName === 'on_chain_start') {
+      if (eventName === 'on_chat_model_end') {
         const SKILL_NAMES = require(path.join(__dirname, '../../backend/src/lib/buildToolNodes')).SKILL_NAMES;
-        if (SKILL_NAMES.includes(name) && !toolsCalled.includes(name)) {
-          toolsCalled.push(name);
+        const calls = data?.output?.tool_calls ?? [];
+        for (const tc of calls) {
+          if (SKILL_NAMES.includes(tc.name) && !toolsCalled.includes(tc.name)) {
+            toolsCalled.push(tc.name);
+          }
         }
       }
 

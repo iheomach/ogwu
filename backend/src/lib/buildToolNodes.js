@@ -12,31 +12,34 @@ const SKILL_NAMES = [
   'getPatientHistory',
 ];
 
-function makeNode(skillName, skillCtx) {
-  const factory = require(`../skills/${skillName}.js`);
-  const skill = factory(skillCtx);
+function buildToolDispatcher(skillCtx) {
+  const skills = Object.fromEntries(
+    SKILL_NAMES.map((name) => {
+      const factory = require(`../skills/${name}.js`);
+      return [name, factory(skillCtx)];
+    }),
+  );
 
-  return async function (state) {
+  return async function toolDispatcherNode(state) {
     const lastMessage = state.messages[state.messages.length - 1];
-    const toolCalls = (lastMessage?.tool_calls ?? []).filter((tc) => tc.name === skillName);
-    if (toolCalls.length === 0) return {};
+    const toolCalls = lastMessage?.tool_calls ?? [];
 
-    // Pause before booking and wait for explicit patient confirmation
-    if (skillName === 'bookAppointment') {
-      const toolCall = toolCalls[0];
+    // bookAppointment must be handled first — interrupt() pauses the graph
+    const bookingCall = toolCalls.find((tc) => tc.name === 'bookAppointment');
+    if (bookingCall) {
       const confirmed = interrupt({
         type: 'booking_confirmation',
-        slot: toolCall.args.starts_at_local,
-        time_zone: toolCall.args.time_zone,
-        hospital_id: toolCall.args.hospital_id,
-        reason: toolCall.args.reason,
+        slot: bookingCall.args.starts_at_local,
+        time_zone: bookingCall.args.time_zone,
+        hospital_id: bookingCall.args.hospital_id,
+        reason: bookingCall.args.reason,
       });
 
       if (!confirmed) {
         return {
           messages: [new ToolMessage({
             content: JSON.stringify({ cancelled: true, message: 'Booking cancelled by patient.' }),
-            tool_call_id: toolCall.id,
+            tool_call_id: bookingCall.id,
           })],
           tool_results: { ...state.tool_results, bookAppointment: { cancelled: true } },
         };
@@ -44,46 +47,47 @@ function makeNode(skillName, skillCtx) {
     }
 
     const toolMessages = [];
-    let resultData = null;
+    const toolResults = { ...state.tool_results };
+    const stateUpdate = {};
 
     for (const toolCall of toolCalls) {
+      const skill = skills[toolCall.name];
+      if (!skill) {
+        toolMessages.push(new ToolMessage({
+          content: JSON.stringify({ error: `Unknown tool: ${toolCall.name}` }),
+          tool_call_id: toolCall.id,
+        }));
+        continue;
+      }
+
       let result;
       try {
         result = await skill.execute(toolCall.args);
       } catch (err) {
         result = { error: err?.message ?? 'Tool execution failed' };
       }
-      resultData = result;
-      toolMessages.push(
-        new ToolMessage({
-          content: typeof result === 'string' ? result : JSON.stringify(result),
-          tool_call_id: toolCall.id,
-        }),
-      );
+
+      toolResults[toolCall.name] = result;
+      toolMessages.push(new ToolMessage({
+        content: typeof result === 'string' ? result : JSON.stringify(result),
+        tool_call_id: toolCall.id,
+      }));
+
+      if (toolCall.name === 'flagEmergency' && result?.flagged) {
+        stateUpdate.urgency = 'emergency';
+      }
+      if (toolCall.name === 'bookAppointment' && result?.success) {
+        stateUpdate.booking_state = result;
+      }
     }
 
-    const stateUpdate = {
-      messages: toolMessages,
-      tool_results: { ...state.tool_results, [skillName]: resultData },
-    };
-
-    // Per-tool state side-effects
-    if (skillName === 'flagEmergency' && resultData?.flagged) {
-      stateUpdate.urgency = 'emergency';
-    }
-
-    if (skillName === 'bookAppointment' && resultData?.success) {
-      stateUpdate.booking_state = resultData;
-    }
-
-    return stateUpdate;
+    return { ...stateUpdate, messages: toolMessages, tool_results: toolResults };
   };
 }
 
+// Legacy per-tool nodes kept for backward compatibility with any direct imports
 function buildToolNodes(skillCtx) {
-  return Object.fromEntries(
-    SKILL_NAMES.map((name) => [name, makeNode(name, skillCtx)]),
-  );
+  return { tools: buildToolDispatcher(skillCtx) };
 }
 
-module.exports = { buildToolNodes, SKILL_NAMES };
+module.exports = { buildToolNodes, buildToolDispatcher, SKILL_NAMES };
