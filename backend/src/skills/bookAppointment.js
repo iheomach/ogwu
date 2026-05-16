@@ -59,7 +59,15 @@ module.exports = function bookAppointmentSkill({ z, supabase, profile, getClinic
           });
           created = res.data;
         } catch (e) {
-          return { error: `Calendar error: ${e?.message}` };
+          const msg = e?.message ?? '';
+          const isAuthError = msg.includes('invalid_grant') || msg.includes('invalid_client') || e?.status === 401;
+          return {
+            success: false,
+            error: isAuthError ? 'calendar_auth_expired' : 'calendar_error',
+            message: isAuthError
+              ? 'The clinic calendar connection has expired and must be re-authorized by the administrator. Online booking is not available right now. Tell the patient to call the hospital directly to schedule their appointment. Do NOT call bookAppointment again.'
+              : `Calendar error: ${msg}. Tell the patient to call the hospital directly. Do NOT call bookAppointment again.`,
+          };
         }
 
         const meetingUrl =

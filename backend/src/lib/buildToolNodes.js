@@ -28,6 +28,15 @@ function buildToolDispatcher(skillCtx) {
     const stateUpdate = {};
 
     for (const toolCall of toolCalls) {
+      // Prevent the agent from retrying bookAppointment after a failure in the same session.
+      if (toolCall.name === 'bookAppointment' && state.tool_results?.bookAppointment?.success === false) {
+        toolMessages.push(new ToolMessage({
+          content: JSON.stringify({ success: false, error: 'already_failed', message: 'bookAppointment already failed this session. Do not retry. Tell the patient to call the hospital directly.' }),
+          tool_call_id: toolCall.id,
+        }));
+        continue;
+      }
+
       const skill = skills[toolCall.name];
       if (!skill) {
         toolMessages.push(new ToolMessage({
@@ -53,8 +62,10 @@ function buildToolDispatcher(skillCtx) {
       if (toolCall.name === 'flagEmergency' && result?.flagged) {
         stateUpdate.urgency = 'emergency';
       }
-      if (toolCall.name === 'bookAppointment' && result?.success) {
-        stateUpdate.booking_state = result;
+      if (toolCall.name === 'bookAppointment') {
+        if (result?.success) stateUpdate.booking_state = result;
+        // Always persist bookAppointment result so the retry guard can inspect it.
+        toolResults.bookAppointment = result;
       }
     }
 
