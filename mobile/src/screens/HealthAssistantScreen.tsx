@@ -207,6 +207,15 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
   const [textDate, setTextDate] = useState<string>('');
   const [inputFocused, setInputFocused] = useState(false);
 
+  // Sync selection when firstAvailable resolves (e.g. after mount or slots change)
+  useEffect(() => {
+    if (firstAvailable && !selectedDateKey) {
+      setSelectedDateKey(firstAvailable);
+      const [y, m, d] = firstAvailable.split('-');
+      setTextDate(`${m}/${d}/${y}`);
+    }
+  }, [firstAvailable, selectedDateKey]);
+
   const markedDates = useMemo(() => {
     const marks: Record<string, any> = {};
     for (const dateKey of slotsByDate.keys()) {
@@ -247,6 +256,25 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
     if (!selectedSlot || disabled) return;
     onSelect(selectedSlot, hospitalId);
   };
+
+  // All provided slots are in the past — session was resumed with stale data
+  const slotsExpired = slots.length > 0 && slotsByDate.size === 0;
+
+  if (slotsExpired) {
+    return (
+      <View style={styles.slotPickerContainer}>
+        <View style={styles.slotPickerHeader}>
+          <Text style={styles.slotPickerHospitalName}>{hospitalName}</Text>
+        </View>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 20, alignItems: 'center' }}>
+          <MaterialIcons name="event-busy" size={32} color={colors.grey300} />
+          <Text style={{ marginTop: 10, fontSize: 14, color: colors.grey500, textAlign: 'center' }}>
+            These slots are no longer available. Ask the assistant to search for new availability.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.slotPickerContainer}>
