@@ -22,13 +22,6 @@ export type AgentMessage = {
   parts: ToolPart[];
 };
 
-export type BookingInterrupt = {
-  slot: string;
-  time_zone: string;
-  hospital_id: string;
-  reason: string;
-};
-
 // ── Auth fetch ────────────────────────────────────────────────────────────────
 
 async function authedFetch(url: string, init?: RequestInit) {
@@ -51,7 +44,6 @@ type SSEHandler = {
   onText: (delta: string) => void;
   onToolCall: (toolCallId: string, toolName: string, args: unknown) => void;
   onToolResult: (toolCallId: string, result: unknown) => void;
-  onInterrupt: (data: BookingInterrupt) => void;
   onError: (msg: string) => void;
 };
 
@@ -86,13 +78,6 @@ async function parseSSEStream(response: Response, handlers: SSEHandler) {
         case 'a': {
           const p = parsed as { toolCallId: string; result: unknown };
           handlers.onToolResult(p.toolCallId, p.result);
-          break;
-        }
-        case '2': {
-          const items = parsed as Array<{ type: string; data: BookingInterrupt }>;
-          for (const item of items) {
-            if (item.type === 'booking_interrupt') handlers.onInterrupt(item.data);
-          }
           break;
         }
         case '3': handlers.onError(parsed as string); break;
@@ -147,7 +132,6 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [pendingInterrupt, setPendingInterrupt] = useState<BookingInterrupt | null>(null);
   const [contextSummary, setContextSummary] = useState<string | null>(null);
   const [hasPreviousSession, setHasPreviousSession] = useState(false);
 
@@ -229,7 +213,6 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
           return msgs;
         });
       },
-      onInterrupt: (data) => setPendingInterrupt(data),
       onError: (msg) => { throw new Error(msg); },
     });
   }, [apiBase, location, lat, lon]);
@@ -280,7 +263,6 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     setMessages([...nextMessages, assistantMsg]);
     setIsLoading(true);
     setError(null);
-    setPendingInterrupt(null);
 
     try {
       await runStream(`${apiBase}/chat`, { messages: serialiseMessages(nextMessages) });
@@ -298,32 +280,10 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     append({ role: 'user', content: text });
   }, [input, isLoading, append]);
 
-  const confirmBooking = useCallback(async (confirmed: boolean) => {
-    setPendingInterrupt(null);
-    const assistantMsg: AgentMessage = {
-      id: `assistant-resume-${Date.now()}`,
-      role: 'assistant',
-      content: '',
-      parts: [],
-    };
-    setMessages((prev) => [...prev, assistantMsg]);
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await runStream(`${apiBase}/resume`, { confirmed });
-    } catch (err: any) {
-      setError(err instanceof Error ? err : new Error(String(err)));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [apiBase, runStream]);
-
   const resetState = useCallback(() => {
     setMessages([]);
     setInput('');
     setError(null);
-    setPendingInterrupt(null);
   }, []);
 
   // Generates a new session — old checkpoint preserved in DB but no longer active.
@@ -345,7 +305,6 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     setMessages([]);
     setInput('');
     setError(null);
-    setPendingInterrupt(null);
     setContextSummary(null);
     if (fetchSummary) fetchContextSummary();
   }, [fetchContextSummary]);
@@ -361,7 +320,6 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     setMessages(prevMessages);
     setInput('');
     setError(null);
-    setPendingInterrupt(null);
     setContextSummary(null);
     setHasPreviousSession(false);
     previousSessionIdRef.current = null;
@@ -377,8 +335,6 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
     append,
     isLoading,
     error,
-    pendingInterrupt,
-    confirmBooking,
     resetState,
     startNewSession,
     resumePreviousSession,

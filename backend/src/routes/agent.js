@@ -14,7 +14,6 @@ const { buildSystemPrompt } = require('../lib/buildSystemPrompt');
 const { buildGraph } = require('../lib/buildGraph');
 const { SKILL_NAMES } = require('../lib/buildToolNodes');
 const { getCheckpointer } = require('../lib/checkpointer');
-const { Command } = require('@langchain/langgraph');
 const { parseAgentUrgency } = require('../lib/urgency');
 const { checkWithLlamaGuard, OUTPUT_SAFE_FALLBACK } = require('../lib/llamaGuard');
 
@@ -575,15 +574,8 @@ router.post('/chat', authenticate, async (req, res) => {
       writePart('3', String(streamErr?.message ?? 'Stream error'));
     }
 
-    // Single getState call covers: booking interrupt + input_blocked check
     if (checkpointer) {
       const graphState = await agent.getState(threadConfig);
-
-      const pendingInterrupts = (graphState.tasks ?? []).flatMap((t) => t.interrupts ?? []);
-      if (pendingInterrupts.length > 0) {
-        hasText = true;
-        writePart('2', [{ type: 'booking_interrupt', data: pendingInterrupts[0].value }]);
-      }
 
       if (!hasText && graphState.values?.input_blocked) {
         const lastMsg = graphState.values.messages[graphState.values.messages.length - 1];
@@ -629,143 +621,6 @@ router.post('/chat', authenticate, async (req, res) => {
   } catch (err) {
     if (!res.headersSent) {
       res.status(400).json({ error: err?.message || 'Failed to run agent' });
-    }
-  }
-});
-
-// ── Resume endpoint (human-in-the-loop) ──────────────────────────────────────
-
-router.post('/resume', authenticate, async (req, res) => {
-  try {
-    const confirmed = req.body?.confirmed === true;
-    const checkpointer = await getCheckpointer();
-    if (!checkpointer) return res.status(400).json({ error: 'Checkpointer not configured' });
-
-    const [profile, triageIntake, lastHospital] = await Promise.all([
-      loadPatientProfile(req.user.id),
-      loadTriageIntake(req.user.id),
-      loadLastHospital(req.user.id),
-    ]);
-
-    const liveLocation = safeText(req.body?.location, 100) || null;
-    const patientLat = typeof req.body?.lat === 'number' ? req.body.lat : null;
-    const patientLon = typeof req.body?.lon === 'number' ? req.body.lon : null;
-    const patientTimeZone = safeText(req.body?.time_zone, 100) || null;
-
-    const skillCtx = {
-      z, supabase, profile,
-      patientLat, patientLon, haversineKm,
-      fetchAvailableSlots, getClinicCalendarAuth,
-      safeText, normalizeUrgency,
-      patientTimeZone,
-    };
-
-    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake, lastHospital });
-    const agent = buildGraph(skillCtx, system, checkpointer);
-    const sessionId = safeText(req.body?.session_id, 64) || 'default';
-    const threadConfig = { configurable: { thread_id: `${req.user.id}-${sessionId}` } };
-
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('X-Vercel-AI-Data-Stream', 'v1');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.flushHeaders();
-
-    function writePart(code, value) {
-      res.write(`${code}:${JSON.stringify(value)}\n`);
-    }
-
-    let hasText = false;
-    const totalUsage = { promptTokens: 0, completionTokens: 0 };
-    const pendingTools = new Map();
-    const skillNameSet = new Set(SKILL_NAMES);
-    const textChunks = [];
-
-    try {
-      const eventStream = agent.streamEvents(
-        new Command({ resume: confirmed }),
-        { version: 'v2', recursionLimit: 40, ...threadConfig },
-      );
-
-      for await (const event of eventStream) {
-        const { event: eventName, name, run_id, data } = event;
-
-        if (eventName === 'on_chat_model_stream') {
-          const content = data?.chunk?.content;
-          if (typeof content === 'string' && content) {
-            hasText = true;
-            textChunks.push(content);
-          } else if (Array.isArray(content)) {
-            for (const part of content) {
-              if (part.type === 'text' && part.text) { hasText = true; textChunks.push(part.text); }
-            }
-          }
-        } else if (eventName === 'on_chat_model_start') {
-          writePart('f', { messageId: `step-${Date.now()}` });
-        } else if (eventName === 'on_chat_model_end') {
-          const usage = data?.output?.response_metadata?.token_usage;
-          totalUsage.promptTokens += usage?.prompt_tokens ?? 0;
-          totalUsage.completionTokens += usage?.completion_tokens ?? 0;
-          writePart('e', {
-            finishReason: data?.output?.response_metadata?.finish_reason ?? 'stop',
-            usage: { promptTokens: usage?.prompt_tokens ?? 0, completionTokens: usage?.completion_tokens ?? 0 },
-            isContinued: false,
-          });
-        } else if (eventName === 'on_chain_start' && name === 'tools') {
-          const state = data?.input;
-          const lastMsg = state?.messages?.[state.messages.length - 1];
-          const toolCalls = lastMsg?.tool_calls ?? [];
-          const pending = [];
-          for (const tc of toolCalls) {
-            if (skillNameSet.has(tc.name)) {
-              pending.push({ toolCallId: tc.id, toolName: tc.name });
-              writePart('9', { toolCallId: tc.id, toolName: tc.name, args: tc.args ?? {} });
-            }
-          }
-          if (pending.length > 0) pendingTools.set(run_id, pending);
-        } else if (eventName === 'on_chain_end' && name === 'tools') {
-          const pending = pendingTools.get(run_id);
-          if (pending) {
-            const toolMessages = data?.output?.messages ?? [];
-            for (const p of pending) {
-              const toolMsg = toolMessages.find((m) => m.tool_call_id === p.toolCallId);
-              if (toolMsg) {
-                const raw = toolMsg.content;
-                let result;
-                try { result = typeof raw === 'string' ? JSON.parse(raw) : (raw ?? ''); } catch { result = raw ?? ''; }
-                writePart('a', { toolCallId: p.toolCallId, result });
-              }
-            }
-            pendingTools.delete(run_id);
-          }
-        }
-      }
-    } catch (streamErr) {
-      console.error('[agent] resume stream caught:', streamErr?.message);
-      writePart('3', String(streamErr?.message ?? 'Stream error'));
-    }
-
-    if (!hasText) {
-      writePart('0', confirmed
-        ? "I'm sorry, something went wrong with the booking. Please try again."
-        : 'Booking cancelled. Let me know if you\'d like to pick a different time.');
-    } else if (textChunks.length > 0) {
-      const guardResult = await checkWithLlamaGuard(
-        [{ role: 'assistant', content: textChunks.join('') }],
-        'Agent',
-      );
-      if (!guardResult.safe) {
-        console.warn(`[agent] resume output blocked for user=${req.user?.id} category=${guardResult.category}`);
-        writePart('0', OUTPUT_SAFE_FALLBACK);
-      } else {
-        for (const chunk of textChunks) writePart('0', chunk);
-      }
-    }
-
-    writePart('d', { finishReason: 'stop', usage: totalUsage });
-    res.end();
-  } catch (err) {
-    if (!res.headersSent) {
-      res.status(400).json({ error: err?.message || 'Failed to resume agent' });
     }
   }
 });

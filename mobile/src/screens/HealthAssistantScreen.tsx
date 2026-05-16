@@ -576,8 +576,6 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     error,
     setInput,
     setMessages,
-    pendingInterrupt,
-    confirmBooking,
     resetState,
     startNewSession,
     resumePreviousSession,
