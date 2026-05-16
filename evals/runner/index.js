@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ci trigger v2
+// ci trigger v3
 'use strict';
 
 /**
