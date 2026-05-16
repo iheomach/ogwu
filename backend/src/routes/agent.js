@@ -599,6 +599,11 @@ router.post('/chat', authenticate, async (req, res) => {
         writePart('0', blocked);
         hasText = true;
       }
+
+      if (!hasText && graphState.values?.urgency === 'emergency') {
+        writePart('0', "I've flagged this as a medical emergency and alerted the care team immediately. Please seek urgent care now — if you're in immediate danger, call emergency services (911) right away.");
+        hasText = true;
+      }
     }
 
     if (!hasText) {

@@ -12,7 +12,8 @@ const { notifyEmergency } = require('./notify');
 
 async function inputGuardNode(state) {
   const lastHuman = [...state.messages].reverse().find((m) => m._getType?.() === 'human');
-  if (!lastHuman) return {};
+  // Reset per-turn transient state so prior emergency flags don't persist into a new turn.
+  if (!lastHuman) return { urgency: null, input_blocked: false };
 
   const content = typeof lastHuman.content === 'string'
     ? lastHuman.content
@@ -20,14 +21,14 @@ async function inputGuardNode(state) {
       ? lastHuman.content.filter((p) => p.type === 'text').map((p) => p.text).join('')
       : '';
 
-  if (!content.trim()) return {};
+  if (!content.trim()) return { urgency: null, input_blocked: false };
 
   const result = await checkWithLlamaGuard([{ role: 'user', content }], 'User');
   if (!result.safe) {
     console.warn(`[guard] input blocked — category: ${result.category}`);
-    return { messages: [new AIMessage(INPUT_SAFE_FALLBACK)], input_blocked: true };
+    return { messages: [new AIMessage(INPUT_SAFE_FALLBACK)], input_blocked: true, urgency: null };
   }
-  return {};
+  return { urgency: null, input_blocked: false };
 }
 
 function routeFromInputGuard(state) {
