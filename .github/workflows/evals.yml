@@ -29,6 +29,7 @@ jobs:
     name: Run Eval Suite
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: production
 
     steps:
       - uses: actions/checkout@v4
