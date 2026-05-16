@@ -63,7 +63,8 @@ async function checkWithLlamaGuard(turns, checkRole = 'Agent') {
     });
 
     if (!res.ok) {
-      console.error('[llamaGuard] HTTP error:', res.status);
+      const body = await res.text();
+      console.error('[llamaGuard] HTTP error:', res.status, body);
       return { safe: true, category: null };
     }
 
