@@ -724,6 +724,19 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     })();
   }, [messages, isInitialized]);
 
+  // Index of the most recent searchHospitals message — any SlotPicker from
+  // an earlier message is superseded (new hospital search started) and hidden.
+  const lastSearchHospitalsIdx = useMemo(
+    () => messages.reduce((best: number, m: any, i: number) => {
+      const parts: any[] = (m as any)?.parts || [];
+      const called = parts.filter((p) => p.type?.startsWith('tool-')).some((p) =>
+        (p.toolInvocation?.toolName ?? p.toolName ?? (p.type ?? '').replace('tool-', '')) === 'searchHospitals'
+      );
+      return called ? i : best;
+    }, -1),
+    [messages]
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: '#FAF7FB' }]}>
       <KeyboardAvoidingView
@@ -1108,7 +1121,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                       toolName === 'getHospitalBookingInfo' &&
                       (invState === 'output-available' || invState === 'result' || !!part.output || !!part.result);
 
-                    if (isSlotResult) {
+                    if (isSlotResult && idx >= lastSearchHospitalsIdx) {
                       const output = part.output ?? part.result ?? invocation?.result ?? invocation?.output;
                       if (output?.type === 'onboarded' && Array.isArray(output?.available_slots) && output.available_slots.length > 0) {
                         return (
