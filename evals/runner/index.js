@@ -220,6 +220,16 @@ async function main() {
   );
   console.log(`\nResults written to: ${outPath}`);
 
+  // FIFO: keep only the 3 newest result files
+  const allResults = fs.readdirSync(resultsDir)
+    .filter((f) => f.endsWith('.json'))
+    .sort()   // ISO timestamps sort lexicographically — oldest first
+    .reverse(); // newest first
+  for (const old of allResults.slice(3)) {
+    fs.unlinkSync(path.join(resultsDir, old));
+    console.log(`Removed old result: ${old}`);
+  }
+
   // ── Exit code ─────────────────────────────────────────────────────────────
 
   if (overallPct < PASS_THRESHOLD) {

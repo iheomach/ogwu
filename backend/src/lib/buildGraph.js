@@ -45,7 +45,9 @@ function makeEscalateNode(skillCtx) {
     const reason = state.tool_results?.flagEmergency?.reason ?? null;
     console.warn(`[agent] EMERGENCY escalated — patient ${patientId}`);
     await notifyEmergency({ patientId, reason });
-    return {};
+    // Reset urgency so the agent gets one more turn to respond and the
+    // routing loop doesn't re-enter escalate on the next tools call.
+    return { urgency: null };
   };
 }
 
@@ -96,7 +98,7 @@ function buildGraph(skillCtx, systemPrompt, checkpointer = null) {
   graph.addConditionalEdges('input_guard', routeFromInputGuard, ['agent', END]);
   graph.addConditionalEdges('agent', routeFromAgent, ['tools', 'escalate', END]);
   graph.addConditionalEdges('tools', routeFromTool, ['escalate', 'agent']);
-  graph.addEdge('escalate', END);
+  graph.addEdge('escalate', 'agent');
 
   return graph.compile({ checkpointer: checkpointer ?? undefined });
 }

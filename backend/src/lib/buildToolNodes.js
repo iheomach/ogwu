@@ -28,6 +28,15 @@ function buildToolDispatcher(skillCtx) {
     const stateUpdate = {};
 
     for (const toolCall of toolCalls) {
+      // Prevent double-escalation: flagEmergency already ran this session.
+      if (toolCall.name === 'flagEmergency' && state.tool_results?.flagEmergency?.flagged) {
+        toolMessages.push(new ToolMessage({
+          content: JSON.stringify({ flagged: true, message: 'Emergency already escalated this session.' }),
+          tool_call_id: toolCall.id,
+        }));
+        continue;
+      }
+
       // Prevent the agent from retrying bookAppointment after a failure in the same session.
       if (toolCall.name === 'bookAppointment' && state.tool_results?.bookAppointment?.success === false) {
         toolMessages.push(new ToolMessage({
