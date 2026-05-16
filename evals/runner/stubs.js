@@ -151,6 +151,7 @@ function buildStubSkillCtx(patientProfile = {}) {
     safeText,
     normalizeUrgency,
     patientTimeZone: 'Africa/Lagos',
+    notifyEmergency: async () => {},
   };
 }
 

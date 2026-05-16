@@ -5,7 +5,7 @@ const { AgentState } = require('./agentState');
 const { buildToolDispatcher, SKILL_NAMES } = require('./buildToolNodes');
 const { loadLangGraphSkills } = require('./loadLangGraphSkills');
 const { checkWithLlamaGuard, INPUT_SAFE_FALLBACK } = require('./llamaGuard');
-const { notifyEmergency } = require('./notify');
+const { notifyEmergency: _notifyEmergency } = require('./notify');
 
 // ── Input guard node ──────────────────────────────────────────────────────────
 // Runs before the agent. Blocks harmful user messages via Llama Guard.
@@ -38,12 +38,15 @@ function routeFromInputGuard(state) {
 // ── Escalate node ─────────────────────────────────────────────────────────────
 // Triggered when urgency = emergency. Inserts an emergency_alerts row so the
 // provider's admin dashboard receives a Supabase Realtime push immediately.
-async function escalateNode(state) {
-  const patientId = state.patient_id;
-  const reason = state.tool_results?.flagEmergency?.reason ?? null;
-  console.warn(`[agent] EMERGENCY escalated — patient ${patientId}`);
-  await notifyEmergency({ patientId, reason });
-  return {};
+function makeEscalateNode(skillCtx) {
+  const notifyEmergency = skillCtx.notifyEmergency ?? _notifyEmergency;
+  return async function escalateNode(state) {
+    const patientId = state.patient_id;
+    const reason = state.tool_results?.flagEmergency?.reason ?? null;
+    console.warn(`[agent] EMERGENCY escalated — patient ${patientId}`);
+    await notifyEmergency({ patientId, reason });
+    return {};
+  };
 }
 
 // ── Routing ───────────────────────────────────────────────────────────────────
@@ -87,7 +90,7 @@ function buildGraph(skillCtx, systemPrompt, checkpointer = null) {
     .addNode('input_guard', inputGuardNode)
     .addNode('agent', agentNode)
     .addNode('tools', buildToolDispatcher(skillCtx))
-    .addNode('escalate', escalateNode);
+    .addNode('escalate', makeEscalateNode(skillCtx));
 
   graph.addEdge('__start__', 'input_guard');
   graph.addConditionalEdges('input_guard', routeFromInputGuard, ['agent', END]);
