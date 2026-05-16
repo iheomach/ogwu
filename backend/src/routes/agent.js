@@ -79,7 +79,7 @@ function withTimeout(promise, ms) {
 
 // patientTimeZone: IANA zone from the patient's device — slots are displayed in this zone
 // providerTimeZone: overrides the calendar's own zone for working-hours logic (optional)
-async function fetchAvailableSlots(daysAhead = 5, patientTimeZone = null, providerTimeZone = null) {
+async function fetchAvailableSlots(daysAhead = 5, providerTimeZone = null) {
   const auth = await getClinicCalendarAuth();
   if (!auth) return [];
 
@@ -101,9 +101,6 @@ async function fetchAvailableSlots(daysAhead = 5, patientTimeZone = null, provid
       }
     }
   }
-
-  // Patient display zone — fall back to provider zone if unknown
-  const displayZone = patientTimeZone || providerTimeZone;
 
   // Working-hours window is always in the provider's timezone (8am–5pm clinic time)
   const now = DateTime.now().setZone(providerTimeZone);
@@ -135,13 +132,10 @@ async function fetchAvailableSlots(daysAhead = 5, patientTimeZone = null, provid
         return cursor < bEnd && slotEnd > bStart;
       });
       if (!busy) {
-        // Convert the slot to the patient's local timezone for display
-        const inPatientZone = cursor.setZone(displayZone);
         slots.push({
-          starts_at_local: inPatientZone.toFormat("yyyy-MM-dd'T'HH:mm"),
-          display: inPatientZone.toFormat("ccc d MMM, h:mm a"),
-          time_zone: displayZone,           // patient's timezone — used by bookAppointment to parse starts_at_local
-          provider_time_zone: providerTimeZone, // clinic's timezone — used for the calendar event
+          starts_at_local: cursor.toFormat("yyyy-MM-dd'T'HH:mm"),
+          display: cursor.toFormat("ccc d MMM, h:mm a"),
+          time_zone: providerTimeZone,
         });
       }
     }

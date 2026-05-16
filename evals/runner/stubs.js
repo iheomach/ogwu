@@ -87,8 +87,8 @@ async function fetchAvailableSlots() {
   const base = new Date();
   base.setHours(base.getHours() + 2, 0, 0, 0);
   return [
-    { starts_at_local: isoLocal(base, 0), display: 'Today, 2:00 PM', time_zone: 'Africa/Lagos', provider_time_zone: 'Africa/Lagos' },
-    { starts_at_local: isoLocal(base, 2), display: 'Today, 4:00 PM', time_zone: 'Africa/Lagos', provider_time_zone: 'Africa/Lagos' },
+    { starts_at_local: isoLocal(base, 0), display: 'Today, 2:00 PM', time_zone: 'Africa/Lagos' },
+    { starts_at_local: isoLocal(base, 2), display: 'Today, 4:00 PM', time_zone: 'Africa/Lagos' },
   ];
 }
 

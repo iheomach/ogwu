@@ -1,4 +1,4 @@
-module.exports = function getHospitalBookingInfoSkill({ z, profile, supabase, fetchAvailableSlots, patientTimeZone }) {
+module.exports = function getHospitalBookingInfoSkill({ z, profile, supabase, fetchAvailableSlots }) {
   return {
     inputSchema: z.object({
       hospital_id: z.string().describe('UUID of the hospital from searchHospitals results'),
@@ -35,7 +35,7 @@ module.exports = function getHospitalBookingInfoSkill({ z, profile, supabase, fe
         }
 
         if (is_onboarded) {
-          const slots = await fetchAvailableSlots(30, patientTimeZone);
+          const slots = await fetchAvailableSlots(30);
           if (slots.length === 0) {
             return { type: 'onboarded_no_slots', message: 'No available slots in the next 7 days. Tell the patient to call directly.', phone: hospital_phone };
           }
