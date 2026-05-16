@@ -55,7 +55,7 @@ async function checkWithLlamaGuard(turns, checkRole = 'Agent') {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-guard-4-12b',
+        model: 'openai/gpt-oss-safeguard-20b',
         messages: [{ role: 'user', content: buildPrompt(turns, checkRole) }],
         max_tokens: 20,
         temperature: 0,
