@@ -1,5 +1,4 @@
 const { ToolMessage } = require('@langchain/core/messages');
-const { interrupt } = require('@langchain/langgraph');
 
 const SKILL_NAMES = [
   'searchHospitals',
@@ -23,28 +22,6 @@ function buildToolDispatcher(skillCtx) {
   return async function toolDispatcherNode(state) {
     const lastMessage = state.messages[state.messages.length - 1];
     const toolCalls = lastMessage?.tool_calls ?? [];
-
-    // bookAppointment must be handled first — interrupt() pauses the graph
-    const bookingCall = toolCalls.find((tc) => tc.name === 'bookAppointment');
-    if (bookingCall) {
-      const confirmed = interrupt({
-        type: 'booking_confirmation',
-        slot: bookingCall.args.starts_at_local,
-        time_zone: bookingCall.args.time_zone,
-        hospital_id: bookingCall.args.hospital_id,
-        reason: bookingCall.args.reason,
-      });
-
-      if (!confirmed) {
-        return {
-          messages: [new ToolMessage({
-            content: JSON.stringify({ cancelled: true, message: 'Booking cancelled by patient.' }),
-            tool_call_id: bookingCall.id,
-          })],
-          tool_results: { ...state.tool_results, bookAppointment: { cancelled: true } },
-        };
-      }
-    }
 
     const toolMessages = [];
     const toolResults = { ...state.tool_results };

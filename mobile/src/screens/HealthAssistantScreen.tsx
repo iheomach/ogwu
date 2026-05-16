@@ -1169,43 +1169,6 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
               </View>
             )}
 
-            {/* Booking confirmation interrupt */}
-            {pendingInterrupt && (
-              <View style={[styles.slotPickerContainer, { marginBottom: spacing.md }]}>
-                <View style={styles.slotPickerHeader}>
-                  <Text style={styles.slotPickerHospitalName}>Confirm your booking</Text>
-                  <Text style={styles.slotPickerSubtitle}>{pendingInterrupt.slot}</Text>
-                  {!!pendingInterrupt.reason && (
-                    <Text style={[styles.slotPickerSubtitle, { marginTop: 4 }]}>
-                      Reason: {pendingInterrupt.reason}
-                    </Text>
-                  )}
-                </View>
-                <View style={{ flexDirection: 'row', gap: 10, padding: spacing.md }}>
-                  <TouchableOpacity
-                    onPress={() => confirmBooking(false)}
-                    disabled={isLoading}
-                    style={{
-                      flex: 1, paddingVertical: 13, borderRadius: 12, alignItems: 'center',
-                      borderWidth: 1.5, borderColor: 'rgba(69,0,80,0.25)',
-                    }}
-                  >
-                    <Text style={{ fontWeight: '600', color: colors.grey700 }}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => confirmBooking(true)}
-                    disabled={isLoading}
-                    style={{
-                      flex: 2, paddingVertical: 13, borderRadius: 12, alignItems: 'center',
-                      backgroundColor: colors.purple,
-                    }}
-                  >
-                    <Text style={styles.slotConfirmBtnText}>Confirm booking</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
             {!!error && (
               <View style={[styles.assistantBubble, { backgroundColor: 'rgba(239, 68, 68, 0.06)', borderColor: 'rgba(239, 68, 68, 0.2)' }]}>
                 <Text style={{ color: colors.error, fontSize: 14, lineHeight: 20 }}>
