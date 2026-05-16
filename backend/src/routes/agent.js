@@ -148,7 +148,7 @@ async function fetchAvailableSlots(daysAhead = 5, patientTimeZone = null, provid
 
     cursor = cursor.plus({ minutes: 30 });
     if (cursor.hour >= 17) cursor = cursor.plus({ days: 1 }).startOf('day').set({ hour: 8 });
-    if (cursor.weekday > 5) cursor = cursor.set({ weekday: 1 }).plus(cursor.weekday === 6 ? { days: 2 } : { days: 1 });
+    if (cursor.weekday > 5) cursor = cursor.plus({ days: 8 - cursor.weekday }).startOf('day').set({ hour: 8 });
   }
 
   return slots;
