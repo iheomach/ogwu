@@ -30,6 +30,11 @@ function makeQueryBuilder(table) {
     like: () => builder,
     order: () => builder,
     limit: () => builder,
+    single: async () => {
+      const rows = defaultTableData(table);
+      const row = Array.isArray(rows) ? (rows[0] ?? null) : rows;
+      return { data: row, error: null };
+    },
     maybeSingle: async () => ({ data: null, error: null }),
     then: (resolve) =>
       resolve({
