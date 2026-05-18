@@ -185,14 +185,14 @@ export function AppRouter() {
 
         if (!isMounted) return;
 
-        if (res.safety_note) {
-          Alert.alert(t('triage.safetyTitle'), res.safety_note);
-        }
-
         if (res.done) {
           // Nothing to ask; still record completion so we don't prompt again.
           try {
-            await triageComplete({ locale, profile: profile ?? {}, qa: triageQa, location: formatLocation(locationSummary) });
+            const saved = await triageComplete({ locale, profile: profile ?? {}, qa: triageQa, location: formatLocation(locationSummary) });
+            if (!isMounted) return;
+            if (saved.safety_note) {
+              Alert.alert(t('triage.safetyTitle'), saved.safety_note);
+            }
           } catch {
             // Non-fatal
           }
@@ -346,10 +346,6 @@ export function AppRouter() {
         qa: nextQa,
         location: formatLocation(locationSummary),
       });
-
-      if (res.safety_note) {
-        Alert.alert(t('triage.safetyTitle'), res.safety_note);
-      }
 
       if (res.done) {
         const saved = await triageComplete({ locale, profile: profile ?? {}, qa: nextQa, location: formatLocation(locationSummary) });

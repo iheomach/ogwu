@@ -249,11 +249,6 @@ router.post('/next', authenticate, async (req, res) => {
     const qa = Array.isArray(req.body?.qa) ? req.body.qa : [];
 
     // Rule-based question gathering: do NOT call OpenAI here.
-    const allUserText = qa.map((x) => (x && typeof x.a === 'string' ? x.a : '')).join(' ');
-    if (hasEmergencySignals(allUserText)) {
-      return res.json({ done: true, question: null, summary: null, safety_note: safetyNote(locale) });
-    }
-
     if (qa.length >= MAX_QUESTIONS) {
       return res.json({ done: true, question: null, summary: null, safety_note: null });
     }
