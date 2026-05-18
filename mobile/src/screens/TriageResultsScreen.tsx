@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
-  Share,
   Text,
   TouchableOpacity,
   View,
@@ -13,8 +11,6 @@ import type { TriageIntake, TriageResultsScreenProps } from '../types';
 import { styles, colors } from '../ui/styles';
 import { t } from '../i18n';
 import { triageGetIntake } from '../lib/triage';
-import { encountersCreateShare } from '../lib/encounters';
-import { fetchReport, buildReportText } from '../lib/report';
 
 function urgencyColors(urgency: TriageIntake['urgency']) {
   switch (urgency) {
@@ -34,28 +30,6 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
   const [error, setError] = useState<string | null>(null);
   const [intake, setIntake] = useState<TriageIntake | null>(null);
 
-  const [shareLoading, setShareLoading] = useState(false);
-
-  const onShare = async () => {
-    if (!intake || shareLoading) return;
-    try {
-      setShareLoading(true);
-      const data = await fetchReport();
-      const message = buildReportText(data);
-      const res = await Share.share({ message, title: t('triageResults.shareTitle') });
-      if ((res as any)?.action === Share.sharedAction) {
-        try {
-          await encountersCreateShare({ doctor_id: null });
-        } catch {
-          // best-effort — don't block the share on a failed encounter record
-        }
-      }
-    } catch (e: any) {
-      Alert.alert(t('triageResults.shareErrorTitle'), e?.message ?? t('triageResults.shareErrorBody'));
-    } finally {
-      setShareLoading(false);
-    }
-  };
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -90,17 +64,6 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
 
         <Text style={styles.title}>{t('triageResults.title')}</Text>
         <Text style={styles.helper}>{t('triageResults.helper')}</Text>
-
-        <TouchableOpacity
-          style={[styles.btnPrimary, busy || loading || !intake || shareLoading ? styles.btnPrimaryDisabled : null]}
-          onPress={onShare}
-          disabled={busy || loading || !intake || shareLoading}
-        >
-          {shareLoading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.btnPrimaryText}>{t('triageResults.share')}</Text>
-          }
-        </TouchableOpacity>
 
         {loading && (
           <View style={[styles.center, { paddingHorizontal: 0, paddingVertical: 24, marginTop: 16 }]}>
