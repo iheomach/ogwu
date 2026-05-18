@@ -12,6 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -121,12 +123,32 @@ function MessageText({ text, color }: { text: string; color: string }) {
   );
 }
 
-// ── Add to Google Calendar button ────────────────────────────────────────────
+// ── Calendar helpers ─────────────────────────────────────────────────────────
 function toGCalDate(isoUtc: string): string {
-  // Converts ISO UTC string to YYYYMMDDTHHmmssZ
   return isoUtc.replace(/[-:]/g, '').replace(/\.\d{3}/, '').replace('+00:00', 'Z');
 }
 
+function buildIcs(startsAt: string, hospitalName: string, meetingUrl: string | null): string {
+  const end = new Date(startsAt);
+  end.setMinutes(end.getMinutes() + 30);
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Ogwu//Health Assistant//EN',
+    'BEGIN:VEVENT',
+    `UID:${Date.now()}@ogwu.app`,
+    `DTSTART:${toGCalDate(startsAt)}`,
+    `DTEND:${toGCalDate(end.toISOString())}`,
+    `SUMMARY:Appointment at ${hospitalName}`,
+    meetingUrl ? `DESCRIPTION:Join online: ${meetingUrl}` : 'DESCRIPTION:Ogwu Health Appointment',
+    meetingUrl ? `LOCATION:${meetingUrl}` : '',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].filter(Boolean);
+  return lines.join('\r\n');
+}
+
+// ── Add to Google Calendar button ────────────────────────────────────────────
 function AddToCalendarButton({ startsAt, meetingUrl, hospitalName }: {
   startsAt: string;
   meetingUrl: string;
@@ -163,6 +185,35 @@ function AddToCalendarButton({ startsAt, meetingUrl, hospitalName }: {
         <Text style={styles.gcalSubtitle}>Includes Google Meet link</Text>
       </View>
       <MaterialIcons name="open-in-new" size={16} color="#4285F4" />
+    </TouchableOpacity>
+  );
+}
+
+// ── Add to Apple Calendar button (iOS only) ──────────────────────────────────
+function AddToAppleCalendarButton({ startsAt, meetingUrl, hospitalName }: {
+  startsAt: string;
+  meetingUrl: string | null;
+  hospitalName: string;
+}) {
+  const handlePress = async () => {
+    try {
+      const ics = buildIcs(startsAt, hospitalName, meetingUrl);
+      const file = new File(Paths.cache, 'ogwu-appointment.ics');
+      file.write(ics);
+      await Sharing.shareAsync(file.uri, { mimeType: 'text/calendar', UTI: 'public.calendar-event' });
+    } catch {
+      Alert.alert('Could not open Calendar', 'Please add the appointment manually.');
+    }
+  };
+
+  return (
+    <TouchableOpacity onPress={handlePress} activeOpacity={0.8} style={styles.appleCalButton}>
+      <MaterialIcons name="event" size={22} color="#1C1C1E" />
+      <View style={styles.spacer}>
+        <Text style={styles.appleCalLabel}>Add to Apple Calendar</Text>
+        {meetingUrl && <Text style={styles.appleCalSubtitle}>Includes meeting link</Text>}
+      </View>
+      <MaterialIcons name="open-in-new" size={16} color="#1C1C1E" />
     </TouchableOpacity>
   );
 }
@@ -932,14 +983,23 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                       const tn = part.toolName ?? (part.type ?? '').replace('tool-', '');
                       if (tn === 'bookAppointment') {
                         const output = part.output ?? part.result;
-                        if (output?.success && output?.meeting_url) {
+                        if (output?.success && output?.starts_at) {
                           return (
                             <View key={`ps-${idx}`} style={[styles.assistantBubble, { opacity: 0.85 }]}>
-                              <AddToCalendarButton
-                                startsAt={output.starts_at}
-                                meetingUrl={output.meeting_url}
-                                hospitalName={output.hospital_name ?? 'Hospital'}
-                              />
+                              {output.meeting_url && (
+                                <AddToCalendarButton
+                                  startsAt={output.starts_at}
+                                  meetingUrl={output.meeting_url}
+                                  hospitalName={output.hospital_name ?? 'Hospital'}
+                                />
+                              )}
+                              {Platform.OS === 'ios' && (
+                                <AddToAppleCalendarButton
+                                  startsAt={output.starts_at}
+                                  meetingUrl={output.meeting_url ?? null}
+                                  hospitalName={output.hospital_name ?? 'Hospital'}
+                                />
+                              )}
                             </View>
                           );
                         }
@@ -1045,15 +1105,15 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                 : text;
 
               // Extract calendar button data for inline rendering
-              let calendarData: { startsAt: string; meetingUrl: string; hospitalName: string } | null = null;
+              let calendarData: { startsAt: string; meetingUrl: string | null; hospitalName: string } | null = null;
               if (hasCalendarButton) {
                 for (const part of toolParts) {
                   const inv = part.toolInvocation;
                   const tn = inv?.toolName ?? part.toolName ?? (part.type ?? '').replace('tool-', '');
                   if (tn !== 'bookAppointment') continue;
                   const output = part.output ?? part.result ?? inv?.result ?? inv?.output;
-                  if (output?.success && output?.meeting_url && output?.starts_at) {
-                    calendarData = { startsAt: output.starts_at, meetingUrl: output.meeting_url, hospitalName: output.hospital_name ?? 'Hospital' };
+                  if (output?.success && output?.starts_at) {
+                    calendarData = { startsAt: output.starts_at, meetingUrl: output.meeting_url ?? null, hospitalName: output.hospital_name ?? 'Hospital' };
                     break;
                   }
                 }
@@ -1082,8 +1142,15 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                           color={role === 'user' ? colors.white : colors.grey900}
                         />
                       )}
-                      {calendarData && (
+                      {calendarData && calendarData.meetingUrl && (
                         <AddToCalendarButton
+                          startsAt={calendarData.startsAt}
+                          meetingUrl={calendarData.meetingUrl}
+                          hospitalName={calendarData.hospitalName}
+                        />
+                      )}
+                      {calendarData && Platform.OS === 'ios' && (
+                        <AddToAppleCalendarButton
                           startsAt={calendarData.startsAt}
                           meetingUrl={calendarData.meetingUrl}
                           hospitalName={calendarData.hospitalName}

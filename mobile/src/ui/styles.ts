@@ -743,6 +743,34 @@ export const styles = StyleSheet.create({
     marginTop: 1,
   },
 
+  appleCalButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.12)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  appleCalLabel: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: '#1a1a1a',
+  },
+  appleCalSubtitle: {
+    fontSize: 11,
+    color: colors.grey500,
+    marginTop: 1,
+  },
+
   // ─── Assistant — slot picker ──────────────────────────────────────────────
   slotPickerContainer: {
     backgroundColor: colors.white,
