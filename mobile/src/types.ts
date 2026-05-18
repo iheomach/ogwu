@@ -26,6 +26,7 @@ export type AppScreen =
   | 'sendToHospital'
   | 'thread'
   | 'records'
+  | 'inbox'
   | 'profile';
 
 export type ScreenPropsBase = {
@@ -173,6 +174,12 @@ export type ConsultThread = {
     urgency: UrgencyTier;
     summary: string | null;
     answers: Array<{ q: string; a: string }>;
+  } | null;
+  last_message?: {
+    thread_id: string;
+    body: string;
+    sender_role: 'patient' | 'provider' | 'system';
+    created_at: string;
   } | null;
 };
 

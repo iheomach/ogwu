@@ -101,6 +101,24 @@ router.get('/', authenticate, async (req, res) => {
       hospital_name: t.hospital_id ? (hospitalNames[t.hospital_id] ?? null) : null,
     }));
 
+    // Attach last message preview for inbox display
+    const threadIds = enriched.map(t => t.id);
+    let lastMessageByThread = {};
+    if (threadIds.length > 0) {
+      const { data: msgs } = await supabase
+        .from('consult_messages')
+        .select('thread_id, body, sender_role, created_at')
+        .in('thread_id', threadIds)
+        .order('created_at', { ascending: false });
+      for (const msg of (msgs ?? [])) {
+        if (!lastMessageByThread[msg.thread_id]) lastMessageByThread[msg.thread_id] = msg;
+      }
+    }
+    const withLastMessage = enriched.map(t => ({
+      ...t,
+      last_message: lastMessageByThread[t.id] ?? null,
+    }));
+
     // Backfill titles for old threads that never got one — fire-and-forget
     const untitled = enriched.filter(t => !t.title && t.intake_snapshot);
     if (untitled.length > 0) {
@@ -114,7 +132,7 @@ router.get('/', authenticate, async (req, res) => {
       ).catch(() => {});
     }
 
-    return res.json({ threads: enriched });
+    return res.json({ threads: withLastMessage });
   } catch (err) {
     return serverError(res, err, 'Failed to load consult threads.');
   }

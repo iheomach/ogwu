@@ -1,11 +1,11 @@
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { colors, styles } from './styles';
 import { t } from '../i18n';
 
-export type TabKey = 'home' | 'newConsult' | 'records' | 'profile';
+export type TabKey = 'home' | 'newConsult' | 'records' | 'inbox' | 'profile';
 
 type TabIconName = keyof typeof MaterialIcons.glyphMap;
 
@@ -14,11 +14,13 @@ function TabButton({
   icon,
   active,
   onPress,
+  badge = 0,
 }: {
   label: string;
   icon: TabIconName;
   active: boolean;
   onPress: () => void;
+  badge?: number;
 }) {
   return (
     <TouchableOpacity
@@ -27,16 +29,43 @@ function TabButton({
       activeOpacity={0.8}
       accessibilityRole="button"
     >
-      <MaterialIcons
-        name={icon}
-        size={18}
-        color={active ? colors.white : colors.purpleMid}
-        style={styles.tabButtonIcon}
-      />
+      <View style={{ position: 'relative' }}>
+        <MaterialIcons
+          name={icon}
+          size={18}
+          color={active ? colors.white : colors.purpleMid}
+          style={styles.tabButtonIcon}
+        />
+        {badge > 0 && (
+          <View style={sheet.badge}>
+            <Text style={sheet.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+          </View>
+        )}
+      </View>
       <Text style={[styles.tabButtonText, active && styles.tabButtonTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
 }
+
+const sheet = StyleSheet.create({
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    minWidth: 15,
+    height: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700' as const,
+  },
+});
 
 function AssistantFab({ active, onPress }: { active: boolean; onPress: () => void }) {
   return (
@@ -59,11 +88,13 @@ export function TabScaffold({
   onNavigate,
   children,
   locale: _locale,
+  openThreadCount = 0,
 }: {
   activeTab: TabKey;
   onNavigate: (tab: TabKey) => void;
   children: React.ReactNode;
   locale?: string;
+  openThreadCount?: number;
 }) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.purpleDark }}>
@@ -86,6 +117,13 @@ export function TabScaffold({
           <AssistantFab
             active={activeTab === 'newConsult'}
             onPress={() => onNavigate('newConsult')}
+          />
+          <TabButton
+            label="Inbox"
+            icon="inbox"
+            active={activeTab === 'inbox'}
+            onPress={() => onNavigate('inbox')}
+            badge={activeTab !== 'inbox' ? openThreadCount : 0}
           />
           <TabButton
             label={t('tabs.profile')}

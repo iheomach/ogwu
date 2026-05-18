@@ -20,6 +20,7 @@ import { TriageScreen } from './screens/TriageScreen';
 import { TriageResultsScreen } from './screens/TriageResultsScreen';
 import { HealthAssistantScreen } from './screens/HealthAssistantScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
+import { InboxScreen } from './screens/InboxScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { ThreadScreen } from './screens/ThreadScreen';
 import { SendToHospitalScreen } from './screens/SendToHospitalScreen';
@@ -40,6 +41,7 @@ export function AppRouter() {
   const [screen, setScreen] = useState<AppScreen>('phone');
   const [locale, setLocale] = useState<SupportedLocale>('en');
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [openThreadCount, setOpenThreadCount] = useState(0);
 
   const [triageQa, setTriageQa] = useState<TriageQA[]>([]);
   const [triageQuestion, setTriageQuestion] = useState('');
@@ -429,7 +431,7 @@ export function AppRouter() {
   };
 
   const isTabScreen = (s: AppScreen): s is TabKey =>
-    s === 'home' || s === 'newConsult' || s === 'records' || s === 'profile';
+    s === 'home' || s === 'newConsult' || s === 'records' || s === 'inbox' || s === 'profile';
 
   const goTab = (tab: TabKey) => setScreen(tab);
 
@@ -509,7 +511,7 @@ export function AppRouter() {
       )}
 
       {screen === 'home' && (
-        <TabScaffold activeTab="home" onNavigate={goTab} locale={locale}>
+        <TabScaffold activeTab="home" onNavigate={goTab} locale={locale} openThreadCount={openThreadCount}>
           <HomeScreen
             busy={busy}
             phoneLabel={phoneLabel}
@@ -522,7 +524,7 @@ export function AppRouter() {
       )}
 
       {screen === 'newConsult' && (
-        <TabScaffold activeTab="newConsult" onNavigate={goTab} locale={locale}>
+        <TabScaffold activeTab="newConsult" onNavigate={goTab} locale={locale} openThreadCount={openThreadCount}>
           <HealthAssistantScreen
             busy={busy}
             location={formatLocation(locationSummary)}
@@ -558,7 +560,7 @@ export function AppRouter() {
       )}
 
       {screen === 'records' && (
-        <TabScaffold activeTab="records" onNavigate={goTab} locale={locale}>
+        <TabScaffold activeTab="records" onNavigate={goTab} locale={locale} openThreadCount={openThreadCount}>
           <RecordsScreen
             busy={busy}
             onOpenThread={(threadId) => {
@@ -569,9 +571,23 @@ export function AppRouter() {
         </TabScaffold>
       )}
 
+      {screen === 'inbox' && (
+        <TabScaffold activeTab="inbox" onNavigate={goTab} locale={locale} openThreadCount={openThreadCount}>
+          <InboxScreen
+            busy={busy}
+            onOpenThread={(threadId) => {
+              setActiveThreadId(threadId);
+              setScreen('thread');
+            }}
+            onOpenAssistant={() => setScreen('newConsult')}
+            onThreadCountChange={setOpenThreadCount}
+          />
+        </TabScaffold>
+      )}
+
       {screen === 'profile' && (
-        <TabScaffold activeTab="profile" onNavigate={goTab} locale={locale}>
-          <ProfileScreen
+        <TabScaffold activeTab="profile" onNavigate={goTab} locale={locale} openThreadCount={openThreadCount}>
+           <ProfileScreen
             busy={busy}
             phoneLabel={phoneLabel}
             profile={profile}
