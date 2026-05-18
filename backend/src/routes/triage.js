@@ -6,6 +6,7 @@ const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
 const { parseTriageUrgency } = require('../lib/urgency');
 const healthlake = require('../lib/healthlake');
+const comprehendMedical = require('../lib/comprehendMedical');
 
 const fetchImpl = global.fetch || require('node-fetch');
 
@@ -124,43 +125,30 @@ function pickBranchKey(mainComplaintText) {
   return 'other';
 }
 
-function computeUrgency(answers) {
+// entitySignals: { emergencySignaled, urgentSignaled } from Comprehend Medical.
+// ICD-10-grounded signals take priority over keyword matching — if CM flags
+// emergency, we trust it even if the keyword scan would only say urgent.
+function computeUrgency(answers, entitySignals = {}) {
+  const { emergencySignaled = false, urgentSignaled = false } = entitySignals;
+
   const text = Array.isArray(answers)
-    ? answers
-        .map((x) => `${x?.q || ''} ${x?.a || ''}`)
-        .join(' ')
+    ? answers.map((x) => `${x?.q || ''} ${x?.a || ''}`).join(' ')
     : '';
 
-  if (hasEmergencySignals(text)) return 'emergency';
+  if (hasEmergencySignals(text) || emergencySignaled) return 'emergency';
 
   const t = normalizeText(text);
 
-  // Urgent-ish signals (non-exhaustive). Keep it conservative.
   const urgentNeedles = [
-    'blood in urine',
-    'blood in stool',
-    'vomiting blood',
-    'throwing up blood',
-    'black stool',
-    'severe pain',
-    'worst pain',
-    'severe headache',
-    'stiff neck',
-    'high fever',
-    'fever 39',
-    'fever 40',
-    'temperature 39',
-    'temperature 40',
+    'blood in urine', 'blood in stool', 'vomiting blood', 'throwing up blood',
+    'black stool', 'severe pain', 'worst pain', 'severe headache', 'stiff neck',
+    'high fever', 'fever 39', 'fever 40', 'temperature 39', 'temperature 40',
   ];
-  if (urgentNeedles.some((n) => t.includes(n))) return 'urgent';
-
-  // Numeric pain/severity shortcuts (e.g. 9/10, 10/10).
+  if (urgentNeedles.some((n) => t.includes(n)) || urgentSignaled) return 'urgent';
   if (/\b(9|10)\s*\/\s*10\b/.test(t)) return 'urgent';
 
-  // “Soon” signals: moderate severity, fever mention, persistent symptoms.
   const soonNeedles = ['fever', 'chills', 'dizzy', 'dizziness', 'dehydr', 'worse', 'getting worse'];
   if (soonNeedles.some((n) => t.includes(n))) return 'soon';
-
   if (/\b(6|7|8)\s*\/\s*10\b/.test(t)) return 'soon';
 
   return 'routine';
@@ -293,17 +281,8 @@ router.post('/complete', authenticate, async (req, res) => {
         a: typeof x.a === 'string' ? String(x.a).slice(0, 2000) : '',
       }));
 
-    const urgency = parseTriageUrgency(computeUrgency(trimmed));
-
     const localeSafe = safeLocale(locale);
-    const languageMap = {
-      en: 'English',
-      es: 'Spanish',
-      fr: 'French',
-      ig: 'Igbo',
-      yo: 'Yoruba',
-      ha: 'Hausa',
-    };
+    const languageMap = { en: 'English', es: 'Spanish', fr: 'French', ig: 'Igbo', yo: 'Yoruba', ha: 'Hausa' };
     const languageName = languageMap[localeSafe] || 'English';
 
     // Compute age server-side so the LLM never infers it from a raw DOB
@@ -321,14 +300,9 @@ router.post('/complete', authenticate, async (req, res) => {
       }
     }
 
-    const profileForLLM = {
-      ...(profile || {}),
-      ...(patientAge !== null ? { age: patientAge } : {}),
-    };
-    // Strip raw dob so the model uses the computed age only
+    const profileForLLM = { ...(profile || {}), ...(patientAge !== null ? { age: patientAge } : {}) };
     delete profileForLLM.dob;
 
-    // Ask the model for a short summary (still no advice)
     const locationLine = location ? ` The patient is located in ${location}.` : '';
     const messages = [
       {
@@ -349,24 +323,33 @@ router.post('/complete', authenticate, async (req, res) => {
       },
     ];
 
+    // Run LLM summary and Comprehend Medical entity extraction in parallel.
+    const [llmResult, entityResult] = await Promise.allSettled([
+      openaiChat({ locale, messages }),
+      comprehendMedical.extractEntitiesFromAnswers(trimmed),
+    ]);
+
     let summary = null;
     let safety_note = null;
-    try {
-      const parsed = await openaiChat({ locale, messages });
-      summary = typeof parsed?.summary === 'string' ? parsed.summary : null;
-      safety_note = toUserDirectedSafetyNote(localeSafe, parsed?.safety_note);
-    } catch {
-      // Non-fatal: we can still save answers.
+    if (llmResult.status === 'fulfilled') {
+      summary = typeof llmResult.value?.summary === 'string' ? llmResult.value.summary : null;
+      safety_note = toUserDirectedSafetyNote(localeSafe, llmResult.value?.safety_note);
     }
+
+    const { entities = [], emergencySignaled = false, urgentSignaled = false } =
+      entityResult.status === 'fulfilled' ? entityResult.value : {};
+
+    // Urgency: ICD-10-grounded entity signals take priority over keyword scan.
+    const urgency = parseTriageUrgency(computeUrgency(trimmed, { emergencySignaled, urgentSignaled }));
 
     const patientId = req.user.id;
     const ts = new Date().toISOString();
-    console.log(`[triage] /complete patient=${patientId} healthlake=${healthlake.isConfigured()}`);
+    console.log(`[triage] /complete patient=${patientId} healthlake=${healthlake.isConfigured()} urgency=${urgency} entities=${entities.length}`);
 
     if (healthlake.isConfigured()) {
       // HealthLake is the authoritative store.
       try {
-        await healthlake.writeTriageIntake(patientId, { locale, answers: trimmed, urgency, summary, safety_note });
+        await healthlake.writeTriageIntake(patientId, { locale, answers: trimmed, urgency, summary, safety_note, extracted_entities: entities });
       } catch (hlErr) {
         console.error('[healthlake] triage write failed:', hlErr.message);
         return serverError(res, hlErr, 'Failed to save triage intake.', 400);

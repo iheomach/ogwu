@@ -105,7 +105,7 @@ function triageObservation(patientId, code, valueString, effectiveDateTime, ques
   };
 }
 
-async function writeTriageIntake(patientId, { locale, answers, urgency, summary, safety_note }) {
+async function writeTriageIntake(patientId, { locale, answers, urgency, summary, safety_note, extracted_entities }) {
   if (!isConfigured()) return;
   const ts = new Date().toISOString();
 
@@ -117,6 +117,9 @@ async function writeTriageIntake(patientId, { locale, answers, urgency, summary,
     triageObservation(patientId, 'triage-locale', locale || 'en', ts),
     ...(summary ? [triageObservation(patientId, 'triage-summary', summary, ts)] : []),
     ...(safety_note ? [triageObservation(patientId, 'triage-safety-note', safety_note, ts)] : []),
+    ...(Array.isArray(extracted_entities) && extracted_entities.length
+      ? [triageObservation(patientId, 'triage-entities', JSON.stringify(extracted_entities), ts)]
+      : []),
   ];
 
   console.log(`[healthlake] writeTriageIntake patient=${patientId} observations=${observations.length}`);
@@ -165,6 +168,12 @@ async function getTriageIntake(patientId) {
       .filter((r) => r.code?.coding?.some((c) => c.code === 'triage-qa'))
       .map((r) => ({ q: r.code?.text || '', a: r.valueString || '' }));
 
+    const extractedEntities = (() => {
+      const raw = byCode('triage-entities')?.valueString;
+      if (!raw) return [];
+      try { return JSON.parse(raw); } catch { return []; }
+    })();
+
     return {
       answers,
       urgency: byCode('triage-urgency')?.valueString || 'routine',
@@ -172,6 +181,7 @@ async function getTriageIntake(patientId) {
       safety_note: byCode('triage-safety-note')?.valueString || null,
       locale: byCode('triage-locale')?.valueString || 'en',
       updated_at: effectiveDateTime,
+      extracted_entities: extractedEntities,
     };
   } catch (err) {
     console.warn('[healthlake] getTriageIntake failed:', err.message);

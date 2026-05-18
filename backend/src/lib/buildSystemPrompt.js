@@ -35,6 +35,15 @@ function buildTriageSection(intake) {
     lines.push(`- Triage summary: ${intake.summary}`);
   }
 
+  if (Array.isArray(intake.extracted_entities) && intake.extracted_entities.length > 0) {
+    lines.push('- ICD-10-CM entities (Comprehend Medical, confidence ≥ 0.80 -- use these to inform clinical reasoning):');
+    for (const e of intake.extracted_entities) {
+      const flag = e.isEmergency ? ' [EMERGENCY-CODED]' : e.isUrgent ? ' [URGENT-CODED]' : '';
+      const code = e.icd10Code ? ` (${e.icd10Code}: ${e.icd10Description})` : '';
+      lines.push(`    • "${e.text}"${code}${flag}`);
+    }
+  }
+
   if (lines.length === 0) return '';
 
   return `\n\nPre-session triage (completed before this chat -- treat as established context):\n${lines.join('\n')}`;

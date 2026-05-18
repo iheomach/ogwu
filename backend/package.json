@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.0",
+    "@aws-sdk/client-comprehendmedical": "^3.1048.0",
     "@langchain/core": "^1.1.46",
     "@langchain/langgraph": "^1.3.0",
     "@langchain/langgraph-checkpoint-postgres": "^1.0.1",
