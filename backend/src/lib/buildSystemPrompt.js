@@ -48,6 +48,19 @@ function buildLastHospitalSection(lastHospital) {
 - is_onboarded: ${lastHospital.is_onboarded ? 'true' : 'false'}`;
 }
 
+function buildFhirSection(fhirContext) {
+  if (!fhirContext) return '';
+  const conditions = Array.isArray(fhirContext.conditions) ? fhirContext.conditions.filter(Boolean) : [];
+  const medications = Array.isArray(fhirContext.medications) ? fhirContext.medications.filter(Boolean) : [];
+  if (!conditions.length && !medications.length) return '';
+
+  const lines = ['\n\nVerified FHIR health record (authoritative -- supersedes any conflicting profile data above):'];
+  if (conditions.length) lines.push(`- Confirmed conditions: ${conditions.join(', ')}`);
+  if (medications.length) lines.push(`- Active medications: ${medications.join(', ')}`);
+  lines.push('Do NOT ask the patient to repeat or confirm any of this information.');
+  return lines.join('\n');
+}
+
 function buildSystemPrompt(profile) {
   const sex = csvish(profile?.biological_sex) || csvish(profile?.sex) || 'not provided';
   const age = profile?.age ?? computeAge(profile?.dob);
@@ -61,6 +74,7 @@ function buildSystemPrompt(profile) {
   const triageSection = buildTriageSection(profile?.triageIntake);
   const lastHospital = profile?.lastHospital ?? null;
   const lastHospitalSection = buildLastHospitalSection(lastHospital);
+  const fhirSection = buildFhirSection(profile?.fhirContext);
 
   return `You are Ogwu, an AI health assistant for patients in Nigeria and emerging markets.
 
@@ -69,7 +83,7 @@ Patient profile (do NOT ask the patient to repeat any of this):
 - Age: ${age ?? 'not provided'}
 - Allergies: ${allergies}
 - Existing conditions: ${conditions}
-- Current location: ${locationLine}${liveLocation ? ' (from device GPS -- use this for hospital search)' : ''}${triageSection}${lastHospitalSection}
+- Current location: ${locationLine}${liveLocation ? ' (from device GPS -- use this for hospital search)' : ''}${triageSection}${lastHospitalSection}${fhirSection}
 
 ## Your workflow
 

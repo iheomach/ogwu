@@ -5,6 +5,7 @@ const router = express.Router();
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
 const { parseTriageUrgency } = require('../lib/urgency');
+const healthlake = require('../lib/healthlake');
 
 const fetchImpl = global.fetch || require('node-fetch');
 
@@ -380,6 +381,21 @@ router.post('/complete', authenticate, async (req, res) => {
       .single();
 
     if (error) return serverError(res, error, 'An error occurred.', 400);
+
+    // Fire-and-forget: write FHIR resources to HealthLake.
+    // Failures here must never block the response to the patient.
+    const patientId = req.user.id;
+    const recordedDate = data.updated_at ? String(data.updated_at).slice(0, 10) : undefined;
+    Promise.allSettled([
+      healthlake.upsertPatient({ id: patientId, ...profile }),
+      healthlake.writeTriageObservations(patientId, trimmed, data.updated_at),
+      healthlake.writeConditions(patientId, profile.known_conditions, recordedDate),
+      healthlake.writeMedications(patientId, profile.current_medications),
+    ]).then((results) => {
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length) console.warn('[healthlake] triage write partial failure:', failed.map((r) => r.reason?.message));
+    });
+
     return res.json({ intake: data, safety_note });
   } catch (err) {
     return serverError(res, err, 'Failed to save triage intake.', 400);

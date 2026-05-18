@@ -5,6 +5,7 @@ const router = express.Router();
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
 const { parseTriageUrgency } = require('../lib/urgency');
+const healthlake = require('../lib/healthlake');
 
 // List encounters for the signed-in patient
 router.get('/', authenticate, async (req, res) => {
@@ -93,6 +94,12 @@ router.post('/share', authenticate, async (req, res) => {
       .single();
 
     if (error) return serverError(res, error, 'Failed to create encounter.');
+
+    // Fire-and-forget: mirror to HealthLake as a FHIR Encounter.
+    healthlake.writeEncounter(req.user.id, data).catch((err) =>
+      console.warn('[healthlake] encounter write failed:', err.message),
+    );
+
     return res.json({ encounter: data });
   } catch (e) {
     return serverError(res, e, 'Failed to create encounter.');

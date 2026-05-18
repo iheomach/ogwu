@@ -11,6 +11,7 @@ const router = express.Router();
 const authenticate = require('../middleware/auth');
 const supabase = require('../lib/supabase');
 const { buildSystemPrompt } = require('../lib/buildSystemPrompt');
+const healthlake = require('../lib/healthlake');
 const { buildGraph } = require('../lib/buildGraph');
 const { SKILL_NAMES } = require('../lib/buildToolNodes');
 const { getCheckpointer } = require('../lib/checkpointer');
@@ -184,6 +185,14 @@ async function loadLastHospital(userId) {
     .maybeSingle();
 
   return hospital || null;
+}
+
+async function loadFhirContext(userId) {
+  const [conditions, medications] = await Promise.all([
+    healthlake.getPatientConditions(userId),
+    healthlake.getPatientMedications(userId),
+  ]);
+  return { conditions, medications };
 }
 
 // ── Message conversion ────────────────────────────────────────────────────────
@@ -455,10 +464,11 @@ router.get('/session', authenticate, async (req, res) => {
 
 router.post('/chat', authenticate, async (req, res) => {
   try {
-    const [profile, triageIntake, lastHospital] = await Promise.all([
+    const [profile, triageIntake, lastHospital, fhirContext] = await Promise.all([
       loadPatientProfile(req.user.id),
       loadTriageIntake(req.user.id),
       loadLastHospital(req.user.id),
+      loadFhirContext(req.user.id),
     ]);
 
     const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
@@ -479,7 +489,7 @@ router.post('/chat', authenticate, async (req, res) => {
     // On a fresh/cleared session messages contains only the new user message,
     // so injecting it there would make the agent volunteer the old hospital
     // unprompted — defeating the history clear.
-    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake, lastHospital: messages.length > 1 ? lastHospital : null });
+    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake, lastHospital: messages.length > 1 ? lastHospital : null, fhirContext });
     const checkpointer = await getCheckpointer();
     const agent = buildGraph(skillCtx, system, checkpointer);
     const langChainMessages = toLangChainMessages(messages);
