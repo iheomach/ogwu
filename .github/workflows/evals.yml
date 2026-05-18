@@ -40,6 +40,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commit cadence (run every 4th commit)
+        id: cadence
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          echo "commit_count=$COUNT" >> $GITHUB_OUTPUT
+          if [ $((COUNT % 4)) -ne 0 ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Commit $COUNT — skipping (not a multiple of 4)"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "Commit $COUNT — running evals"
+          fi
 
       - uses: actions/setup-node@v4
         with:
@@ -60,7 +76,7 @@ jobs:
           fi
 
       - name: Run eval suite
-        if: ${{ github.event.inputs.skip_eval != 'true' }}
+        if: ${{ github.event.inputs.skip_eval != 'true' && steps.cadence.outputs.skip != 'true' }}
         working-directory: backend
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -81,7 +97,7 @@ jobs:
           fi
 
       - name: Commit eval results to repo
-        if: always()
+        if: always() && steps.cadence.outputs.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
