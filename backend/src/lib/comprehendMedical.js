@@ -13,7 +13,8 @@
 const { ComprehendMedicalClient, InferICD10CMCommand } = require('@aws-sdk/client-comprehendmedical');
 
 const REGION = process.env.AWS_REGION || 'us-east-1';
-const MIN_SCORE = 0.80;
+const ENTITY_MIN_SCORE   = 0.80; // entity-level confidence
+const CONCEPT_MIN_SCORE  = 0.60; // ICD-10 concept-level confidence (lower: Comprehend is conservative here)
 
 // ICD-10-CM prefixes that map to immediately life-threatening conditions.
 // Matching any of these in a high-confidence entity upgrades urgency to emergency.
@@ -49,6 +50,7 @@ const URGENT_PREFIXES = [
   'E11.6', 'E11.65',          // Diabetic foot / complications
   'G43',                       // Migraine
   'M54.5',                     // Low back pain (severe)
+  'R07',                       // Chest pain (symptom-level — not yet coded as ACS)
 ];
 
 function isConfigured() {
@@ -89,10 +91,10 @@ async function extractEntitiesFromAnswers(answers) {
     const { Entities = [] } = await client.send(new InferICD10CMCommand({ Text: text }));
 
     const entities = Entities
-      .filter((e) => (e.Score ?? 0) >= MIN_SCORE)
+      .filter((e) => (e.Score ?? 0) >= ENTITY_MIN_SCORE)
       .map((e) => {
         const topConcept = (e.ICD10CMConcepts ?? [])
-          .filter((c) => (c.Score ?? 0) >= MIN_SCORE)
+          .filter((c) => (c.Score ?? 0) >= CONCEPT_MIN_SCORE)
           .sort((a, b) => (b.Score ?? 0) - (a.Score ?? 0))[0] ?? null;
 
         return {

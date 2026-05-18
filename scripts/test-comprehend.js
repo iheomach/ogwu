@@ -47,10 +47,12 @@ async function testLiveCall() {
   }
   info(`AWS_REGION=${process.env.AWS_REGION}`);
 
-  // Chest pain answers should trigger I21.* (acute MI) → emergencySignaled
+  // Explicit "heart attack" language maps to I21.* in Comprehend Medical.
+  // Comprehend codes stated conditions, not inferred diagnoses, so symptom-only
+  // text (e.g. "chest pain") maps to R07.* which is caught by URGENT_PREFIXES.
   const answers = [
-    { q: 'What is your main symptom?',  a: 'severe crushing chest pain radiating to my left arm and jaw' },
-    { q: 'How long have you had this?', a: 'started about 30 minutes ago and is getting worse' },
+    { q: 'What is your main symptom?',  a: 'I think I am having a heart attack' },
+    { q: 'How long have you had this?', a: 'started about 30 minutes ago, crushing pain in my chest' },
     { q: 'Any other symptoms?',         a: 'I am sweating heavily and feel short of breath' },
   ];
 
