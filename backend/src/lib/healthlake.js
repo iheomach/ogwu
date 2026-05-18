@@ -80,6 +80,7 @@ async function upsertPatient(profile) {
   const sex = String(profile.biological_sex || profile.sex || '').toLowerCase();
   return fhirRequest('PUT', `Patient/${profile.id}`, {
     resourceType: 'Patient',
+    id: profile.id,
     identifier: [{ system: 'urn:ogwu:patient', value: profile.id }],
     name: [{ family: profile.last_name || '', given: [profile.first_name || ''] }],
     gender: genderMap[sex] ?? 'unknown',
@@ -148,7 +149,7 @@ async function getTriageIntake(patientId) {
 
     const all = await fhirRequest(
       'GET',
-      `Observation?patient=${patientRef(patientId)}&_sort=-date&_count=200`,
+      `Observation?patient=${patientRef(patientId)}&_sort=-date&_count=100`,
     );
     const allEntries = all?.entry ?? [];
     console.log(`[healthlake] getTriageIntake: all-obs search returned ${allEntries.length} entries`);
