@@ -159,7 +159,13 @@ async function loadPatientProfile(userId) {
 }
 
 async function loadTriageIntake(userId) {
-  return healthlake.getTriageIntake(userId);
+  if (healthlake.isConfigured()) return healthlake.getTriageIntake(userId);
+  const { data } = await supabase
+    .from('triage_intakes')
+    .select('answers, urgency, summary, safety_note, locale, updated_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return data || null;
 }
 
 async function loadLastHospital(userId) {

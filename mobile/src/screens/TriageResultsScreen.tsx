@@ -103,21 +103,20 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
         </TouchableOpacity>
 
         {loading && (
-          <View style={[styles.center, { paddingHorizontal: 0, paddingVertical: 24 }]}
-          >
+          <View style={[styles.center, { paddingHorizontal: 0, paddingVertical: 24, marginTop: 16 }]}>
             <ActivityIndicator color={colors.purple} />
           </View>
         )}
 
         {!loading && error && (
-          <View style={styles.card}>
+          <View style={[styles.card, { marginTop: 16 }]}>
             <Text style={styles.value}>{t('triageResults.errorTitle')}</Text>
             <Text style={[styles.helper, { marginBottom: 0 }]}>{error}</Text>
           </View>
         )}
 
         {!loading && !error && !intake && (
-          <View style={styles.card}>
+          <View style={[styles.card, { marginTop: 16 }]}>
             <Text style={styles.value}>{t('triageResults.emptyTitle')}</Text>
             <Text style={[styles.helper, { marginBottom: 0 }]}>{t('triageResults.emptyBody')}</Text>
           </View>
