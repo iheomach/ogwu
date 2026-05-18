@@ -1,390 +1,67 @@
+'use strict';
+
 const serverError = require('../lib/serverError');
 const express = require('express');
 const router = express.Router();
 
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
-const { parseTriageUrgency } = require('../lib/urgency');
 const healthlake = require('../lib/healthlake');
-const comprehendMedical = require('../lib/comprehendMedical');
-
-const fetchImpl = global.fetch || require('node-fetch');
-
-const MAX_QUESTIONS = 5;
-
-function normalizeText(s) {
-  return String(s || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s+/-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function hasEmergencySignals(allText) {
-  const t = normalizeText(allText);
-  if (!t) return false;
-
-  // Very small heuristic set; we prefer false negatives over false positives.
-  const needles = [
-    'chest pain',
-    'pressure in chest',
-    'trouble breathing',
-    'cant breathe',
-    "can't breathe",
-    'shortness of breath',
-    'severe bleeding',
-    'bleeding a lot',
-    'passed out',
-    'fainted',
-    'confusion',
-    'slurred speech',
-    'weakness on one side',
-    'seizure',
-    'suicidal',
-    'kill myself',
-    'overdose',
-  ];
-  return needles.some((n) => t.includes(n));
-}
-
-function safetyNote(localeSafe) {
-  switch (localeSafe) {
-    case 'fr':
-      return "Vos symptômes peuvent être urgents. Veuillez appeler les services d'urgence locaux ou vous rendre aux urgences immédiatement.";
-    case 'es':
-      return 'Tus síntomas podrían ser una urgencia. Llama a los servicios de emergencia locales o acude a urgencias de inmediato.';
-    case 'ig':
-      return 'Ihe ị kọwara nwere ike ịbụ mberede. Biko kpọọ ndị enyemaka mberede ma ọ bụ gaa ụlọ ọgwụ ozugbo.';
-    case 'yo':
-      return 'Àwọn ààmì tó o sọ lè jẹ́ pajawiri. Jọ̀wọ́ pe àwọn iṣẹ́ pajawiri tàbí lọ sí ilé ìwòsàn lẹ́sẹ̀kẹsẹ.';
-    case 'ha':
-      return 'Alamomin da ka bayyana na iya zama gaggawa. Da fatan za a kira agajin gaggawa ko ku je asibiti nan da nan.';
-    default:
-      return 'Your symptoms may be urgent. Please call local emergency services or go to the emergency department immediately.';
-  }
-}
-
-function q(localeSafe, key) {
-  const en = {
-    main: 'What is your main concern today (in one sentence)?',
-    onset: 'When did this start (today / days / weeks / months), and is it getting better, worse, or staying the same?',
-    severity:
-      'How severe is it right now on a 0–10 scale? Any red flags like trouble breathing, chest pain, fainting, confusion, or uncontrolled bleeding?',
-    pain:
-      'Where exactly is the pain or symptom located, and does it spread anywhere else?',
-    breathing: 'Do you have cough, wheezing, or shortness of breath? If yes, what triggers it and how bad is it?',
-    gi: 'Any nausea, vomiting, diarrhea, or stomach pain? Are you able to keep fluids down?',
-    urinary: 'Any burning with urination, frequent urination, or blood in urine?',
-    skin: 'Any rash, swelling, or itching? When did it start and has it spread?',
-    other: 'What other symptoms are you having (fever, chills, headache, dizziness, weakness, numbness)?',
-    meds: 'What medications or supplements are you taking now, and what have you tried so far for this problem?',
-  };
-
-  const es = {
-    main: '¿Cuál es tu principal motivo de consulta hoy (en una sola frase)?',
-    onset: '¿Cuándo comenzó (hoy / días / semanas / meses) y está mejorando, empeorando o igual?',
-    severity:
-      '¿Qué tan fuerte es ahora en una escala de 0 a 10? ¿Alguna señal de alarma como falta de aire, dolor en el pecho, desmayo, confusión o sangrado incontrolable?',
-    pain: '¿Dónde exactamente está el dolor o síntoma y se irradia a otra parte?',
-    breathing: '¿Tienes tos, sibilancias o falta de aire? Si sí, ¿qué lo empeora y qué tan intenso es?',
-    gi: '¿Náuseas, vómitos, diarrea o dolor abdominal? ¿Puedes mantener líquidos?',
-    urinary: '¿Ardor al orinar, orinar con frecuencia o sangre en la orina?',
-    skin: '¿Sarpullido, hinchazón o picazón? ¿Cuándo empezó y se ha extendido?',
-    other: '¿Qué otros síntomas tienes (fiebre, escalofríos, dolor de cabeza, mareos, debilidad, entumecimiento)?',
-    meds: '¿Qué medicamentos o suplementos tomas ahora y qué has probado hasta ahora para esto?',
-  };
-
-  const fr = {
-    main: "Quel est votre principal problème aujourd'hui (en une phrase) ?",
-    onset: "Quand cela a-t-il commencé (aujourd'hui / jours / semaines / mois) et est-ce que ça s'améliore, s'aggrave ou reste stable ?",
-    severity:
-      "Quelle est l'intensité maintenant sur une échelle de 0 à 10 ? Y a-t-il des signes d'alarme (difficulté à respirer, douleur thoracique, malaise, confusion, saignement important) ?",
-    pain: "Où se situe exactement la douleur/le symptôme, et est-ce que ça irradie ailleurs ?",
-    breathing: "Avez-vous de la toux, des sifflements ou un essoufflement ? Si oui, qu'est-ce qui déclenche et quelle est l'intensité ?",
-    gi: "Avez-vous des nausées, vomissements, diarrhée ou des douleurs abdominales ? Pouvez-vous garder des liquides ?",
-    urinary: "Brûlures en urinant, envies fréquentes, ou sang dans les urines ?",
-    skin: "Éruption, gonflement ou démangeaisons ? Quand cela a-t-il commencé et est-ce que ça s'étend ?",
-    other: "Quels autres symptômes avez-vous (fièvre, frissons, maux de tête, vertiges, faiblesse, engourdissement) ?",
-    meds: "Quels médicaments ou compléments prenez-vous actuellement, et qu'avez-vous déjà essayé pour ce problème ?",
-  };
-
-  // Lightweight fallbacks for locales without full question translations.
-  const table = localeSafe === 'es' ? es : localeSafe === 'fr' ? fr : en;
-  return table[key] || en[key] || en.main;
-}
-
-function pickBranchKey(mainComplaintText) {
-  const t = normalizeText(mainComplaintText);
-  if (!t) return 'other';
-
-  if (/(pain|ache|hurt|cramp|sore|migraine|headache|back pain|abdominal pain)/.test(t)) return 'pain';
-  if (/(breath|breathing|cough|asthma|wheeze|shortness)/.test(t)) return 'breathing';
-  if (/(vomit|vomiting|nausea|diarrhea|stomach|abdominal|belly)/.test(t)) return 'gi';
-  if (/(urine|urinary|pee|burning|uti)/.test(t)) return 'urinary';
-  if (/(rash|hives|swelling|itch|itching|skin)/.test(t)) return 'skin';
-  return 'other';
-}
-
-// entitySignals: { emergencySignaled, urgentSignaled } from Comprehend Medical.
-// ICD-10-grounded signals take priority over keyword matching — if CM flags
-// emergency, we trust it even if the keyword scan would only say urgent.
-function computeUrgency(answers, entitySignals = {}) {
-  const { emergencySignaled = false, urgentSignaled = false } = entitySignals;
-
-  const text = Array.isArray(answers)
-    ? answers.map((x) => `${x?.q || ''} ${x?.a || ''}`).join(' ')
-    : '';
-
-  if (hasEmergencySignals(text) || emergencySignaled) return 'emergency';
-
-  const t = normalizeText(text);
-
-  const urgentNeedles = [
-    'blood in urine', 'blood in stool', 'vomiting blood', 'throwing up blood',
-    'black stool', 'severe pain', 'worst pain', 'severe headache', 'stiff neck',
-    'high fever', 'fever 39', 'fever 40', 'temperature 39', 'temperature 40',
-  ];
-  if (urgentNeedles.some((n) => t.includes(n)) || urgentSignaled) return 'urgent';
-  if (/\b(9|10)\s*\/\s*10\b/.test(t)) return 'urgent';
-
-  const soonNeedles = ['fever', 'chills', 'dizzy', 'dizziness', 'dehydr', 'worse', 'getting worse'];
-  if (soonNeedles.some((n) => t.includes(n))) return 'soon';
-  if (/\b(6|7|8)\s*\/\s*10\b/.test(t)) return 'soon';
-
-  return 'routine';
-}
-
-function requireEnv(name) {
-  const value = process.env[name];
-  if (!value || value.trim().length === 0) {
-    throw new Error(`Missing required env var: ${name}`);
-  }
-  return value;
-}
-
-function getModel() {
-  return process.env.OPENAI_MODEL || 'gpt-4o-mini';
-}
+const { runTriageNext, runTriageComplete } = require('../lib/triageGraph');
 
 function safeLocale(locale) {
   const l = String(locale || 'en').toLowerCase();
-  // Keep it simple: allow short language codes; fallback to en.
   if (/^(en|es|fr|ig|yo|ha)([-_].+)?$/.test(l)) return l.split(/[-_]/)[0];
   return 'en';
 }
 
-function toUserDirectedSafetyNote(localeSafe, note) {
-  const raw = typeof note === 'string' ? note.trim() : '';
-  if (!raw) return null;
-
-  // Only a minimal rewrite for common English third-person phrasing.
-  // If the model already returns second-person language, keep it.
-  if (localeSafe !== 'en') return raw;
-
-  let out = raw;
-
-  out = out.replace(/^\s*the patient should\b/i, 'You should');
-  out = out.replace(/^\s*patient should\b/i, 'You should');
-  out = out.replace(/\bthe patient\b/gi, 'you');
-  out = out.replace(/\bpatient\b/gi, 'you');
-  out = out.replace(/\btheir\b/gi, 'your');
-
-  // Normalize capitalization if we created a leading "you".
-  out = out.replace(/^you\b/, 'You');
-
-  return out;
+function trimAnswers(qa) {
+  const max = parseInt(process.env.TRIAGE_MAX_QUESTIONS || '10', 10);
+  return (Array.isArray(qa) ? qa : [])
+    .filter((x) => x && typeof x.q === 'string')
+    .slice(0, max)
+    .map((x) => ({
+      q: String(x.q).slice(0, 280),
+      a: typeof x.a === 'string' ? String(x.a).slice(0, 2000) : '',
+    }));
 }
 
-async function openaiChat({ locale, messages }) {
-  const apiKey = requireEnv('OPENAI_API_KEY');
-  const res = await fetchImpl('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: getModel(),
-      temperature: 0.4,
-      messages,
-      response_format: { type: 'json_object' },
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`LLM request failed (${res.status}): ${text}`);
-  }
-
-  const json = await res.json();
-  const content = json?.choices?.[0]?.message?.content;
-  if (!content) throw new Error('LLM returned no content');
-
-  let parsed;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new Error('LLM returned non-JSON content');
-  }
-
-  return parsed;
-}
-
-// Returns the next question (or done=true)
+// Returns the next question, or done=true when the graph signals the interview is complete.
 router.post('/next', authenticate, async (req, res) => {
   try {
     const locale = safeLocale(req.body?.locale);
     const profile = req.body?.profile || {};
     const qa = Array.isArray(req.body?.qa) ? req.body.qa : [];
-
-    // Rule-based question gathering: do NOT call OpenAI here.
-    if (qa.length >= MAX_QUESTIONS) {
-      return res.json({ done: true, question: null, summary: null, safety_note: null });
-    }
-
-    const step = qa.length;
-    if (step === 0) {
-      return res.json({ done: false, question: q(locale, 'main'), summary: null, safety_note: null });
-    }
-    if (step === 1) {
-      return res.json({ done: false, question: q(locale, 'onset'), summary: null, safety_note: null });
-    }
-    if (step === 2) {
-      return res.json({ done: false, question: q(locale, 'severity'), summary: null, safety_note: null });
-    }
-    if (step === 3) {
-      const mainComplaint = qa?.[0]?.a || '';
-      const key = pickBranchKey(mainComplaint);
-      return res.json({ done: false, question: q(locale, key), summary: null, safety_note: null });
-    }
-
-    // step === 4 (final question)
-    return res.json({ done: false, question: q(locale, 'meds'), summary: null, safety_note: null });
+    const { done, question } = await runTriageNext({ locale, profile, answers: qa });
+    return res.json({ done, question, summary: null, safety_note: null });
   } catch (err) {
     return serverError(res, err, 'Failed to generate triage question.', 400);
   }
 });
 
-// Saves the completed intake
+// Runs the completion chain (Comprehend → urgency → summarize → write) and returns the intake.
 router.post('/complete', authenticate, async (req, res) => {
   try {
     const locale = safeLocale(req.body?.locale);
     const profile = req.body?.profile || {};
-    const qa = Array.isArray(req.body?.qa) ? req.body.qa : [];
     const location = typeof req.body?.location === 'string' ? req.body.location.trim() : null;
+    const answers = trimAnswers(req.body?.qa);
 
-    const trimmed = qa
-      .filter((x) => x && typeof x.q === 'string')
-      .slice(0, MAX_QUESTIONS)
-      .map((x) => ({
-        q: String(x.q).slice(0, 280),
-        a: typeof x.a === 'string' ? String(x.a).slice(0, 2000) : '',
-      }));
+    const { intake, safety_note } = await runTriageComplete({
+      locale,
+      profile,
+      answers,
+      location,
+      patientId: req.user.id,
+    });
 
-    const localeSafe = safeLocale(locale);
-    const languageMap = { en: 'English', es: 'Spanish', fr: 'French', ig: 'Igbo', yo: 'Yoruba', ha: 'Hausa' };
-    const languageName = languageMap[localeSafe] || 'English';
-
-    // Compute age server-side so the LLM never infers it from a raw DOB
-    let patientAge = null;
-    if (profile?.dob) {
-      const dob = new Date(profile.dob);
-      if (!isNaN(dob.getTime())) {
-        const today = new Date();
-        let age = today.getFullYear() - dob.getFullYear();
-        if (
-          today.getMonth() < dob.getMonth() ||
-          (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
-        ) age--;
-        patientAge = age;
-      }
-    }
-
-    const profileForLLM = { ...(profile || {}), ...(patientAge !== null ? { age: patientAge } : {}) };
-    delete profileForLLM.dob;
-
-    const locationLine = location ? ` The patient is located in ${location}.` : '';
-    const messages = [
-      {
-        role: 'system',
-        content:
-          `Summarize the following patient intake in 4-6 bullets.${locationLine} ` +
-          `No diagnosis, no treatment advice. ` +
-          `If emergency symptoms are present, include a first bullet saying they should seek urgent care. ` +
-          `Return ONLY JSON: { "summary": string, "safety_note": string|null }. ` +
-          `Write in ${languageName}. ` +
-          `If you include a safety_note, address the user directly in second person ("you"), e.g. ` +
-          `"It is recommended that you ... due to your symptoms" (do not say "the patient"). ` +
-          `Never use em dashes (—) in any output. Use a comma or rewrite the phrase instead.`,
-      },
-      {
-        role: 'user',
-        content: JSON.stringify({ locale, profile: profileForLLM, location: location || undefined, answers: trimmed }),
-      },
-    ];
-
-    // Run LLM summary and Comprehend Medical entity extraction in parallel.
-    const [llmResult, entityResult] = await Promise.allSettled([
-      openaiChat({ locale, messages }),
-      comprehendMedical.extractEntitiesFromAnswers(trimmed),
-    ]);
-
-    let summary = null;
-    let safety_note = null;
-    if (llmResult.status === 'fulfilled') {
-      summary = typeof llmResult.value?.summary === 'string' ? llmResult.value.summary : null;
-      safety_note = toUserDirectedSafetyNote(localeSafe, llmResult.value?.safety_note);
-    }
-
-    const { entities = [], emergencySignaled = false, urgentSignaled = false } =
-      entityResult.status === 'fulfilled' ? entityResult.value : {};
-
-    // Urgency: ICD-10-grounded entity signals take priority over keyword scan.
-    const urgency = parseTriageUrgency(computeUrgency(trimmed, { emergencySignaled, urgentSignaled }));
-
-    const patientId = req.user.id;
-    const ts = new Date().toISOString();
-    console.log(`[triage] /complete patient=${patientId} healthlake=${healthlake.isConfigured()} urgency=${urgency} entities=${entities.length}`);
-
-    if (healthlake.isConfigured()) {
-      // HealthLake is the authoritative store.
-      try {
-        await healthlake.writeTriageIntake(patientId, { locale, answers: trimmed, urgency, summary, safety_note, extracted_entities: entities });
-      } catch (hlErr) {
-        console.error('[healthlake] triage write failed:', hlErr.message);
-        return serverError(res, hlErr, 'Failed to save triage intake.', 400);
-      }
-
-      // Secondary writes: fire-and-forget.
-      Promise.allSettled([
-        healthlake.upsertPatient({ id: patientId, ...profile }),
-        healthlake.writeConditions(patientId, profile.known_conditions, ts.slice(0, 10)),
-        healthlake.writeAllergies(patientId, profile.allergies),
-        healthlake.writeMedications(patientId, profile.current_medications),
-      ]).then((results) => {
-        const failed = results.filter((r) => r.status === 'rejected');
-        if (failed.length) console.warn('[healthlake] secondary writes failed:', failed.map((r) => r.reason?.message));
-      });
-
-      const intake = { user_id: patientId, locale, answers: trimmed, urgency, summary, safety_note, created_at: ts, updated_at: ts };
-      return res.json({ intake, safety_note });
-    }
-
-    // Fallback: HealthLake not configured — persist to Supabase.
-    const { data, error } = await supabase
-      .from('triage_intakes')
-      .upsert({ user_id: patientId, locale, answers: trimmed, urgency, summary, safety_note }, { onConflict: 'user_id' })
-      .select('user_id, locale, answers, urgency, summary, safety_note, created_at, updated_at')
-      .single();
-
-    if (error) return serverError(res, error, 'An error occurred.', 400);
-    return res.json({ intake: data, safety_note });
+    return res.json({ intake, safety_note });
   } catch (err) {
     return serverError(res, err, 'Failed to save triage intake.', 400);
   }
 });
 
-// Checks whether triage is completed
+// Returns whether triage has been completed for this patient.
 router.get('/status', authenticate, async (req, res) => {
   try {
     if (healthlake.isConfigured()) {
@@ -400,7 +77,7 @@ router.get('/status', authenticate, async (req, res) => {
   }
 });
 
-// Returns the saved triage intake (or null)
+// Returns the saved triage intake (or null if not completed).
 router.get('/intake', authenticate, async (req, res) => {
   try {
     if (healthlake.isConfigured()) {
