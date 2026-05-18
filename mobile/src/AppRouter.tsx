@@ -27,6 +27,7 @@ import { initI18n, setLocale as persistLocale, t } from './i18n';
 import type { SupportedLocale } from './i18n/translations';
 import type { TriageQA } from './types';
 import { triageComplete, triageNext, triageStatus } from './lib/triage';
+import { apiDelete } from './lib/api';
 import { TabScaffold, type TabKey } from './ui/TabScaffold';
 import { requestAndGetLocation, formatLocation, type LocationSummary } from './lib/location';
 
@@ -401,6 +402,32 @@ export function AppRouter() {
     }
   };
 
+  const onSaveProfile = async (newAllergies: string, newConditions: string) => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ allergies: newAllergies || null, known_conditions: newConditions || null })
+      .eq('id', user.id)
+      .select('id, phone, first_name, middle_name, last_name, dob, biological_sex, known_conditions, allergies')
+      .single();
+    if (error) { Alert.alert('Save failed', error.message); return; }
+    setProfile(data);
+  };
+
+  const onDeleteAccount = async () => {
+    try {
+      setBusy(true);
+      await apiDelete('/api/users/me');
+      await supabase.auth.signOut();
+      setProfile(null);
+      setScreen('phone');
+    } catch (err: any) {
+      Alert.alert('Delete failed', err?.message ?? 'Could not delete account. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const isTabScreen = (s: AppScreen): s is TabKey =>
     s === 'home' || s === 'newConsult' || s === 'records' || s === 'profile';
 
@@ -555,7 +582,9 @@ export function AppRouter() {
               setScreen('triage');
             }}
             onViewTriageResults={() => setScreen('triageResults')}
+            onSaveProfile={onSaveProfile}
             onLogout={onLogout}
+            onDeleteAccount={onDeleteAccount}
           />
         </TabScaffold>
       )}

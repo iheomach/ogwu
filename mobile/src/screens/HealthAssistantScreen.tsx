@@ -781,7 +781,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#FAF7FB' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: '#ffffff' }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

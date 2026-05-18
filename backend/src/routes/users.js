@@ -75,4 +75,15 @@ router.put('/:id', authenticate, async (req, res) => {
   }
 });
 
+// Delete own account (authenticated)
+router.delete('/me', authenticate, async (req, res) => {
+  try {
+    const { error } = await supabase.auth.admin.deleteUser(req.user.id);
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ deleted: true });
+  } catch (err) {
+    return serverError(res, err, 'Failed to delete account.');
+  }
+});
+
 module.exports = router;

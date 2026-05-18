@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { TriageScreenProps } from '../types';
-import { colors, styles } from '../ui/styles';
+import { colors, styles, spacing } from '../ui/styles';
 import { t } from '../i18n';
 
 export function TriageScreen({
@@ -32,14 +32,18 @@ export function TriageScreen({
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {/* Static header — scrolls independently of the keyboard */}
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.xl }}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
+        >
           <TouchableOpacity style={styles.btnGhost} onPress={onBack} disabled={busy}>
             <Text style={styles.btnGhostText}>{t('common.back')}</Text>
           </TouchableOpacity>
 
-          {/* Brand */}
           <View style={styles.brandRow}>
             <Image source={require('../../assets/ogwu-mark.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
           </View>
@@ -47,10 +51,13 @@ export function TriageScreen({
           <Text style={styles.title}>{t('triage.title')}</Text>
           <Text style={styles.helper}>{t('triage.helper')}</Text>
 
-          <View style={[styles.pill, { marginBottom: 24 }]}> 
+          <View style={[styles.pill, { marginBottom: 24 }]}>
             <Text style={styles.pillText}>{t('triage.progress', { step, total })}</Text>
           </View>
+        </ScrollView>
 
+        {/* Input + button — rises smoothly with keyboard, no teleport */}
+        <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
           <Text style={styles.inputLabel}>{question}</Text>
           <TextInput
             value={answer}
@@ -63,7 +70,6 @@ export function TriageScreen({
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
           />
-
           <TouchableOpacity
             style={[styles.btnPrimary, (!canContinue || busy) && styles.btnPrimaryDisabled]}
             onPress={onNext}
@@ -74,7 +80,7 @@ export function TriageScreen({
               {busy ? t('triage.loading') : t('triage.next')}
             </Text>
           </TouchableOpacity>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

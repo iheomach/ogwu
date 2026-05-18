@@ -96,7 +96,9 @@ export type ProfileScreenProps = ScreenPropsBase & {
   onChangeLocale: (locale: SupportedLocale) => void;
   onRunTriage: () => void;
   onViewTriageResults: () => void;
+  onSaveProfile: (allergies: string, knownConditions: string) => Promise<void>;
   onLogout: () => void;
+  onDeleteAccount: () => Promise<void>;
 };
 
 export type TriageIntake = {

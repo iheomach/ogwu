@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -33,10 +33,15 @@ export function ProfileScreen({
   onChangeLocale,
   onRunTriage,
   onViewTriageResults,
+  onSaveProfile,
   onLogout,
+  onDeleteAccount,
 }: ProfileScreenProps) {
   const [languageOpen, setLanguageOpen] = useState(false);
   const [languageMenuVisible, setLanguageMenuVisible] = useState(false);
+  const [allergies, setAllergies] = useState(profile?.allergies ?? '');
+  const [conditions, setConditions] = useState(profile?.known_conditions ?? '');
+  const [saving, setSaving] = useState(false);
 
   const menuAnim = useRef(new Animated.Value(0)).current;
   const menuMaxHeight = useMemo(() => SUPPORTED_LOCALES.length * 48, []);
@@ -76,9 +81,51 @@ export function ProfileScreen({
           <ProfileRow label={t('home.fullName')} value={displayFullName || null} />
           <ProfileRow label={t('home.dob')} value={profile?.dob} />
           <ProfileRow label={t('home.sex')} value={profile?.biological_sex} />
-          <ProfileRow label={t('home.allergies')} value={profile?.allergies} />
-          <ProfileRow label={t('home.conditions')} value={profile?.known_conditions} last />
+
+          {/* Editable: allergies */}
+          <View style={[styles.profileField]}>
+            <Text style={styles.label}>{t('home.allergies')}</Text>
+            <TextInput
+              value={allergies}
+              onChangeText={setAllergies}
+              placeholder="e.g. Penicillin, peanuts"
+              placeholderTextColor={colors.grey300}
+              style={styles.profileEditInput}
+              editable={!busy && !saving}
+              multiline
+            />
+          </View>
+
+          {/* Editable: conditions */}
+          <View style={[styles.profileField, styles.profileFieldLast]}>
+            <Text style={styles.label}>{t('home.conditions')}</Text>
+            <TextInput
+              value={conditions}
+              onChangeText={setConditions}
+              placeholder="e.g. Hypertension, diabetes"
+              placeholderTextColor={colors.grey300}
+              style={styles.profileEditInput}
+              editable={!busy && !saving}
+              multiline
+            />
+          </View>
         </View>
+
+        <TouchableOpacity
+          style={[styles.btnPrimary, (busy || saving) && styles.btnPrimaryDisabled, { marginBottom: 24 }]}
+          onPress={async () => {
+            setSaving(true);
+            try {
+              await onSaveProfile(allergies.trim(), conditions.trim());
+            } finally {
+              setSaving(false);
+            }
+          }}
+          disabled={busy || saving}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.btnPrimaryText}>{saving ? 'Saving…' : 'Save changes'}</Text>
+        </TouchableOpacity>
 
         <Text style={[styles.label, { marginBottom: 12 }]}>{t('home.language')}</Text>
         <View style={styles.dropdownContainer}>
@@ -161,6 +208,28 @@ export function ProfileScreen({
           activeOpacity={0.8}
         >
           <Text style={styles.btnDestructiveText}>{busy ? t('common.signingOut') : t('common.signOut')}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.btnDestructive, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.error, marginTop: 8 }]}
+          onPress={() => {
+            Alert.alert(
+              'Delete Account',
+              'This will permanently delete your account and all health data. This cannot be undone.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: () => onDeleteAccount(),
+                },
+              ],
+            );
+          }}
+          disabled={busy}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.btnDestructiveText, { color: colors.error }]}>Delete Account</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

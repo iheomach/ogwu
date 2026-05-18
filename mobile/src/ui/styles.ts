@@ -288,6 +288,13 @@ export const styles = StyleSheet.create({
   profileFieldLast: {
     borderBottomWidth: 0,
   },
+  profileEditInput: {
+    fontSize: 14,
+    color: colors.grey900,
+    paddingTop: 4,
+    paddingBottom: 2,
+    minHeight: 36,
+  },
 
   // ─── Pill / badge ─────────────────────────────────────────────────────────
   pill: {
@@ -958,13 +965,13 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: 6,
-    paddingBottom: 6,
+    paddingTop: 4,
+    paddingBottom: 4,
     backgroundColor: colors.purpleDark,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 6,
+    paddingVertical: 4,
     alignItems: 'center',
   },
   tabButtonIcon: {
@@ -978,5 +985,30 @@ export const styles = StyleSheet.create({
   },
   tabButtonTextActive: {
     color: colors.white,
+  },
+
+  // ─── Assistant FAB (center nav button) ────────────────────────────────
+  assistantFab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 2,
+  },
+  assistantFabInner: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.purple,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginTop: -18,
+    shadowColor: colors.purple,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  assistantFabInnerActive: {
+    backgroundColor: '#6B0080',
   },
 });

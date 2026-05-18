@@ -38,6 +38,22 @@ function TabButton({
   );
 }
 
+function AssistantFab({ active, onPress }: { active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      style={styles.assistantFab}
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={t('tabs.newConsult')}
+    >
+      <View style={[styles.assistantFabInner, active && styles.assistantFabInnerActive]}>
+        <MaterialIcons name="smart-toy" size={26} color={colors.white} />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 export function TabScaffold({
   activeTab,
   onNavigate,
@@ -62,16 +78,14 @@ export function TabScaffold({
             onPress={() => onNavigate('home')}
           />
           <TabButton
-            label={t('tabs.newConsult')}
-            icon="add-circle-outline"
-            active={activeTab === 'newConsult'}
-            onPress={() => onNavigate('newConsult')}
-          />
-          <TabButton
             label={t('tabs.records')}
             icon="description"
             active={activeTab === 'records'}
             onPress={() => onNavigate('records')}
+          />
+          <AssistantFab
+            active={activeTab === 'newConsult'}
+            onPress={() => onNavigate('newConsult')}
           />
           <TabButton
             label={t('tabs.profile')}

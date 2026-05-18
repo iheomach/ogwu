@@ -95,15 +95,22 @@ function QuickActionCard({
   );
 }
 
+function firstSentence(text: string | null | undefined): string {
+  if (!text) return '';
+  const m = text.match(/^[^.!?]*[.!?]/);
+  return m ? m[0].trim() : text.slice(0, 120).trim();
+}
+
 function UrgencyBanner({ intake }: { intake: TriageIntake }) {
   const cfg = urgencyConfig(intake.urgency ?? 'routine');
+  const sentence = firstSentence(intake.summary) || `${intake.answers.length} intake answers on file`;
   return (
     <View style={[styles.urgencyBannerRow, { backgroundColor: cfg.bg, borderColor: `${cfg.fg}30` }]}>
       <MaterialIcons name={cfg.icon} size={18} color={cfg.fg} />
       <View style={{ flex: 1 }}>
         <Text style={[styles.urgencyBannerLabel, { color: cfg.fg }]}>{cfg.label}</Text>
-        <Text style={[styles.urgencyBannerSummary, { color: cfg.fg }]}>
-          {intake.summary ?? `${intake.answers.length} intake answers on file`}
+        <Text style={[styles.urgencyBannerSummary, { color: cfg.fg }]} numberOfLines={1}>
+          {sentence}
         </Text>
       </View>
     </View>
@@ -151,9 +158,9 @@ export function HomeScreen({
   const tags = useMemo(() => deriveSituationTags(intake), [intake]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.purple }]}>
       <ScrollView
-        style={styles.spacer}
+        style={[styles.spacer, { backgroundColor: colors.bg }]}
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
