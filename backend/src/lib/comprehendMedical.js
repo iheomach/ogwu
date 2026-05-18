@@ -13,8 +13,7 @@
 const { ComprehendMedicalClient, InferICD10CMCommand } = require('@aws-sdk/client-comprehendmedical');
 
 const REGION = process.env.AWS_REGION || 'us-east-1';
-const ENTITY_MIN_SCORE   = 0.80; // entity-level confidence
-const CONCEPT_MIN_SCORE  = 0.60; // ICD-10 concept-level confidence (lower: Comprehend is conservative here)
+const ENTITY_MIN_SCORE = 0.80; // entity-level confidence — the meaningful gate
 
 // ICD-10-CM prefixes that map to immediately life-threatening conditions.
 // Matching any of these in a high-confidence entity upgrades urgency to emergency.
@@ -117,7 +116,6 @@ async function extractEntitiesFromAnswers(answers) {
       .filter((e) => (e.Score ?? 0) >= ENTITY_MIN_SCORE)
       .map((e) => {
         const topConcept = (e.ICD10CMConcepts ?? [])
-          .filter((c) => (c.Score ?? 0) >= CONCEPT_MIN_SCORE)
           .sort((a, b) => (b.Score ?? 0) - (a.Score ?? 0))[0] ?? null;
 
         return {
