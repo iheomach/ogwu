@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
+const healthlake = require('../lib/healthlake');
 
 // Allowed fields a user may update on their own profile
 const UPDATABLE_FIELDS = [
@@ -57,6 +58,17 @@ router.put('/:id', authenticate, async (req, res) => {
       .select()
       .single();
     if (error) return res.status(400).json({ error: 'Failed to update profile.' });
+
+    // Mirror clinical fields to HealthLake as a fire-and-forget side effect.
+    Promise.allSettled([
+      healthlake.upsertPatient({ id: req.params.id, ...data }),
+      ...(updates.known_conditions !== undefined ? [healthlake.writeConditions(req.params.id, data.known_conditions)] : []),
+      ...(updates.allergies !== undefined ? [healthlake.writeAllergies(req.params.id, data.allergies)] : []),
+    ]).then((results) => {
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length) console.warn('[healthlake] profile sync failed:', failed.map((r) => r.reason?.message));
+    });
+
     res.json(data);
   } catch (err) {
     return serverError(res, err, 'Failed to update profile.');

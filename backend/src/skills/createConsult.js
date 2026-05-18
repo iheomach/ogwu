@@ -1,4 +1,4 @@
-module.exports = function createConsultSkill({ z, supabase, profile, safeText, normalizeUrgency }) {
+module.exports = function createConsultSkill({ z, profile, healthlake, safeText, normalizeUrgency }) {
   return {
     inputSchema: z.object({
       complaint: z.string().describe("Chief complaint in the patient's own words"),
@@ -11,23 +11,15 @@ module.exports = function createConsultSkill({ z, supabase, profile, safeText, n
     }),
     execute: async (params) => {
       try {
-        const { data, error } = await supabase
-          .from('consults')
-          .insert({
-            patient_id: profile.id,
-            complaint: safeText(params.complaint, 400),
-            urgency: normalizeUrgency(params.urgency),
-            symptoms: Array.isArray(params.symptoms) ? params.symptoms.map((s) => safeText(s, 80)).filter(Boolean) : [],
-            recommended_specialty: params.recommended_specialty ? safeText(params.recommended_specialty, 80) : null,
-            care_pathway: safeText(params.care_pathway, 4000),
-            recommended_hospital_ids: Array.isArray(params.recommended_hospital_ids) ? params.recommended_hospital_ids.map(String) : null,
-            is_emergency_flagged: !!params.is_emergency_flagged,
-          })
-          .select('id')
-          .single();
-
-        if (error) return { success: false, error: error.message };
-        return { success: true, consult_id: data.id };
+        const fhirId = await healthlake.writeClinicalImpression(profile.id, {
+          complaint: safeText(params.complaint, 400),
+          urgency: normalizeUrgency(params.urgency),
+          symptoms: Array.isArray(params.symptoms) ? params.symptoms.map((s) => safeText(s, 80)).filter(Boolean) : [],
+          recommended_specialty: params.recommended_specialty ? safeText(params.recommended_specialty, 80) : null,
+          care_pathway: safeText(params.care_pathway, 4000),
+          is_emergency_flagged: !!params.is_emergency_flagged,
+        });
+        return { success: true, consult_id: fhirId };
       } catch (e) {
         return { success: false, error: String(e?.message ?? e) };
       }

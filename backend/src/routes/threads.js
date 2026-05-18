@@ -7,6 +7,7 @@ const { openai } = require('@ai-sdk/openai');
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
 const { parseTriageUrgency } = require('../lib/urgency');
+const healthlake = require('../lib/healthlake');
 
 async function generateThreadTitle(intake) {
   // Build the best available description of the medical concern
@@ -58,23 +59,16 @@ function pickProviderType({ doctor_id, hospital_id, external_provider }) {
 }
 
 async function snapshotLatestIntake(userId) {
-  const { data, error } = await supabase
-    .from('triage_intakes')
-    .select('locale, answers, urgency, summary, safety_note, created_at, updated_at')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (error) throw error;
+  const data = await healthlake.getTriageIntake(userId);
   if (!data) return null;
-
   return {
     locale: data.locale ?? null,
     urgency: data.urgency ?? 'routine',
     summary: data.summary ?? null,
     safety_note: data.safety_note ?? null,
     answers: Array.isArray(data.answers) ? data.answers : [],
-    created_at: data.created_at,
-    updated_at: data.updated_at,
+    created_at: data.updated_at ?? null,
+    updated_at: data.updated_at ?? null,
   };
 }
 

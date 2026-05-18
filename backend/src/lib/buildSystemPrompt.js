@@ -52,11 +52,13 @@ function buildFhirSection(fhirContext) {
   if (!fhirContext) return '';
   const conditions = Array.isArray(fhirContext.conditions) ? fhirContext.conditions.filter(Boolean) : [];
   const medications = Array.isArray(fhirContext.medications) ? fhirContext.medications.filter(Boolean) : [];
-  if (!conditions.length && !medications.length) return '';
+  const allergies = Array.isArray(fhirContext.allergies) ? fhirContext.allergies.filter(Boolean) : [];
+  if (!conditions.length && !medications.length && !allergies.length) return '';
 
   const lines = ['\n\nVerified FHIR health record (authoritative -- supersedes any conflicting profile data above):'];
   if (conditions.length) lines.push(`- Confirmed conditions: ${conditions.join(', ')}`);
   if (medications.length) lines.push(`- Active medications: ${medications.join(', ')}`);
+  if (allergies.length) lines.push(`- Confirmed allergies: ${allergies.join(', ')}`);
   lines.push('Do NOT ask the patient to repeat or confirm any of this information.');
   return lines.join('\n');
 }

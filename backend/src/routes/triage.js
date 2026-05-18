@@ -2,7 +2,6 @@ const serverError = require('../lib/serverError');
 const express = require('express');
 const router = express.Router();
 
-const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
 const { parseTriageUrgency } = require('../lib/urgency');
 const healthlake = require('../lib/healthlake');
@@ -364,39 +363,30 @@ router.post('/complete', authenticate, async (req, res) => {
       // Non-fatal: we can still save answers.
     }
 
-    const { data, error } = await supabase
-      .from('triage_intakes')
-      .upsert(
-        {
-          user_id: req.user.id,
-          locale,
-          answers: trimmed,
-          urgency,
-          summary,
-          safety_note,
-        },
-        { onConflict: 'user_id' }
-      )
-      .select('user_id, locale, answers, urgency, summary, safety_note, created_at, updated_at')
-      .single();
-
-    if (error) return serverError(res, error, 'An error occurred.', 400);
-
-    // Fire-and-forget: write FHIR resources to HealthLake.
-    // Failures here must never block the response to the patient.
     const patientId = req.user.id;
-    const recordedDate = data.updated_at ? String(data.updated_at).slice(0, 10) : undefined;
+    const ts = new Date().toISOString();
+
+    // Primary write: triage intake is now authoritative in HealthLake.
+    try {
+      await healthlake.writeTriageIntake(patientId, { locale, answers: trimmed, urgency, summary, safety_note });
+    } catch (hlErr) {
+      console.error('[healthlake] triage write failed:', hlErr.message);
+      if (healthlake.isConfigured()) return serverError(res, hlErr, 'Failed to save triage intake.', 400);
+    }
+
+    // Secondary writes: fire-and-forget, failures are logged but don't block.
     Promise.allSettled([
       healthlake.upsertPatient({ id: patientId, ...profile }),
-      healthlake.writeTriageObservations(patientId, trimmed, data.updated_at),
-      healthlake.writeConditions(patientId, profile.known_conditions, recordedDate),
+      healthlake.writeConditions(patientId, profile.known_conditions, ts.slice(0, 10)),
+      healthlake.writeAllergies(patientId, profile.allergies),
       healthlake.writeMedications(patientId, profile.current_medications),
     ]).then((results) => {
       const failed = results.filter((r) => r.status === 'rejected');
-      if (failed.length) console.warn('[healthlake] triage write partial failure:', failed.map((r) => r.reason?.message));
+      if (failed.length) console.warn('[healthlake] secondary writes failed:', failed.map((r) => r.reason?.message));
     });
 
-    return res.json({ intake: data, safety_note });
+    const intake = { user_id: patientId, locale, answers: trimmed, urgency, summary, safety_note, created_at: ts, updated_at: ts };
+    return res.json({ intake, safety_note });
   } catch (err) {
     return serverError(res, err, 'Failed to save triage intake.', 400);
   }
@@ -405,14 +395,8 @@ router.post('/complete', authenticate, async (req, res) => {
 // Checks whether triage is completed
 router.get('/status', authenticate, async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('triage_intakes')
-      .select('user_id')
-      .eq('user_id', req.user.id)
-      .maybeSingle();
-
-    if (error) return serverError(res, error, 'An error occurred.', 400);
-    return res.json({ completed: !!data });
+    const completed = await healthlake.hasTriageIntake(req.user.id);
+    return res.json({ completed });
   } catch (err) {
     return serverError(res, err, 'Failed to load triage status.', 400);
   }
@@ -421,14 +405,8 @@ router.get('/status', authenticate, async (req, res) => {
 // Returns the saved triage intake (or null)
 router.get('/intake', authenticate, async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('triage_intakes')
-      .select('user_id, locale, answers, urgency, summary, safety_note, created_at, updated_at')
-      .eq('user_id', req.user.id)
-      .maybeSingle();
-
-    if (error) return serverError(res, error, 'An error occurred.', 400);
-    return res.json({ intake: data ?? null });
+    const intake = await healthlake.getTriageIntake(req.user.id);
+    return res.json({ intake: intake ?? null });
   } catch (err) {
     return serverError(res, err, 'Failed to load triage intake.', 400);
   }

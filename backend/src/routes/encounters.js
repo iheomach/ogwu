@@ -53,13 +53,7 @@ router.post('/share', authenticate, async (req, res) => {
   try {
     const doctor_id = typeof req.body?.doctor_id === 'string' ? req.body.doctor_id : null;
 
-    const { data: intake, error: intakeErr } = await supabase
-      .from('triage_intakes')
-      .select('locale, urgency, summary, safety_note, answers')
-      .eq('user_id', req.user.id)
-      .maybeSingle();
-
-    if (intakeErr) return serverError(res, intakeErr, 'Failed to load intake.');
+    const intake = await healthlake.getTriageIntake(req.user.id);
     if (!intake) return res.status(400).json({ error: 'No intake found to share' });
 
     const payload = {

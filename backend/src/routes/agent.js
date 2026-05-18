@@ -159,12 +159,7 @@ async function loadPatientProfile(userId) {
 }
 
 async function loadTriageIntake(userId) {
-  const { data } = await supabase
-    .from('triage_intakes')
-    .select('answers, urgency, summary, safety_note, updated_at')
-    .eq('user_id', userId)
-    .maybeSingle();
-  return data || null;
+  return healthlake.getTriageIntake(userId);
 }
 
 async function loadLastHospital(userId) {
@@ -188,11 +183,12 @@ async function loadLastHospital(userId) {
 }
 
 async function loadFhirContext(userId) {
-  const [conditions, medications] = await Promise.all([
+  const [conditions, medications, allergies] = await Promise.all([
     healthlake.getPatientConditions(userId),
     healthlake.getPatientMedications(userId),
+    healthlake.getPatientAllergies(userId),
   ]);
-  return { conditions, medications };
+  return { conditions, medications, allergies };
 }
 
 // ── Message conversion ────────────────────────────────────────────────────────
@@ -306,7 +302,7 @@ router.get('/session', authenticate, async (req, res) => {
 
     const profile = await loadPatientProfile(req.user.id);
     const skillCtx = {
-      z, supabase, profile,
+      z, supabase, profile, healthlake,
       patientLat: null, patientLon: null, haversineKm,
       fetchAvailableSlots, getClinicCalendarAuth,
       safeText, normalizeUrgency, patientTimeZone: null,
@@ -387,7 +383,7 @@ router.get('/context', authenticate, async (req, res) => {
 
     const profile = await loadPatientProfile(req.user.id);
     const skillCtx = {
-      z, supabase, profile,
+      z, supabase, profile, healthlake,
       patientLat: null, patientLon: null, haversineKm,
       fetchAvailableSlots, getClinicCalendarAuth,
       safeText, normalizeUrgency,
@@ -423,7 +419,7 @@ router.get('/session', authenticate, async (req, res) => {
 
     const profile = await loadPatientProfile(req.user.id);
     const skillCtx = {
-      z, supabase, profile,
+      z, supabase, profile, healthlake,
       patientLat: null, patientLon: null, haversineKm,
       fetchAvailableSlots, getClinicCalendarAuth,
       safeText, normalizeUrgency,
@@ -478,7 +474,7 @@ router.post('/chat', authenticate, async (req, res) => {
     const patientTimeZone = safeText(req.body?.time_zone, 100) || null;
 
     const skillCtx = {
-      z, supabase, profile,
+      z, supabase, profile, healthlake,
       patientLat, patientLon, haversineKm,
       fetchAvailableSlots, getClinicCalendarAuth,
       safeText, normalizeUrgency,

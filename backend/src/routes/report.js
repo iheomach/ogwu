@@ -4,31 +4,23 @@ const router = express.Router();
 
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
+const healthlake = require('../lib/healthlake');
 
 // GET /api/report — aggregated health report for the signed-in patient
 router.get('/', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const [profileRes, intakeRes, consultsRes, appointmentsRes] = await Promise.all([
+    const [profileRes, intake, consults, appointmentsRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('first_name, middle_name, last_name, dob, biological_sex, allergies, known_conditions')
         .eq('id', userId)
         .maybeSingle(),
 
-      supabase
-        .from('triage_intakes')
-        .select('urgency, summary, safety_note, answers, updated_at')
-        .eq('user_id', userId)
-        .maybeSingle(),
+      healthlake.getTriageIntake(userId),
 
-      supabase
-        .from('consults')
-        .select('complaint, urgency, symptoms, recommended_specialty, care_pathway, created_at')
-        .eq('patient_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(5),
+      healthlake.getClinicalImpressions(userId, 5),
 
       supabase
         .from('appointments')
@@ -54,8 +46,8 @@ router.get('/', authenticate, async (req, res) => {
 
     return res.json({
       profile: profileRes.data || null,
-      intake: intakeRes.data || null,
-      consults: consultsRes.data || [],
+      intake: intake || null,
+      consults: consults || [],
       appointments: appointments.map((a) => ({
         ...a,
         hospital_name: hospitalsMap[a.hospital_id] || null,
