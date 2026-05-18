@@ -51,34 +51,42 @@ const TriageAnnotation = Annotation.Root({
 
 // ── Shared utilities ──────────────────────────────────────────────────────────
 
+// Keyword fallbacks used when Comprehend Medical returns no high-confidence entities
+// (e.g. very short answers, vague input). Comprehend + EMERGENCY_PREFIXES is the
+// primary signal; these only fire when that path produces nothing.
+const EMERGENCY_KEYWORD_FALLBACKS = [
+  'chest pain', 'pressure in chest', 'trouble breathing', 'cant breathe', "can't breathe",
+  'shortness of breath', 'severe bleeding', 'bleeding a lot', 'passed out', 'fainted',
+  'confusion', 'slurred speech', 'weakness on one side', 'seizure', 'suicidal',
+  'kill myself', 'overdose',
+];
+
+const URGENT_KEYWORD_FALLBACKS = [
+  'blood in urine', 'blood in stool', 'vomiting blood', 'throwing up blood', 'black stool',
+  'severe pain', 'worst pain', 'severe headache', 'stiff neck',
+  'high fever', 'fever 39', 'fever 40', 'temperature 39', 'temperature 40',
+];
+
+const SOON_KEYWORD_FALLBACKS = [
+  'fever', 'chills', 'dizzy', 'dizziness', 'dehydr', 'worse', 'getting worse',
+];
+
 function normalizeText(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9\s+/-]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function hasEmergencySignals(text) {
+function hasEmergencyKeywordFallback(text) {
   const t = normalizeText(text);
-  const needles = [
-    'chest pain', 'pressure in chest', 'trouble breathing', 'cant breathe', "can't breathe",
-    'shortness of breath', 'severe bleeding', 'bleeding a lot', 'passed out', 'fainted',
-    'confusion', 'slurred speech', 'weakness on one side', 'seizure', 'suicidal',
-    'kill myself', 'overdose',
-  ];
-  return needles.some((n) => t.includes(n));
+  return EMERGENCY_KEYWORD_FALLBACKS.some((kw) => t.includes(kw));
 }
 
 function computeUrgencyFromState(state) {
   const text = (state.answers || []).map((x) => `${x?.q || ''} ${x?.a || ''}`).join(' ');
-  if (hasEmergencySignals(text) || state.emergency_signaled) return 'emergency';
+  if (hasEmergencyKeywordFallback(text) || state.emergency_signaled) return 'emergency';
   const t = normalizeText(text);
-  const urgentNeedles = [
-    'blood in urine', 'blood in stool', 'vomiting blood', 'throwing up blood', 'black stool',
-    'severe pain', 'worst pain', 'severe headache', 'stiff neck',
-    'high fever', 'fever 39', 'fever 40', 'temperature 39', 'temperature 40',
-  ];
-  if (urgentNeedles.some((n) => t.includes(n)) || state.urgent_signaled) return 'urgent';
+  if (URGENT_KEYWORD_FALLBACKS.some((kw) => t.includes(kw)) || state.urgent_signaled) return 'urgent';
   if (/\b(9|10)\s*\/\s*10\b/.test(t)) return 'urgent';
-  const soonNeedles = ['fever', 'chills', 'dizzy', 'dizziness', 'dehydr', 'worse', 'getting worse'];
-  if (soonNeedles.some((n) => t.includes(n))) return 'soon';
+  if (SOON_KEYWORD_FALLBACKS.some((kw) => t.includes(kw))) return 'soon';
   if (/\b(6|7|8)\s*\/\s*10\b/.test(t)) return 'soon';
   return 'routine';
 }
