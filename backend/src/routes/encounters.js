@@ -4,7 +4,6 @@ const router = express.Router();
 
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
-const { parseTriageUrgency } = require('../lib/urgency');
 const healthlake = require('../lib/healthlake');
 
 // List encounters for the signed-in patient
@@ -56,43 +55,32 @@ router.post('/share', authenticate, async (req, res) => {
     const intake = await healthlake.getTriageIntake(req.user.id);
     if (!intake) return res.status(400).json({ error: 'No intake found to share' });
 
-    const payload = {
-      patient_id: req.user.id,
-      doctor_id,
-      source: 'share',
-      status: 'shared',
-      locale: intake.locale,
-      urgency: parseTriageUrgency(intake.urgency),
+    // Write clinical data to HealthLake first; get back the FHIR id for linking.
+    const fhir_encounter_id = await healthlake.writeEncounter(req.user.id, {
+      urgency: intake.urgency,
       summary: intake.summary,
       safety_note: intake.safety_note,
       answers: intake.answers,
-    };
+    }).catch((err) => {
+      console.warn('[healthlake] encounter write failed:', err.message);
+      return null;
+    });
 
+    // Store only operational fields in Supabase, linked by fhir_encounter_id.
     const { data, error } = await supabase
       .from('encounters')
-      .insert(payload)
-      .select(
-        [
-          'id',
-          'patient_id',
-          'doctor_id',
-          'source',
-          'status',
-          'locale',
-          'urgency',
-          'summary',
-          'safety_note',
-          'created_at',
-        ].join(',')
-      )
+      .insert({
+        patient_id: req.user.id,
+        doctor_id,
+        source: 'share',
+        status: 'shared',
+        locale: intake.locale,
+        fhir_encounter_id,
+      })
+      .select('id, patient_id, doctor_id, source, status, locale, fhir_encounter_id, created_at')
       .single();
 
     if (error) return serverError(res, error, 'Failed to create encounter.');
-
-    // Fire-and-forget: mirror to HealthLake as a FHIR Encounter.
-    healthlake.writeEncounter(req.user.id, data).catch((err) =>
-      console.warn('[healthlake] encounter write failed:', err.message),
-    );
 
     return res.json({ encounter: data });
   } catch (e) {
