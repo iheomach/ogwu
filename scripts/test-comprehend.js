@@ -47,41 +47,69 @@ async function testLiveCall() {
   }
   info(`AWS_REGION=${process.env.AWS_REGION}`);
 
-  // Explicit "heart attack" language maps to I21.* in Comprehend Medical.
-  // Comprehend codes stated conditions, not inferred diagnoses, so symptom-only
-  // text (e.g. "chest pain") maps to R07.* which is caught by URGENT_PREFIXES.
-  const answers = [
-    { q: 'What is your main symptom?',  a: 'I think I am having a heart attack' },
-    { q: 'How long have you had this?', a: 'started about 30 minutes ago, crushing pain in my chest' },
-    { q: 'Any other symptoms?',         a: 'I am sweating heavily and feel short of breath' },
+  // Sub-test A: patient-reported symptoms → urgentSignaled via R07.*
+  // Comprehend maps patient phrasing to symptom codes, not diagnosis codes.
+  const urgentAnswers = [
+    { q: 'What is your main symptom?',  a: 'severe crushing chest pain radiating to my left arm' },
+    { q: 'How long have you had this?', a: 'started about 30 minutes ago and is getting worse' },
   ];
 
-  let result;
+  let urgentResult;
   try {
-    result = await extractEntitiesFromAnswers(answers);
+    urgentResult = await extractEntitiesFromAnswers(urgentAnswers);
   } catch (err) {
-    fail(`extractEntitiesFromAnswers threw: ${err.message}`);
+    fail(`extractEntitiesFromAnswers (urgent) threw: ${err.message}`);
     return;
   }
 
-  if (result.entities.length > 0) {
-    ok(`returned ${result.entities.length} entity/entities above score threshold`);
+  if (urgentResult.entities.length > 0) {
+    ok(`[urgent] returned ${urgentResult.entities.length} entity/entities above score threshold`);
   } else {
-    fail('returned 0 entities — check MIN_SCORE or AWS credentials');
+    fail('[urgent] returned 0 entities — check ENTITY_MIN_SCORE or AWS credentials');
   }
 
-  if (result.emergencySignaled) {
-    ok('emergencySignaled=true (ICD-10 EMERGENCY_PREFIXES matched)');
+  if (urgentResult.urgentSignaled) {
+    ok('[urgent] urgentSignaled=true (R07.* chest pain matched URGENT_PREFIXES)');
   } else {
-    fail('emergencySignaled=false — chest pain / MI prefix not matched; inspect entity codes below');
+    fail('[urgent] urgentSignaled=false — R07.* not matched; inspect codes below');
   }
 
-  if (result.entities.length > 0) {
-    info('Top entities:');
-    result.entities.slice(0, 5).forEach((e) => {
-      info(`  "${e.text}" → ${e.icd10Code ?? 'no code'} (${e.icd10Description ?? '—'}) score=${e.score}`);
-    });
+  info('[urgent] entities:');
+  urgentResult.entities.slice(0, 5).forEach((e) => {
+    info(`  "${e.text}" → ${e.icd10Code ?? 'no code'} (${e.icd10Description ?? '—'}) score=${e.score}`);
+  });
+
+  // Sub-test B: clinical terminology → emergencySignaled via I21.*
+  // Clinical terms like "acute myocardial infarction" map to diagnosis codes.
+  const emergencyAnswers = [
+    { q: 'Diagnosis',  a: 'acute myocardial infarction with ST elevation' },
+    { q: 'Symptoms',   a: 'cardiac arrest, loss of consciousness' },
+  ];
+
+  let emergencyResult;
+  try {
+    emergencyResult = await extractEntitiesFromAnswers(emergencyAnswers);
+  } catch (err) {
+    fail(`extractEntitiesFromAnswers (emergency) threw: ${err.message}`);
+    return;
   }
+
+  if (emergencyResult.entities.length > 0) {
+    ok(`[emergency] returned ${emergencyResult.entities.length} entity/entities above score threshold`);
+  } else {
+    fail('[emergency] returned 0 entities — check ENTITY_MIN_SCORE or AWS credentials');
+  }
+
+  if (emergencyResult.emergencySignaled) {
+    ok('[emergency] emergencySignaled=true (I21.*/I46.* matched EMERGENCY_PREFIXES)');
+  } else {
+    fail('[emergency] emergencySignaled=false — I21.*/I46.* not matched; inspect codes below');
+  }
+
+  info('[emergency] entities:');
+  emergencyResult.entities.slice(0, 5).forEach((e) => {
+    info(`  "${e.text}" → ${e.icd10Code ?? 'no code'} (${e.icd10Description ?? '—'}) score=${e.score}`);
+  });
 }
 
 // ---------------------------------------------------------------------------
