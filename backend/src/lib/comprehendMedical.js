@@ -22,13 +22,23 @@ const EMERGENCY_PREFIXES = [
   'I21', 'I22', 'I24',        // Acute MI / ACS
   'I26',                       // Pulmonary embolism
   'I46',                       // Cardiac arrest
+  'I16',                       // Hypertensive crisis
   'I60', 'I61', 'I62',        // Intracranial hemorrhage
   'I63', 'I64',                // Stroke
+  'I71',                       // Aortic aneurysm / dissection
   'J80',                       // ARDS
+  'J93',                       // Pneumothorax (tension pneumothorax is immediately fatal)
   'J96',                       // Respiratory failure
+  'G41',                       // Status epilepticus
+  'A41',                       // Sepsis
+  'E10.1',                     // Diabetic ketoacidosis (type 1)
+  'O00',                       // Ectopic pregnancy (rupture → haemorrhagic shock)
+  'K92.0', 'K92.1',           // Haematemesis / melaena (severe GI bleed)
   'R09.0', 'R09.2',           // Asphyxiation / respiratory arrest
   'R55',                       // Syncope / collapse
   'R56',                       // Convulsions / seizures
+  'R57',                       // Shock (cardiogenic, hypovolaemic, septic)
+  'T30', 'T31',               // Major burns
   'T36', 'T37', 'T38', 'T39', // Poisoning — drugs
   'T40', 'T41', 'T42', 'T43', // Poisoning — narcotics / psychotropics
   'T44', 'T45', 'T46',        // Poisoning — cardiac / hematological agents
@@ -42,15 +52,28 @@ const EMERGENCY_PREFIXES = [
 const URGENT_PREFIXES = [
   'K35', 'K36', 'K37',        // Appendicitis
   'K25', 'K26', 'K27',        // Peptic ulcer disease
+  'K85',                       // Acute pancreatitis
   'N20', 'N21',                // Kidney / ureter stones
   'J18',                       // Pneumonia
+  'J44.1',                     // COPD acute exacerbation
   'J45',                       // Asthma
   'N39.0',                     // UTI (systemic risk)
   'A09',                       // Infectious gastroenteritis
   'E11.6', 'E11.65',          // Diabetic foot / complications
   'G43',                       // Migraine
   'M54.5',                     // Low back pain (severe)
+  'I50',                       // Heart failure (acute decompensated)
+  'N17',                       // Acute kidney injury
+  'R00',                       // Palpitations / abnormal heart rate
+  'R04',                       // Haemorrhage from respiratory passages (coughing blood)
+  'R06',                       // Breathing difficulty / dyspnoea
   'R07',                       // Chest pain (symptom-level — not yet coded as ACS)
+  'R10',                       // Abdominal pain
+  'R11',                       // Nausea and vomiting
+  'R31',                       // Haematuria
+  'R41',                       // Altered consciousness / confusion
+  'R42',                       // Dizziness / vertigo
+  'R51',                       // Headache
 ];
 
 function isConfigured() {
