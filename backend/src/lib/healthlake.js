@@ -51,7 +51,10 @@ async function fhirRequest(method, resourcePath, body) {
   });
 
   const fetchImpl = global.fetch || require('node-fetch');
-  const res = await fetchImpl(`https://${HOST}${path}`, {
+  const url = `https://${HOST}${path}`;
+  console.log(`[healthlake] ${method} ${url.split('?')[0]}`);
+
+  const res = await fetchImpl(url, {
     method: opts.method,
     headers: opts.headers,
     body: opts.body,
@@ -59,7 +62,8 @@ async function fhirRequest(method, resourcePath, body) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`HealthLake ${method} ${resourcePath} → ${res.status}: ${text.slice(0, 400)}`);
+    console.error(`[healthlake] ${method} ${resourcePath.split('?')[0]} → ${res.status}: ${text.slice(0, 600)}`);
+    throw new Error(`HealthLake ${method} ${resourcePath.split('?')[0]} → ${res.status}: ${text.slice(0, 400)}`);
   }
   return res.json();
 }
@@ -105,45 +109,55 @@ async function writeTriageIntake(patientId, { locale, answers, urgency, summary,
   const ts = new Date().toISOString();
 
   const observations = [
-    // One Observation per Q&A pair — question text stored in code.text
     ...(answers || [])
       .filter(({ q, a }) => q && a)
       .map(({ q, a }) => triageObservation(patientId, 'triage-qa', a, ts, q)),
-    // Scalar fields
     triageObservation(patientId, 'triage-urgency', urgency || 'routine', ts),
     triageObservation(patientId, 'triage-locale', locale || 'en', ts),
     ...(summary ? [triageObservation(patientId, 'triage-summary', summary, ts)] : []),
     ...(safety_note ? [triageObservation(patientId, 'triage-safety-note', safety_note, ts)] : []),
   ];
 
+  console.log(`[healthlake] writeTriageIntake patient=${patientId} observations=${observations.length}`);
   const results = await Promise.allSettled(
     observations.map((obs) => fhirRequest('POST', 'Observation', obs)),
   );
   const failed = results.filter((r) => r.status === 'rejected');
+  const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+  console.log(`[healthlake] writeTriageIntake done: ${succeeded} ok, ${failed.length} failed`);
   if (failed.length) throw new Error(`Triage write partially failed: ${failed[0].reason?.message}`);
 }
 
 async function getTriageIntake(patientId) {
   if (!isConfigured()) return null;
   try {
+    console.log(`[healthlake] getTriageIntake patient=${patientId}`);
     const result = await fhirRequest(
       'GET',
       `Observation?patient=${patientRef(patientId)}&code=${encodeURIComponent(SYS.TRIAGE + '|triage-urgency')}&_sort=-date&_count=1`,
     );
+    console.log(`[healthlake] getTriageIntake urgency search: total=${result?.total} entries=${result?.entry?.length ?? 0}`);
     const latestUrgencyObs = result?.entry?.[0]?.resource;
-    if (!latestUrgencyObs) return null;
+    if (!latestUrgencyObs) {
+      console.warn(`[healthlake] getTriageIntake: no triage-urgency Observation found for patient ${patientId}`);
+      return null;
+    }
 
     const effectiveDateTime = latestUrgencyObs.effectiveDateTime;
+    console.log(`[healthlake] getTriageIntake: found urgency obs effectiveDateTime=${effectiveDateTime}`);
 
-    // Fetch all triage observations for this patient; filter to the matching timestamp
     const all = await fhirRequest(
       'GET',
       `Observation?patient=${patientRef(patientId)}&_sort=-date&_count=200`,
     );
-    const entries = (all?.entry ?? []).map((e) => e.resource).filter((r) =>
+    const allEntries = all?.entry ?? [];
+    console.log(`[healthlake] getTriageIntake: all-obs search returned ${allEntries.length} entries`);
+
+    const entries = allEntries.map((e) => e.resource).filter((r) =>
       r?.code?.coding?.some((c) => c.system === SYS.TRIAGE) &&
       r?.effectiveDateTime === effectiveDateTime,
     );
+    console.log(`[healthlake] getTriageIntake: ${entries.length} triage entries match timestamp`);
 
     const byCode = (code) => entries.find((r) => r.code?.coding?.some((c) => c.code === code));
     const answers = entries

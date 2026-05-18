@@ -361,6 +361,7 @@ router.post('/complete', authenticate, async (req, res) => {
 
     const patientId = req.user.id;
     const ts = new Date().toISOString();
+    console.log(`[triage] /complete patient=${patientId} healthlake=${healthlake.isConfigured()}`);
 
     if (healthlake.isConfigured()) {
       // HealthLake is the authoritative store.
