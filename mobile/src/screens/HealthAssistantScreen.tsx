@@ -12,8 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import * as ExpoCalendar from 'expo-calendar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -128,26 +127,6 @@ function toGCalDate(isoUtc: string): string {
   return isoUtc.replace(/[-:]/g, '').replace(/\.\d{3}/, '').replace('+00:00', 'Z');
 }
 
-function buildIcs(startsAt: string, hospitalName: string, meetingUrl: string | null): string {
-  const end = new Date(startsAt);
-  end.setMinutes(end.getMinutes() + 30);
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Ogwu//Health Assistant//EN',
-    'BEGIN:VEVENT',
-    `UID:${Date.now()}@ogwu.app`,
-    `DTSTART:${toGCalDate(startsAt)}`,
-    `DTEND:${toGCalDate(end.toISOString())}`,
-    `SUMMARY:Appointment at ${hospitalName}`,
-    meetingUrl ? `DESCRIPTION:Join online: ${meetingUrl}` : 'DESCRIPTION:Ogwu Health Appointment',
-    meetingUrl ? `LOCATION:${meetingUrl}` : '',
-    'END:VEVENT',
-    'END:VCALENDAR',
-  ].filter(Boolean);
-  return lines.join('\r\n');
-}
-
 // ── Add to Google Calendar button ────────────────────────────────────────────
 function AddToCalendarButton({ startsAt, meetingUrl, hospitalName }: {
   startsAt: string;
@@ -197,10 +176,15 @@ function AddToAppleCalendarButton({ startsAt, meetingUrl, hospitalName }: {
 }) {
   const handlePress = async () => {
     try {
-      const ics = buildIcs(startsAt, hospitalName, meetingUrl);
-      const file = new File(Paths.cache, 'ogwu-appointment.ics');
-      file.write(ics);
-      await Sharing.shareAsync(file.uri, { mimeType: 'text/calendar', UTI: 'public.calendar-event' });
+      const start = new Date(startsAt);
+      const end = new Date(start.getTime() + 30 * 60 * 1000);
+      await ExpoCalendar.createEventInCalendarAsync({
+        title: `Appointment at ${hospitalName}`,
+        startDate: start,
+        endDate: end,
+        notes: meetingUrl ? `Join online: ${meetingUrl}` : 'Ogwu Health Appointment',
+        ...(meetingUrl ? { url: meetingUrl } : {}),
+      });
     } catch {
       Alert.alert('Could not open Calendar', 'Please add the appointment manually.');
     }

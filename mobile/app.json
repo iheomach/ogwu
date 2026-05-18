@@ -25,7 +25,13 @@
       "favicon": "./assets/ogwu-ios.png"
     },
     "plugins": [
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow Ogwu to add your appointment to Apple Calendar."
+        }
+      ]
     ]
   }
 }
