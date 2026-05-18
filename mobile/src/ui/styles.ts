@@ -962,16 +962,16 @@ export const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: 4,
-    paddingBottom: 4,
+    paddingBottom: 8,
     backgroundColor: colors.purpleDark,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 4,
+    paddingBottom: 2,
     alignItems: 'center',
   },
   tabButtonIcon: {

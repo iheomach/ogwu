@@ -158,7 +158,7 @@ export function HomeScreen({
   const tags = useMemo(() => deriveSituationTags(intake), [intake]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.purple }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.purple }]}>
       <ScrollView
         style={[styles.spacer, { backgroundColor: colors.bg }]}
         contentContainerStyle={{ paddingBottom: 100 }}

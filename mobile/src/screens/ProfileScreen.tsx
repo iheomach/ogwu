@@ -71,7 +71,7 @@ export function ProfileScreen({
     .join(' ');
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { justifyContent: 'flex-start' }]}>
         <Text style={styles.title}>{t('profile.title')}</Text>
         <Text style={styles.helper}>{phoneLabel}</Text>

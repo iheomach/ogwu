@@ -128,7 +128,7 @@ export function RecordsScreen({ busy, onOpenThread }: RecordsScreenProps) {
   const inactiveThreads = useMemo(() => threads.filter(t => t.status === 'closed'), [threads]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[styles.content, { justifyContent: 'flex-start', opacity: busy ? 0.7 : 1 }]}
