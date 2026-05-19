@@ -74,6 +74,7 @@ export type HomeScreenProps = ScreenPropsBase & {
   onGoNewConsult: () => void;
   onGoRecords: () => void;
   onGoProfile: () => void;
+  onRunTriage: () => void;
 };
 
 export type NewConsultScreenProps = ScreenPropsBase & {

@@ -517,6 +517,7 @@ export function AppRouter() {
             onGoNewConsult={() => setScreen('newConsult')}
             onGoRecords={() => setScreen('records')}
             onGoProfile={() => setScreen('profile')}
+            onRunTriage={() => { resetTriage(); setScreen('triage'); }}
           />
         </TabScaffold>
       )}

@@ -119,6 +119,7 @@ export function HomeScreen({
   onGoNewConsult,
   onGoRecords,
   onGoProfile,
+  onRunTriage,
 }: HomeScreenProps) {
   const displayName = profile?.first_name?.trim() || '';
   const [intakeLoading, setIntakeLoading] = useState(true);
@@ -230,16 +231,16 @@ export function HomeScreen({
                 </Text>
               </View>
             ) : (
-              <TouchableOpacity onPress={onGoProfile} style={styles.noIntakeCard}>
+              <TouchableOpacity onPress={onRunTriage} style={styles.noIntakeCard}>
                 <View style={styles.noIntakeIconBox}>
                   <MaterialIcons name="assignment" size={22} color={colors.purple} />
                 </View>
                 <Text style={styles.noIntakeTitle}>No intake on file</Text>
                 <Text style={styles.noIntakeBody}>
-                  Complete a quick intake from your profile to get personalised health insights.
+                  Complete a quick intake to get personalised health insights.
                 </Text>
                 <View style={styles.noIntakeAction}>
-                  <Text style={styles.noIntakeLinkText}>Go to Profile</Text>
+                  <Text style={styles.noIntakeLinkText}>Start intake</Text>
                   <MaterialIcons name="arrow-forward" size={14} color={colors.purple} />
                 </View>
               </TouchableOpacity>
