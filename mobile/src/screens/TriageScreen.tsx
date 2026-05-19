@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import type { TriageScreenProps } from '../types';
 import { colors, styles, spacing } from '../ui/styles';
@@ -28,19 +29,26 @@ export function TriageScreen({
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Fixed top-left back button */}
+      <TouchableOpacity
+        onPress={onBack}
+        disabled={busy}
+        activeOpacity={0.7}
+        style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}
+      >
+        <MaterialIcons name="arrow-back-ios" size={16} color={colors.purpleGlow} />
+        <Text style={[styles.btnGhostText, { marginLeft: 2 }]}>{t('common.back')}</Text>
+      </TouchableOpacity>
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.lg }}
+          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.lg }}
           keyboardShouldPersistTaps="handled"
           bounces={false}
         >
-          <TouchableOpacity style={styles.btnGhost} onPress={onBack} disabled={busy}>
-            <Text style={styles.btnGhostText}>{t('common.back')}</Text>
-          </TouchableOpacity>
-
           <View style={styles.brandRow}>
             <Image source={require('../../assets/ogwu-mark.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
           </View>

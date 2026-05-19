@@ -1,13 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import type { ConsultThread } from '../types';
-import { threadsList } from '../lib/threads';
+import { threadsList, threadsClose } from '../lib/threads';
+import { apiGet } from '../lib/api';
 import { colors, glassSurface, styles, spacing } from '../ui/styles';
 
+type AppointmentRow = {
+  id: string;
+  hospital_id: string | null;
+  starts_at: string;
+  status: string;
+};
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatApptDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+    ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function bestAppointment(thread: ConsultThread, appts: AppointmentRow[]): AppointmentRow | null {
+  if (!thread.hospital_id) return null;
+  const matching = appts.filter(a => a.hospital_id === thread.hospital_id);
+  if (!matching.length) return null;
+  const now = new Date().toISOString();
+  const future = matching.filter(a => a.starts_at > now).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  return future[0] ?? matching.sort((a, b) => b.starts_at.localeCompare(a.starts_at))[0];
+}
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -62,7 +85,15 @@ function previewText(th: ConsultThread): string | null {
 
 // ── Thread row ────────────────────────────────────────────────────────────────
 
-function ThreadRow({ thread, onPress, muted }: { thread: ConsultThread; onPress: () => void; muted?: boolean }) {
+function ThreadRow({
+  thread, onPress, onCancel, muted, appointment,
+}: {
+  thread: ConsultThread;
+  onPress: () => void;
+  onCancel?: () => void;
+  muted?: boolean;
+  appointment?: AppointmentRow | null;
+}) {
   const urg = thread.urgency ?? thread.intake_snapshot?.urgency ?? 'routine';
   const color = urgencyColor(urg);
   const activityTime = thread.last_message?.created_at ?? thread.updated_at;
@@ -70,73 +101,94 @@ function ThreadRow({ thread, onPress, muted }: { thread: ConsultThread; onPress:
   const hasProviderReply = thread.last_message?.sender_role === 'provider';
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.8}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: 12,
-        backgroundColor: glassSurface.bg,
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: muted ? glassSurface.borderSoft : hasProviderReply ? `${color}40` : glassSurface.borderSoft,
-        opacity: muted ? 0.7 : 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.18,
-        shadowRadius: 8,
-        elevation: 2,
-      }}
-    >
-      <View style={{
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: muted ? colors.grey300 : color,
-        marginTop: 5,
-        flexShrink: 0,
-      }} />
+    <View style={{ marginBottom: 10 }}>
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.8}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          gap: 12,
+          backgroundColor: glassSurface.bg,
+          borderRadius: 14,
+          padding: 14,
+          borderWidth: 1,
+          borderColor: muted ? glassSurface.borderSoft : hasProviderReply ? `${color}40` : glassSurface.borderSoft,
+          opacity: muted ? 0.7 : 1,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.18,
+          shadowRadius: 8,
+          elevation: 2,
+        }}
+      >
+        <View style={{
+          width: 10,
+          height: 10,
+          borderRadius: 5,
+          backgroundColor: muted ? colors.grey300 : color,
+          marginTop: 5,
+          flexShrink: 0,
+        }} />
 
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.grey900, flex: 1, marginRight: 8 }} numberOfLines={1}>
-            {threadTitle(thread)}
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.grey900, flex: 1, marginRight: 8 }} numberOfLines={1}>
+              {threadTitle(thread)}
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.grey500, flexShrink: 0 }}>
+              {timeAgo(activityTime)}
+            </Text>
+          </View>
+
+          <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 2 }}>
+            {providerLabel(thread)}
           </Text>
-          <Text style={{ fontSize: 11, color: colors.grey500, flexShrink: 0 }}>
-            {timeAgo(activityTime)}
-          </Text>
+
+          {appointment && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+              <MaterialIcons name="event" size={11} color={colors.purpleGlow} />
+              <Text style={{ fontSize: 12, color: colors.purpleGlow, fontWeight: '500' }}>
+                {formatApptDate(appointment.starts_at)}
+              </Text>
+            </View>
+          )}
+
+          {preview ? (
+            <Text style={{ fontSize: 13, color: (!muted && hasProviderReply) ? colors.grey900 : colors.grey500, lineHeight: 18, marginTop: 4 }} numberOfLines={2}>
+              {preview}
+            </Text>
+          ) : null}
+
+          {!muted && hasProviderReply && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+              <Text style={{ fontSize: 11, fontWeight: '600', color }}>Provider replied</Text>
+            </View>
+          )}
+
+          {muted && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
+              <MaterialIcons name="check-circle" size={12} color={colors.grey300} />
+              <Text style={{ fontSize: 11, color: colors.grey300 }}>Closed</Text>
+            </View>
+          )}
         </View>
 
-        <Text style={{ fontSize: 12, color: colors.grey500, marginTop: 2, marginBottom: 4 }}>
-          {providerLabel(thread)}
-        </Text>
+        <MaterialIcons name="chevron-right" size={18} color={colors.grey300} style={{ marginTop: 2 }} />
+      </TouchableOpacity>
 
-        {preview ? (
-          <Text style={{ fontSize: 13, color: (!muted && hasProviderReply) ? colors.grey900 : colors.grey500, lineHeight: 18 }} numberOfLines={2}>
-            {preview}
-          </Text>
-        ) : null}
-
-        {!muted && hasProviderReply && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
-            <Text style={{ fontSize: 11, fontWeight: '600', color }}>Provider replied</Text>
-          </View>
-        )}
-
-        {muted && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
-            <MaterialIcons name="check-circle" size={12} color={colors.grey300} />
-            <Text style={{ fontSize: 11, color: colors.grey300 }}>Closed</Text>
-          </View>
-        )}
-      </View>
-
-      <MaterialIcons name="chevron-right" size={18} color={colors.grey300} style={{ marginTop: 2 }} />
-    </TouchableOpacity>
+      {!muted && onCancel && (
+        <TouchableOpacity
+          onPress={onCancel}
+          activeOpacity={0.7}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 6, paddingRight: 2 }}
+        >
+          <MaterialIcons name="cancel" size={12} color={colors.error} />
+          <Text style={{ fontSize: 12, color: colors.error, fontWeight: '500' }}>Cancel consult</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 }
 
@@ -152,6 +204,7 @@ export type InboxScreenProps = {
 export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCountChange }: InboxScreenProps) {
   const [loading, setLoading] = useState(true);
   const [threads, setThreads] = useState<ConsultThread[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
 
@@ -161,12 +214,22 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
       try {
         setLoading(true);
         setError(null);
-        const res = await threadsList();
-        const list = Array.isArray(res.threads) ? res.threads : [];
+        const [threadsRes, apptsRes] = await Promise.allSettled([
+          threadsList(),
+          apiGet<{ appointments: AppointmentRow[] }>('/api/appointments'),
+        ]);
         if (!mounted) return;
-        setThreads(list);
-        const openCount = list.filter(t => t.status === 'open').length;
-        onThreadCountChange?.(openCount);
+        if (threadsRes.status === 'fulfilled') {
+          const list = Array.isArray(threadsRes.value.threads) ? threadsRes.value.threads : [];
+          setThreads(list);
+          const openCount = list.filter(t => t.status === 'open').length;
+          onThreadCountChange?.(openCount);
+        } else {
+          setError(threadsRes.reason?.message ?? 'Failed to load inbox.');
+        }
+        if (apptsRes.status === 'fulfilled') {
+          setAppointments(apptsRes.value.appointments ?? []);
+        }
       } catch (e: any) {
         if (!mounted) return;
         setError(e?.message ?? 'Failed to load inbox.');
@@ -176,6 +239,32 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
     })();
     return () => { mounted = false; };
   }, []);
+
+  const handleCancel = (threadId: string) => {
+    Alert.alert(
+      'Cancel consult',
+      'This will close the consultation. The provider will no longer be able to reply.',
+      [
+        { text: 'Keep open', style: 'cancel' },
+        {
+          text: 'Cancel consult',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await threadsClose(threadId);
+              setThreads(prev => {
+                const updated = prev.map(t => t.id === threadId ? { ...t, status: 'closed' as const } : t);
+                onThreadCountChange?.(updated.filter(t => t.status === 'open').length);
+                return updated;
+              });
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'Could not cancel consult.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const openThreads = useMemo(
     () => threads.filter(t => t.status === 'open').sort((a, b) => {
@@ -317,6 +406,8 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
                 thread={th}
                 onPress={() => onOpenThread(th.id)}
                 muted={activeTab === 'inactive'}
+                onCancel={activeTab === 'active' ? () => handleCancel(th.id) : undefined}
+                appointment={bestAppointment(th, appointments)}
               />
             ))}
           </View>

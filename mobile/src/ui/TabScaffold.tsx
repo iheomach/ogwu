@@ -102,9 +102,14 @@ export function TabScaffold({
 }) {
   return (
     <View style={{ flex: 1 }}>
+      {/* Content fills the full height; tab bar floats on top */}
       <View style={{ flex: 1 }}>{children}</View>
 
-      <SafeAreaView edges={['bottom']} style={styles.tabBarSafeArea}>
+      <SafeAreaView
+        edges={['bottom']}
+        style={styles.tabBarSafeArea}
+        pointerEvents="box-none"
+      >
         <View style={styles.tabBar}>
           <TabButton
             label={t('tabs.home')}
