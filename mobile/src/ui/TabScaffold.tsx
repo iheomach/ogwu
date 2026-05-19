@@ -1,4 +1,4 @@
-import { Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { Image, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -77,7 +77,11 @@ function AssistantFab({ active, onPress }: { active: boolean; onPress: () => voi
       accessibilityLabel={t('tabs.newConsult')}
     >
       <View style={[styles.assistantFabInner, active && styles.assistantFabInnerActive]}>
-        <MaterialIcons name="smart-toy" size={26} color={colors.white} />
+        <Image
+          source={require('../../assets/ogwu-mark.png')}
+          style={{ width: 30, height: 30, tintColor: colors.white }}
+          resizeMode="contain"
+        />
       </View>
     </TouchableOpacity>
   );
