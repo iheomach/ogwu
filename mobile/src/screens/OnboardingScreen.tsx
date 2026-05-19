@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -15,6 +14,7 @@ import { Picker } from '@react-native-picker/picker';
 import type { OnboardingScreenProps } from '../types';
 import { colors, styles } from '../ui/styles';
 import { t } from '../i18n';
+import { OgwuMark } from '../ui/OgwuMark';
 
 function Field({
   label,
@@ -81,7 +81,7 @@ export function OnboardingScreen({
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* Brand */}
         <View style={styles.brandRow}>
-          <Image source={require('../../assets/ogwu-mark.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
+          <OgwuMark size={40} />
         </View>
 
         {/* Heading */}

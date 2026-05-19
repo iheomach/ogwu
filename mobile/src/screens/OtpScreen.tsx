@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { OtpScreenProps } from '../types';
 import { colors, styles } from '../ui/styles';
 import { t } from '../i18n';
+import { OgwuMark } from '../ui/OgwuMark';
 
 export function OtpScreen({ busy, phoneLabel, otp, setOtp, onBack, onVerify }: OtpScreenProps) {
   const [focused, setFocused] = useState(false);
@@ -27,7 +27,7 @@ export function OtpScreen({ busy, phoneLabel, otp, setOtp, onBack, onVerify }: O
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* Brand */}
         <View style={styles.brandRow}>
-          <Image source={require('../../assets/ogwu-mark.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
+          <OgwuMark size={40} />
         </View>
 
         {/* Heading */}
