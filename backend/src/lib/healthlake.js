@@ -1,406 +1,259 @@
 'use strict';
 
 /**
- * AWS HealthLake FHIR R4 client — full clinical data store.
+ * Health data layer — previously AWS HealthLake FHIR R4, now Supabase.
+ * Exported API is identical so no call sites need updating.
  *
- * All public functions return null / [] / false when
- * AWS_HEALTHLAKE_DATASTORE_ID is unset so local dev works without AWS.
- *
- * Auth: IAM SigV4 (aws4). Credentials read from env:
- *   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION (default us-east-1)
+ * Storage mapping:
+ *   triage intake          → triage_intakes
+ *   conditions / allergies → profiles.known_conditions / profiles.allergies
+ *   medications            → profiles.current_medications (column optional)
+ *   clinical impressions   → clinical_impressions
+ *   encounters             → encounters (clinical fields written directly)
+ *   patient upsert         → no-op (profiles managed separately)
  */
 
-const aws4 = require('aws4');
+const supabase = require('./supabase');
+const cache = require('./cache');
 
-const REGION = process.env.AWS_REGION || 'us-east-1';
-const DATASTORE_ID = process.env.AWS_HEALTHLAKE_DATASTORE_ID || '';
-const HOST = `healthlake.${REGION}.amazonaws.com`;
-const BASE = `/datastore/${DATASTORE_ID}/r4`;
-
-// Custom coding system namespace
-const SYS = {
-  TRIAGE: 'urn:ogwu:triage',
-  SURVEY: 'http://terminology.hl7.org/CodeSystem/observation-category',
-  CONDITION_STATUS: 'http://terminology.hl7.org/CodeSystem/condition-clinical',
-  ALLERGY_CLINICAL: 'http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical',
-  ALLERGY_VERIFY: 'http://terminology.hl7.org/CodeSystem/allergyintolerance-verification',
-  ACT: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',
-};
+const TTL_TRIAGE   = 5  * 60 * 1000;
+const TTL_PROFILE  = 10 * 60 * 1000;
+const TTL_CONSULTS = 5  * 60 * 1000;
 
 function isConfigured() {
-  return !!DATASTORE_ID && !!process.env.AWS_ACCESS_KEY_ID;
-}
-
-// ── HTTP ──────────────────────────────────────────────────────────────────────
-
-async function fhirRequest(method, resourcePath, body) {
-  const path = `${BASE}/${resourcePath}`;
-  const opts = {
-    service: 'healthlake',
-    region: REGION,
-    method,
-    host: HOST,
-    path,
-    headers: { 'Content-Type': 'application/fhir+json', Accept: 'application/fhir+json' },
-  };
-  if (body) opts.body = JSON.stringify(body);
-
-  aws4.sign(opts, {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  });
-
-  const fetchImpl = global.fetch || require('node-fetch');
-  const url = `https://${HOST}${path}`;
-  console.log(`[healthlake] ${method} ${url.split('?')[0]}`);
-
-  const res = await fetchImpl(url, {
-    method: opts.method,
-    headers: opts.headers,
-    body: opts.body,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`[healthlake] ${method} ${resourcePath.split('?')[0]} → ${res.status}: ${text.slice(0, 600)}`);
-    throw new Error(`HealthLake ${method} ${resourcePath.split('?')[0]} → ${res.status}: ${text.slice(0, 400)}`);
-  }
-  return res.json();
-}
-
-function patientRef(patientId) {
-  return `Patient%2F${patientId}`;
+  return true;
 }
 
 // ── Patient ───────────────────────────────────────────────────────────────────
 
-async function upsertPatient(profile) {
-  if (!isConfigured()) return null;
-  const genderMap = { male: 'male', female: 'female', other: 'other' };
-  const sex = String(profile.biological_sex || profile.sex || '').toLowerCase();
-  return fhirRequest('PUT', `Patient/${profile.id}`, {
-    resourceType: 'Patient',
-    id: profile.id,
-    identifier: [{ system: 'urn:ogwu:patient', value: profile.id }],
-    name: [{ family: profile.last_name || '', given: [profile.first_name || ''] }],
-    gender: genderMap[sex] ?? 'unknown',
-    ...(profile.dob ? { birthDate: String(profile.dob).slice(0, 10) } : {}),
-  });
+async function upsertPatient(_profile) {
+  // No-op: profile data is managed via the onboarding and profile save flows.
 }
 
 // ── Triage intake ─────────────────────────────────────────────────────────────
-// Stored as a set of Observations sharing a single effectiveDateTime.
-// Codes: triage-qa (Q&A pairs), triage-urgency, triage-summary,
-//        triage-safety-note, triage-locale
 
-function triageObservation(patientId, code, valueString, effectiveDateTime, questionText) {
-  return {
-    resourceType: 'Observation',
-    status: 'final',
-    category: [{ coding: [{ system: SYS.SURVEY, code: 'survey', display: 'Survey' }] }],
-    code: { coding: [{ system: SYS.TRIAGE, code }], ...(questionText ? { text: questionText.slice(0, 255) } : {}) },
-    subject: { reference: `Patient/${patientId}` },
-    effectiveDateTime,
-    valueString: String(valueString || '').slice(0, 4000),
-  };
-}
-
-async function writeTriageIntake(patientId, { locale, answers, urgency, summary, safety_note, extracted_entities }) {
-  if (!isConfigured()) return;
-  const ts = new Date().toISOString();
-
-  const observations = [
-    ...(answers || [])
-      .filter(({ q, a }) => q && a)
-      .map(({ q, a }) => triageObservation(patientId, 'triage-qa', a, ts, q)),
-    triageObservation(patientId, 'triage-urgency', urgency || 'routine', ts),
-    triageObservation(patientId, 'triage-locale', locale || 'en', ts),
-    ...(summary ? [triageObservation(patientId, 'triage-summary', summary, ts)] : []),
-    ...(safety_note ? [triageObservation(patientId, 'triage-safety-note', safety_note, ts)] : []),
-    ...(Array.isArray(extracted_entities) && extracted_entities.length
-      ? [triageObservation(patientId, 'triage-entities', JSON.stringify(extracted_entities), ts)]
-      : []),
-  ];
-
-  console.log(`[healthlake] writeTriageIntake patient=${patientId} observations=${observations.length}`);
-  const results = await Promise.allSettled(
-    observations.map((obs) => fhirRequest('POST', 'Observation', obs)),
-  );
-  const failed = results.filter((r) => r.status === 'rejected');
-  const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-  console.log(`[healthlake] writeTriageIntake done: ${succeeded} ok, ${failed.length} failed`);
-  if (failed.length) throw new Error(`Triage write partially failed: ${failed[0].reason?.message}`);
+async function writeTriageIntake(patientId, { locale, answers, urgency, summary, safety_note }) {
+  const { error } = await supabase
+    .from('triage_intakes')
+    .upsert(
+      { user_id: patientId, locale, answers, urgency, summary, safety_note },
+      { onConflict: 'user_id' },
+    );
+  if (error) throw new Error(`writeTriageIntake failed: ${error.message}`);
+  cache.del(`triage:${patientId}`);
+  cache.del(`has-triage:${patientId}`);
 }
 
 async function getTriageIntake(patientId) {
-  if (!isConfigured()) return null;
-  try {
-    console.log(`[healthlake] getTriageIntake patient=${patientId}`);
-    const result = await fhirRequest(
-      'GET',
-      `Observation?patient=${patientRef(patientId)}&code=${encodeURIComponent(SYS.TRIAGE + '|triage-urgency')}&_sort=-date&_count=1`,
-    );
-    console.log(`[healthlake] getTriageIntake urgency search: total=${result?.total} entries=${result?.entry?.length ?? 0}`);
-    const latestUrgencyObs = result?.entry?.[0]?.resource;
-    if (!latestUrgencyObs) {
-      console.warn(`[healthlake] getTriageIntake: no triage-urgency Observation found for patient ${patientId}`);
-      return null;
-    }
+  const cacheKey = `triage:${patientId}`;
+  const hit = cache.get(cacheKey);
+  if (hit !== undefined) return hit;
 
-    const effectiveDateTime = latestUrgencyObs.effectiveDateTime;
-    console.log(`[healthlake] getTriageIntake: found urgency obs effectiveDateTime=${effectiveDateTime}`);
+  const { data, error } = await supabase
+    .from('triage_intakes')
+    .select('user_id, locale, answers, urgency, summary, safety_note, created_at, updated_at')
+    .eq('user_id', patientId)
+    .maybeSingle();
 
-    const all = await fhirRequest(
-      'GET',
-      `Observation?patient=${patientRef(patientId)}&_sort=-date&_count=100`,
-    );
-    const allEntries = all?.entry ?? [];
-    console.log(`[healthlake] getTriageIntake: all-obs search returned ${allEntries.length} entries`);
-
-    const entries = allEntries.map((e) => e.resource).filter((r) =>
-      r?.code?.coding?.some((c) => c.system === SYS.TRIAGE) &&
-      r?.effectiveDateTime === effectiveDateTime,
-    );
-    console.log(`[healthlake] getTriageIntake: ${entries.length} triage entries match timestamp`);
-
-    const byCode = (code) => entries.find((r) => r.code?.coding?.some((c) => c.code === code));
-    const answers = entries
-      .filter((r) => r.code?.coding?.some((c) => c.code === 'triage-qa'))
-      .map((r) => ({ q: r.code?.text || '', a: r.valueString || '' }));
-
-    const extractedEntities = (() => {
-      const raw = byCode('triage-entities')?.valueString;
-      if (!raw) return [];
-      try { return JSON.parse(raw); } catch { return []; }
-    })();
-
-    return {
-      answers,
-      urgency: byCode('triage-urgency')?.valueString || 'routine',
-      summary: byCode('triage-summary')?.valueString || null,
-      safety_note: byCode('triage-safety-note')?.valueString || null,
-      locale: byCode('triage-locale')?.valueString || 'en',
-      updated_at: effectiveDateTime,
-      extracted_entities: extractedEntities,
-    };
-  } catch (err) {
-    console.warn('[healthlake] getTriageIntake failed:', err.message);
+  if (error) {
+    console.warn('[health-data] getTriageIntake failed:', error.message);
     return null;
   }
+  const result = data ?? null;
+  if (result) cache.set(cacheKey, result, TTL_TRIAGE);
+  return result;
 }
 
 async function hasTriageIntake(patientId) {
-  if (!isConfigured()) return false;
-  try {
-    const result = await fhirRequest(
-      'GET',
-      `Observation?patient=${patientRef(patientId)}&code=${encodeURIComponent(SYS.TRIAGE + '|triage-urgency')}&_count=1`,
-    );
-    return (result?.total ?? 0) > 0 || (result?.entry?.length ?? 0) > 0;
-  } catch {
-    return false;
-  }
+  const cacheKey = `has-triage:${patientId}`;
+  const hit = cache.get(cacheKey);
+  if (hit !== undefined) return hit;
+
+  const { data, error } = await supabase
+    .from('triage_intakes')
+    .select('user_id')
+    .eq('user_id', patientId)
+    .maybeSingle();
+
+  if (error) return false;
+  const value = !!data;
+  cache.set(cacheKey, value, TTL_TRIAGE);
+  return value;
 }
 
 // ── Conditions ────────────────────────────────────────────────────────────────
 
-async function writeConditions(patientId, knownConditions, recordedDate) {
-  if (!isConfigured()) return;
-  const items = String(knownConditions || '').split(',').map((s) => s.trim()).filter(Boolean);
-  if (!items.length) return;
-  const date = recordedDate || new Date().toISOString().slice(0, 10);
-  await Promise.allSettled(items.map((text) =>
-    fhirRequest('POST', 'Condition', {
-      resourceType: 'Condition',
-      subject: { reference: `Patient/${patientId}` },
-      code: { text },
-      clinicalStatus: { coding: [{ system: SYS.CONDITION_STATUS, code: 'active' }] },
-      recordedDate: date,
-    }),
-  ));
+async function writeConditions(_patientId, _knownConditions) {
+  // No-op: conditions live in profiles.known_conditions, written by the profile save flow.
 }
 
 async function getPatientConditions(patientId) {
-  if (!isConfigured()) return [];
-  try {
-    const result = await fhirRequest('GET', `Condition?patient=${patientRef(patientId)}&_count=50`);
-    const texts = (result?.entry ?? []).map((e) => e.resource?.code?.text).filter(Boolean);
-    return [...new Set(texts)];
-  } catch (err) {
-    console.warn('[healthlake] getPatientConditions failed:', err.message);
+  const cacheKey = `conditions:${patientId}`;
+  const hit = cache.get(cacheKey);
+  if (hit !== undefined) return hit;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('known_conditions')
+    .eq('id', patientId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('[health-data] getPatientConditions failed:', error.message);
     return [];
   }
+  const texts = String(data?.known_conditions || '').split(',').map((s) => s.trim()).filter(Boolean);
+  cache.set(cacheKey, texts, TTL_PROFILE);
+  return texts;
 }
 
 // ── Allergies ─────────────────────────────────────────────────────────────────
 
-async function writeAllergies(patientId, allergies) {
-  if (!isConfigured()) return;
-  const items = String(allergies || '').split(',').map((s) => s.trim()).filter(Boolean);
-  if (!items.length) return;
-  await Promise.allSettled(items.map((text) =>
-    fhirRequest('POST', 'AllergyIntolerance', {
-      resourceType: 'AllergyIntolerance',
-      patient: { reference: `Patient/${patientId}` },
-      code: { text },
-      clinicalStatus: { coding: [{ system: SYS.ALLERGY_CLINICAL, code: 'active' }] },
-      verificationStatus: { coding: [{ system: SYS.ALLERGY_VERIFY, code: 'unconfirmed' }] },
-      type: 'allergy',
-    }),
-  ));
+async function writeAllergies(_patientId, _allergies) {
+  // No-op: allergies live in profiles.allergies, written by the profile save flow.
 }
 
 async function getPatientAllergies(patientId) {
-  if (!isConfigured()) return [];
-  try {
-    const result = await fhirRequest('GET', `AllergyIntolerance?patient=${patientRef(patientId)}&_count=50`);
-    const texts = (result?.entry ?? []).map((e) => e.resource?.code?.text).filter(Boolean);
-    return [...new Set(texts)];
-  } catch (err) {
-    console.warn('[healthlake] getPatientAllergies failed:', err.message);
+  const cacheKey = `allergies:${patientId}`;
+  const hit = cache.get(cacheKey);
+  if (hit !== undefined) return hit;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('allergies')
+    .eq('id', patientId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('[health-data] getPatientAllergies failed:', error.message);
     return [];
   }
+  const texts = String(data?.allergies || '').split(',').map((s) => s.trim()).filter(Boolean);
+  cache.set(cacheKey, texts, TTL_PROFILE);
+  return texts;
 }
 
-// ── MedicationStatements ──────────────────────────────────────────────────────
+// ── Medications ───────────────────────────────────────────────────────────────
 
-async function writeMedications(patientId, medications) {
-  if (!isConfigured()) return;
-  const items = String(medications || '').split(',').map((s) => s.trim()).filter(Boolean);
-  if (!items.length) return;
-  await Promise.allSettled(items.map((text) =>
-    fhirRequest('POST', 'MedicationStatement', {
-      resourceType: 'MedicationStatement',
-      status: 'active',
-      subject: { reference: `Patient/${patientId}` },
-      medicationCodeableConcept: { text },
-      effectivePeriod: { start: new Date().toISOString().slice(0, 10) },
-    }),
-  ));
+async function writeMedications(_patientId, _medications) {
+  // No-op: medications live in profiles.current_medications (if column exists).
 }
 
 async function getPatientMedications(patientId) {
-  if (!isConfigured()) return [];
-  try {
-    const result = await fhirRequest('GET', `MedicationStatement?patient=${patientRef(patientId)}&_count=50`);
-    const texts = (result?.entry ?? []).map((e) => e.resource?.medicationCodeableConcept?.text).filter(Boolean);
-    return [...new Set(texts)];
-  } catch (err) {
-    console.warn('[healthlake] getPatientMedications failed:', err.message);
-    return [];
-  }
+  const cacheKey = `medications:${patientId}`;
+  const hit = cache.get(cacheKey);
+  if (hit !== undefined) return hit;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('current_medications')
+    .eq('id', patientId)
+    .maybeSingle();
+
+  if (error || !data?.current_medications) return [];
+  const texts = String(data.current_medications).split(',').map((s) => s.trim()).filter(Boolean);
+  cache.set(cacheKey, texts, TTL_PROFILE);
+  return texts;
 }
 
 // ── Encounters ────────────────────────────────────────────────────────────────
-// Clinical fields (urgency, summary, safety_note, answers) live here.
-// Operational fields (doctor_id, source, status) stay in Supabase linked by fhir_encounter_id.
+// Clinical fields (urgency, summary, safety_note) are written directly by
+// encounters.js — writeEncounter is a no-op here.
 
-async function writeEncounter(patientId, encounter) {
-  if (!isConfigured()) return null;
-  const resource = {
-    resourceType: 'Encounter',
-    status: 'finished',
-    class: { system: SYS.ACT, code: 'AMB', display: 'ambulatory' },
-    subject: { reference: `Patient/${patientId}` },
-    period: { start: encounter.created_at || new Date().toISOString() },
-    ...(encounter.urgency ? {
-      priority: { coding: [{ system: 'urn:ogwu:urgency', code: encounter.urgency }] },
-    } : {}),
-    ...(encounter.summary ? { reasonCode: [{ text: encounter.summary }] } : {}),
-    note: [
-      ...(encounter.safety_note ? [{ text: encounter.safety_note }] : []),
-      ...(encounter.answers?.length ? [{ text: JSON.stringify(encounter.answers) }] : []),
-    ],
-  };
-  const result = await fhirRequest('POST', 'Encounter', resource);
-  return result?.id ?? null;
+async function writeEncounter(_patientId, _encounter) {
+  return null;
 }
 
 async function getEncounters(patientId) {
-  if (!isConfigured()) return [];
-  try {
-    const result = await fhirRequest('GET', `Encounter?patient=${patientRef(patientId)}&_sort=-date&_count=50`);
-    return (result?.entry ?? []).map((e) => {
-      const r = e.resource;
-      return {
-        fhir_id: r.id,
-        urgency: r.priority?.coding?.[0]?.code ?? 'routine',
-        summary: r.reasonCode?.[0]?.text ?? null,
-        safety_note: r.note?.find((n) => !n.text?.startsWith('['))?.text ?? null,
-        created_at: r.period?.start ?? null,
-      };
-    });
-  } catch (err) {
-    console.warn('[healthlake] getEncounters failed:', err.message);
+  const { data, error } = await supabase
+    .from('encounters')
+    .select('id, urgency, summary, safety_note, created_at')
+    .eq('patient_id', patientId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.warn('[health-data] getEncounters failed:', error.message);
     return [];
   }
+  return (data ?? []).map((r) => ({
+    fhir_id: r.id,
+    urgency: r.urgency ?? 'routine',
+    summary: r.summary ?? null,
+    safety_note: r.safety_note ?? null,
+    created_at: r.created_at ?? null,
+  }));
 }
 
 // ── ClinicalImpression (agent-generated consults) ─────────────────────────────
-
-async function getClinicalImpressions(patientId, limit = 5) {
-  if (!isConfigured()) return [];
-  try {
-    const lim = Math.max(1, Math.min(10, Number(limit)));
-    const result = await fhirRequest(
-      'GET',
-      `ClinicalImpression?patient=${patientRef(patientId)}&_sort=-date&_count=${lim}`,
-    );
-    return (result?.entry ?? []).map((e) => {
-      const r = e.resource;
-      return {
-        id: r.id,
-        complaint: r.summary ?? null,
-        urgency: r.extension?.find((x) => x.url === 'urn:ogwu:urgency')?.valueString ?? 'routine',
-        care_pathway: r.note?.[0]?.text ?? null,
-        created_at: r.date ?? null,
-      };
-    });
-  } catch (err) {
-    console.warn('[healthlake] getClinicalImpressions failed:', err.message);
-    return [];
-  }
-}
+// Stored in clinical_impressions table.
 
 async function writeClinicalImpression(patientId, consult) {
-  if (!isConfigured()) return null;
-  const result = await fhirRequest('POST', 'ClinicalImpression', {
-    resourceType: 'ClinicalImpression',
-    status: 'completed',
-    subject: { reference: `Patient/${patientId}` },
-    date: new Date().toISOString(),
-    summary: consult.complaint,
-    finding: (consult.symptoms || []).map((s) => ({ itemCodeableConcept: { text: s } })),
-    note: [
-      { text: consult.care_pathway || '' },
-      ...(consult.recommended_specialty ? [{ text: `Specialty: ${consult.recommended_specialty}` }] : []),
-    ],
-    extension: [
-      { url: 'urn:ogwu:urgency', valueString: consult.urgency || 'routine' },
-      { url: 'urn:ogwu:emergency-flagged', valueBoolean: !!consult.is_emergency_flagged },
-    ],
-  });
-  return result?.id ?? null;
+  for (let lim = 1; lim <= 10; lim++) cache.del(`impressions:${patientId}:${lim}`);
+
+  const { data, error } = await supabase
+    .from('clinical_impressions')
+    .insert({
+      patient_id: patientId,
+      complaint: consult.complaint || null,
+      urgency: consult.urgency || 'routine',
+      care_pathway: consult.care_pathway || null,
+      symptoms: consult.symptoms || [],
+      recommended_specialty: consult.recommended_specialty || null,
+      is_emergency_flagged: !!consult.is_emergency_flagged,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.warn('[health-data] writeClinicalImpression failed:', error.message);
+    return null;
+  }
+  return data?.id ?? null;
+}
+
+async function getClinicalImpressions(patientId, limit = 5) {
+  const lim = Math.max(1, Math.min(10, Number(limit)));
+  const cacheKey = `impressions:${patientId}:${lim}`;
+  const hit = cache.get(cacheKey);
+  if (hit !== undefined) return hit;
+
+  const { data, error } = await supabase
+    .from('clinical_impressions')
+    .select('id, complaint, urgency, care_pathway, created_at')
+    .eq('patient_id', patientId)
+    .order('created_at', { ascending: false })
+    .limit(lim);
+
+  if (error) {
+    console.warn('[health-data] getClinicalImpressions failed:', error.message);
+    return [];
+  }
+  const impressions = (data ?? []).map((r) => ({
+    id: r.id,
+    complaint: r.complaint ?? null,
+    urgency: r.urgency ?? 'routine',
+    care_pathway: r.care_pathway ?? null,
+    created_at: r.created_at ?? null,
+  }));
+  cache.set(cacheKey, impressions, TTL_CONSULTS);
+  return impressions;
 }
 
 module.exports = {
   isConfigured,
   upsertPatient,
-  // Triage
   writeTriageIntake,
   getTriageIntake,
   hasTriageIntake,
-  // Conditions / allergies / medications
   writeConditions,
   getPatientConditions,
   writeAllergies,
   getPatientAllergies,
   writeMedications,
   getPatientMedications,
-  // Encounters
   writeEncounter,
   getEncounters,
-  // Consults
   writeClinicalImpression,
   getClinicalImpressions,
 };

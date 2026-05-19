@@ -7,7 +7,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -17,8 +16,6 @@ import { t } from '../i18n';
 
 export function TriageScreen({
   busy,
-  step,
-  total,
   question,
   answer,
   setAnswer,
@@ -34,9 +31,8 @@ export function TriageScreen({
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Static header — scrolls independently of the keyboard */}
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.xl }}
+          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.lg }}
           keyboardShouldPersistTaps="handled"
           bounces={false}
         >
@@ -51,14 +47,7 @@ export function TriageScreen({
           <Text style={styles.title}>{t('triage.title')}</Text>
           <Text style={styles.helper}>{t('triage.helper')}</Text>
 
-          <View style={[styles.pill, { marginBottom: 24 }]}>
-            <Text style={styles.pillText}>{t('triage.progress', { step, total })}</Text>
-          </View>
-        </ScrollView>
-
-        {/* Input + button — rises smoothly with keyboard, no teleport */}
-        <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-          <Text style={styles.inputLabel}>{question}</Text>
+          <Text style={[styles.inputLabel, { marginTop: 28 }]}>{question}</Text>
           <TextInput
             value={answer}
             onChangeText={setAnswer}
@@ -80,7 +69,7 @@ export function TriageScreen({
               {busy ? t('triage.loading') : t('triage.next')}
             </Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

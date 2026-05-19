@@ -337,7 +337,7 @@ export function AppRouter() {
     const a = triageAnswer.trim();
     if (!q || !a) return;
 
-    const nextQa = [...triageQa, { q, a }].slice(0, 5);
+    const nextQa = [...triageQa, { q, a }];
     setTriageQa(nextQa);
     setTriageAnswer('');
 
@@ -493,8 +493,6 @@ export function AppRouter() {
       {screen === 'triage' && (
         <TriageScreen
           busy={busy}
-          step={Math.min(triageQa.length + 1, 5)}
-          total={5}
           question={triageQuestion || t('triage.loadingQuestion')}
           answer={triageAnswer}
           setAnswer={setTriageAnswer}

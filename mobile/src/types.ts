@@ -205,8 +205,6 @@ export type TriageQA = {
 };
 
 export type TriageScreenProps = ScreenPropsBase & {
-  step: number;
-  total: number;
   question: string;
   answer: string;
   setAnswer: (value: string) => void;

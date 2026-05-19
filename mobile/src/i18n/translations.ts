@@ -79,7 +79,7 @@ export const translations = {
     },
     triage: {
       title: 'Quick intake',
-      helper: 'Answer up to 5 short questions to help your doctor prepare.',
+      helper: 'Answer a few short questions to help your doctor prepare.',
       progress: 'Question %{step} of %{total}',
       placeholder: 'Type your answer…',
       next: 'Next',

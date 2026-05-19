@@ -4,7 +4,6 @@ const router = express.Router();
 
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
-const healthlake = require('../lib/healthlake');
 
 // List encounters for the signed-in patient
 router.get('/', authenticate, async (req, res) => {
@@ -52,21 +51,15 @@ router.post('/share', authenticate, async (req, res) => {
   try {
     const doctor_id = typeof req.body?.doctor_id === 'string' ? req.body.doctor_id : null;
 
-    const intake = await healthlake.getTriageIntake(req.user.id);
+    const { data: intake, error: intakeError } = await supabase
+      .from('triage_intakes')
+      .select('locale, urgency, summary, safety_note')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+
+    if (intakeError) return serverError(res, intakeError, 'Failed to load intake.');
     if (!intake) return res.status(400).json({ error: 'No intake found to share' });
 
-    // Write clinical data to HealthLake first; get back the FHIR id for linking.
-    const fhir_encounter_id = await healthlake.writeEncounter(req.user.id, {
-      urgency: intake.urgency,
-      summary: intake.summary,
-      safety_note: intake.safety_note,
-      answers: intake.answers,
-    }).catch((err) => {
-      console.warn('[healthlake] encounter write failed:', err.message);
-      return null;
-    });
-
-    // Store only operational fields in Supabase, linked by fhir_encounter_id.
     const { data, error } = await supabase
       .from('encounters')
       .insert({
@@ -75,9 +68,11 @@ router.post('/share', authenticate, async (req, res) => {
         source: 'share',
         status: 'shared',
         locale: intake.locale,
-        fhir_encounter_id,
+        urgency: intake.urgency,
+        summary: intake.summary,
+        safety_note: intake.safety_note,
       })
-      .select('id, patient_id, doctor_id, source, status, locale, fhir_encounter_id, created_at')
+      .select('id, patient_id, doctor_id, source, status, locale, urgency, summary, safety_note, created_at')
       .single();
 
     if (error) return serverError(res, error, 'Failed to create encounter.');
