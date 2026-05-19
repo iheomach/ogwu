@@ -99,12 +99,10 @@ async function extractEntitiesFromAnswers(answers) {
     return { entities: [], emergencySignaled: false, urgentSignaled: false };
   }
 
-  // One API call: answers only — question text often contains medical terms (e.g.
-  // "any vision changes or confusion?") that Comprehend would extract as patient
-  // symptoms even when the patient answered "No."
+  // One API call: concatenate all Q&A pairs (HealthLake pricing: per 100 chars)
   const text = answers
-    .filter(({ a }) => a)
-    .map(({ a }) => a)
+    .filter(({ q, a }) => q && a)
+    .map(({ q, a }) => `${q} ${a}`)
     .join('. ')
     .slice(0, 10000);
 
