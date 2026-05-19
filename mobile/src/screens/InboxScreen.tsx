@@ -216,8 +216,6 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
         if (threadsRes.status === 'fulfilled') {
           const list = Array.isArray(threadsRes.value.threads) ? threadsRes.value.threads : [];
           setThreads(list);
-          const openCount = list.filter(t => t.status === 'open').length;
-          onThreadCountChange?.(openCount);
         } else {
           setError(threadsRes.reason?.message ?? 'Failed to load inbox.');
         }
@@ -235,22 +233,38 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
   }, []);
 
   const openThreads = useMemo(
-    () => threads.filter(t => t.status === 'open').sort((a, b) => {
-      const aTime = a.last_message?.created_at ?? a.updated_at;
-      const bTime = b.last_message?.created_at ?? b.updated_at;
-      return bTime.localeCompare(aTime);
-    }),
-    [threads],
+    () => threads
+      .filter(t => {
+        if (t.status !== 'open') return false;
+        const appt = bestAppointment(t, appointments);
+        return !(appt && appt.status === 'cancelled');
+      })
+      .sort((a, b) => {
+        const aTime = a.last_message?.created_at ?? a.updated_at;
+        const bTime = b.last_message?.created_at ?? b.updated_at;
+        return bTime.localeCompare(aTime);
+      }),
+    [threads, appointments],
   );
 
   const closedThreads = useMemo(
-    () => threads.filter(t => t.status === 'closed').sort((a, b) => {
-      const aTime = a.last_message?.created_at ?? a.updated_at;
-      const bTime = b.last_message?.created_at ?? b.updated_at;
-      return bTime.localeCompare(aTime);
-    }),
-    [threads],
+    () => threads
+      .filter(t => {
+        if (t.status === 'closed') return true;
+        const appt = bestAppointment(t, appointments);
+        return !!(appt && appt.status === 'cancelled');
+      })
+      .sort((a, b) => {
+        const aTime = a.last_message?.created_at ?? a.updated_at;
+        const bTime = b.last_message?.created_at ?? b.updated_at;
+        return bTime.localeCompare(aTime);
+      }),
+    [threads, appointments],
   );
+
+  useEffect(() => {
+    onThreadCountChange?.(openThreads.length);
+  }, [openThreads]);
 
   const displayThreads = activeTab === 'active' ? openThreads : closedThreads;
 
@@ -272,7 +286,7 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
             {(['active', 'inactive'] as const).map(tab => {
               const isSelected = activeTab === tab;
               const count = tab === 'active' ? openThreads.length : closedThreads.length;
-              const dotColor = tab === 'active' ? '#16A34A' : colors.grey300;
+              const accentColor = tab === 'active' ? '#16A34A' : colors.grey300;
               return (
                 <TouchableOpacity
                   key={tab}
@@ -288,19 +302,18 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
                     paddingHorizontal: 10,
                     borderRadius: 10,
                     borderWidth: 1.5,
-                    borderColor: isSelected ? dotColor : glassSurface.borderSoft,
+                    borderColor: isSelected ? accentColor : glassSurface.borderSoft,
                     backgroundColor: isSelected
                       ? (tab === 'active' ? 'rgba(22,163,74,0.15)' : glassSurface.bgMid)
                       : glassSurface.bg,
                   }}
                 >
-                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: dotColor }} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? dotColor : colors.grey500, textTransform: 'capitalize' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? accentColor : colors.grey500, textTransform: 'capitalize' }}>
                     {tab}
                   </Text>
                   {count > 0 && (
                     <View style={{
-                      backgroundColor: dotColor,
+                      backgroundColor: accentColor,
                       borderRadius: 8,
                       minWidth: 18,
                       height: 18,
