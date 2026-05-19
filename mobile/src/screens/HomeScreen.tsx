@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -64,12 +64,16 @@ function QuickActionCard({
   subtitle,
   onPress,
   accent,
+  onLayout,
+  cardHeight,
 }: {
   icon: keyof typeof MaterialIcons.glyphMap;
   label: string;
   subtitle: string;
   onPress: () => void;
   accent?: string;
+  onLayout?: (e: any) => void;
+  cardHeight?: number;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
   const handlePressIn = () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 40 }).start();
@@ -81,8 +85,9 @@ function QuickActionCard({
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
+        onLayout={onLayout}
         activeOpacity={1}
-        style={styles.quickActionCard}
+        style={[styles.quickActionCard, cardHeight ? { minHeight: cardHeight } : undefined]}
       >
         <View style={[styles.quickActionIconBox, { backgroundColor: accent ? `${accent}22` : glassSurface.bgMid }]}>
           <MaterialIcons name={icon} size={20} color={accent ?? colors.purple} />
@@ -126,6 +131,11 @@ export function HomeScreen({
   const [intakeLoading, setIntakeLoading] = useState(true);
   const [intake, setIntake] = useState<TriageIntake | null>(null);
   const [homeSummary, setHomeSummary] = useState<string | null>(null);
+  const [cardH, setCardH] = useState(0);
+  const onCardLayout = useCallback((e: any) => {
+    const h = e.nativeEvent.layout.height;
+    setCardH(prev => Math.max(prev, h));
+  }, []);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
@@ -189,6 +199,8 @@ export function HomeScreen({
                 subtitle="Talk to your AI health assistant"
                 onPress={onGoNewConsult}
                 accent={colors.purple}
+                onLayout={onCardLayout}
+                cardHeight={cardH}
               />
               <QuickActionCard
                 icon="description"
@@ -196,6 +208,8 @@ export function HomeScreen({
                 subtitle="Past visits & history"
                 onPress={onGoRecords}
                 accent="#2563EB"
+                onLayout={onCardLayout}
+                cardHeight={cardH}
               />
             </View>
 

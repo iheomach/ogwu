@@ -12,6 +12,7 @@ type AppointmentRow = {
   id: string;
   hospital_id: string | null;
   starts_at: string;
+  created_at: string;
   status: string;
 };
 
@@ -27,9 +28,13 @@ function bestAppointment(thread: ConsultThread, appts: AppointmentRow[]): Appoin
   if (!thread.hospital_id) return null;
   const matching = appts.filter(a => a.hospital_id === thread.hospital_id);
   if (!matching.length) return null;
-  const now = new Date().toISOString();
-  const future = matching.filter(a => a.starts_at > now).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
-  return future[0] ?? matching.sort((a, b) => b.starts_at.localeCompare(a.starts_at))[0];
+  // Match the appointment whose created_at is closest to (and ideally just before) the thread's created_at.
+  // Appointments are created seconds before the thread when booked through OgwuAI.
+  const threadMs = new Date(thread.created_at).getTime();
+  const withDelta = matching.map(a => ({ a, delta: threadMs - new Date(a.created_at).getTime() }));
+  const before = withDelta.filter(x => x.delta >= 0).sort((x, y) => x.delta - y.delta);
+  if (before.length) return before[0].a;
+  return withDelta.sort((x, y) => Math.abs(x.delta) - Math.abs(y.delta))[0].a;
 }
 
 function timeAgo(iso: string): string {
