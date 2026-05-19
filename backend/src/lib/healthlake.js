@@ -42,6 +42,7 @@ async function writeTriageIntake(patientId, { locale, answers, urgency, summary,
   if (error) throw new Error(`writeTriageIntake failed: ${error.message}`);
   cache.del(`triage:${patientId}`);
   cache.del(`has-triage:${patientId}`);
+  cache.del(`home-summary:${patientId}`);
 }
 
 async function getTriageIntake(patientId) {

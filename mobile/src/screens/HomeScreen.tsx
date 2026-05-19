@@ -12,7 +12,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 import type { HomeScreenProps } from '../types';
 import type { TriageIntake } from '../types';
-import { triageGetIntake } from '../lib/triage';
+import { triageGetIntake, triageHomeSummary } from '../lib/triage';
 import { colors, styles, spacing } from '../ui/styles';
 import { t } from '../i18n';
 
@@ -95,22 +95,16 @@ function QuickActionCard({
   );
 }
 
-function firstSentence(text: string | null | undefined): string {
-  if (!text) return '';
-  const m = text.match(/^[^.!?]*[.!?]/);
-  return m ? m[0].trim() : text.slice(0, 120).trim();
-}
-
-function UrgencyBanner({ intake }: { intake: TriageIntake }) {
+function UrgencyBanner({ intake, homeSummary }: { intake: TriageIntake; homeSummary: string | null }) {
   const cfg = urgencyConfig(intake.urgency ?? 'routine');
-  const sentence = firstSentence(intake.summary) || `${intake.answers.length} intake answers on file`;
+  const text = homeSummary ?? `${intake.answers.length} intake answer${intake.answers.length === 1 ? '' : 's'} recorded`;
   return (
     <View style={[styles.urgencyBannerRow, { backgroundColor: cfg.bg, borderColor: `${cfg.fg}30` }]}>
       <MaterialIcons name={cfg.icon} size={18} color={cfg.fg} />
       <View style={{ flex: 1 }}>
         <Text style={[styles.urgencyBannerLabel, { color: cfg.fg }]}>{cfg.label}</Text>
-        <Text style={[styles.urgencyBannerSummary, { color: cfg.fg }]} numberOfLines={1}>
-          {sentence}
+        <Text style={[styles.urgencyBannerSummary, { color: cfg.fg }]} numberOfLines={2}>
+          {text}
         </Text>
       </View>
     </View>
@@ -129,6 +123,7 @@ export function HomeScreen({
   const displayName = profile?.first_name?.trim() || '';
   const [intakeLoading, setIntakeLoading] = useState(true);
   const [intake, setIntake] = useState<TriageIntake | null>(null);
+  const [homeSummary, setHomeSummary] = useState<string | null>(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
@@ -144,8 +139,13 @@ export function HomeScreen({
     let mounted = true;
     (async () => {
       try {
-        const res = await triageGetIntake();
-        if (mounted) setIntake(res.intake);
+        const [intakeRes, summaryRes] = await Promise.all([
+          triageGetIntake(),
+          triageHomeSummary(),
+        ]);
+        if (!mounted) return;
+        setIntake(intakeRes.intake);
+        setHomeSummary(summaryRes.summary);
       } catch {
         if (mounted) setIntake(null);
       } finally {
@@ -207,7 +207,7 @@ export function HomeScreen({
               </View>
             ) : intake ? (
               <View style={styles.healthStatusCard}>
-                <UrgencyBanner intake={intake} />
+                <UrgencyBanner intake={intake} homeSummary={homeSummary} />
 
                 {tags.length > 0 && (
                   <View>

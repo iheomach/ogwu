@@ -68,3 +68,7 @@ export async function triageStatus(): Promise<TriageStatusResponse> {
 export async function triageGetIntake(): Promise<TriageIntakeResponse> {
   return apiGet<TriageIntakeResponse>('/api/triage/intake');
 }
+
+export async function triageHomeSummary(): Promise<{ summary: string | null }> {
+  return apiGet<{ summary: string | null }>('/api/triage/home-summary');
+}

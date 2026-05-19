@@ -62,7 +62,7 @@ function previewText(th: ConsultThread): string | null {
 
 // ── Thread row ────────────────────────────────────────────────────────────────
 
-function ThreadRow({ thread, onPress }: { thread: ConsultThread; onPress: () => void }) {
+function ThreadRow({ thread, onPress, muted }: { thread: ConsultThread; onPress: () => void; muted?: boolean }) {
   const urg = thread.urgency ?? thread.intake_snapshot?.urgency ?? 'routine';
   const color = urgencyColor(urg);
   const activityTime = thread.last_message?.created_at ?? thread.updated_at;
@@ -82,7 +82,8 @@ function ThreadRow({ thread, onPress }: { thread: ConsultThread; onPress: () => 
         padding: 14,
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: hasProviderReply ? `${color}30` : 'rgba(69,0,80,0.07)',
+        borderColor: muted ? 'rgba(69,0,80,0.07)' : hasProviderReply ? `${color}30` : 'rgba(69,0,80,0.07)',
+        opacity: muted ? 0.7 : 1,
         shadowColor: colors.purple,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
@@ -90,12 +91,11 @@ function ThreadRow({ thread, onPress }: { thread: ConsultThread; onPress: () => 
         elevation: 2,
       }}
     >
-      {/* Urgency dot */}
       <View style={{
         width: 10,
         height: 10,
         borderRadius: 5,
-        backgroundColor: color,
+        backgroundColor: muted ? colors.grey300 : color,
         marginTop: 5,
         flexShrink: 0,
       }} />
@@ -115,15 +115,22 @@ function ThreadRow({ thread, onPress }: { thread: ConsultThread; onPress: () => 
         </Text>
 
         {preview ? (
-          <Text style={{ fontSize: 13, color: hasProviderReply ? colors.grey900 : colors.grey500, lineHeight: 18 }} numberOfLines={2}>
+          <Text style={{ fontSize: 13, color: (!muted && hasProviderReply) ? colors.grey900 : colors.grey500, lineHeight: 18 }} numberOfLines={2}>
             {preview}
           </Text>
         ) : null}
 
-        {hasProviderReply && (
+        {!muted && hasProviderReply && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
             <Text style={{ fontSize: 11, fontWeight: '600', color }}>Provider replied</Text>
+          </View>
+        )}
+
+        {muted && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
+            <MaterialIcons name="check-circle" size={12} color={colors.grey300} />
+            <Text style={{ fontSize: 11, color: colors.grey300 }}>Closed</Text>
           </View>
         )}
       </View>
@@ -146,6 +153,7 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
   const [loading, setLoading] = useState(true);
   const [threads, setThreads] = useState<ConsultThread[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
 
   useEffect(() => {
     let mounted = true;
@@ -171,13 +179,23 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
 
   const openThreads = useMemo(
     () => threads.filter(t => t.status === 'open').sort((a, b) => {
-      // Provider replies bubble to top
       const aTime = a.last_message?.created_at ?? a.updated_at;
       const bTime = b.last_message?.created_at ?? b.updated_at;
       return bTime.localeCompare(aTime);
     }),
     [threads],
   );
+
+  const closedThreads = useMemo(
+    () => threads.filter(t => t.status === 'closed').sort((a, b) => {
+      const aTime = a.last_message?.created_at ?? a.updated_at;
+      const bTime = b.last_message?.created_at ?? b.updated_at;
+      return bTime.localeCompare(aTime);
+    }),
+    [threads],
+  );
+
+  const displayThreads = activeTab === 'active' ? openThreads : closedThreads;
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
@@ -187,9 +205,60 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Inbox</Text>
-        <Text style={[styles.helper, { marginBottom: 24 }]}>
-          Active conversations with your care team.
+        <Text style={[styles.helper, { marginBottom: 20 }]}>
+          Your async consultations with providers.
         </Text>
+
+        {/* Active / Inactive tabs */}
+        {!loading && !error && (
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+            {(['active', 'inactive'] as const).map(tab => {
+              const isSelected = activeTab === tab;
+              const count = tab === 'active' ? openThreads.length : closedThreads.length;
+              const dotColor = tab === 'active' ? '#16A34A' : colors.grey300;
+              return (
+                <TouchableOpacity
+                  key={tab}
+                  onPress={() => setActiveTab(tab)}
+                  activeOpacity={0.8}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    paddingVertical: 9,
+                    paddingHorizontal: 10,
+                    borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: isSelected ? dotColor : 'rgba(0,0,0,0.07)',
+                    backgroundColor: isSelected
+                      ? (tab === 'active' ? 'rgba(22,163,74,0.08)' : 'rgba(0,0,0,0.04)')
+                      : 'transparent',
+                  }}
+                >
+                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: dotColor }} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? dotColor : colors.grey500, textTransform: 'capitalize' }}>
+                    {tab}
+                  </Text>
+                  {count > 0 && (
+                    <View style={{
+                      backgroundColor: dotColor,
+                      borderRadius: 8,
+                      minWidth: 18,
+                      height: 18,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingHorizontal: 4,
+                    }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.white }}>{count}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
         {loading && (
           <View style={{ alignItems: 'center', paddingVertical: 40 }}>
@@ -201,7 +270,7 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
           <Text style={[styles.helper, { color: colors.error }]}>{error}</Text>
         )}
 
-        {!loading && !error && openThreads.length === 0 && (
+        {!loading && !error && displayThreads.length === 0 && (
           <View style={{
             alignItems: 'center',
             paddingVertical: 48,
@@ -219,29 +288,35 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
               <MaterialIcons name="inbox" size={30} color={colors.purple} />
             </View>
             <Text style={{ fontSize: 16, fontWeight: '700', color: colors.grey900, marginBottom: 8, textAlign: 'center' }}>
-              No active conversations
+              {activeTab === 'active' ? 'No active conversations' : 'No closed conversations'}
             </Text>
             <Text style={{ fontSize: 13, color: colors.grey500, textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
-              When you book an appointment or get referred to a provider, your conversation thread will appear here.
+              {activeTab === 'active'
+                ? 'When you book an appointment or get referred to a provider, your conversation thread will appear here.'
+                : 'Closed consultations will appear here for your records.'
+              }
             </Text>
-            <TouchableOpacity
-              onPress={onOpenAssistant}
-              activeOpacity={0.85}
-              style={[styles.btnPrimary, busy && styles.btnPrimaryDisabled]}
-              disabled={busy}
-            >
-              <Text style={styles.btnPrimaryText}>Start a consultation</Text>
-            </TouchableOpacity>
+            {activeTab === 'active' && (
+              <TouchableOpacity
+                onPress={onOpenAssistant}
+                activeOpacity={0.85}
+                style={[styles.btnPrimary, busy && styles.btnPrimaryDisabled]}
+                disabled={busy}
+              >
+                <Text style={styles.btnPrimaryText}>Start a consultation</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
-        {!loading && !error && openThreads.length > 0 && (
+        {!loading && !error && displayThreads.length > 0 && (
           <View>
-            {openThreads.map(th => (
+            {displayThreads.map(th => (
               <ThreadRow
                 key={th.id}
                 thread={th}
                 onPress={() => onOpenThread(th.id)}
+                muted={activeTab === 'inactive'}
               />
             ))}
           </View>

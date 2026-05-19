@@ -4,9 +4,12 @@ const serverError = require('../lib/serverError');
 const express = require('express');
 const router = express.Router();
 
+const { generateText } = require('ai');
+const { openai } = require('@ai-sdk/openai');
 const supabase = require('../lib/supabase');
 const authenticate = require('../middleware/auth');
 const healthlake = require('../lib/healthlake');
+const cache = require('../lib/cache');
 const { runTriageNext, runTriageComplete } = require('../lib/triageGraph');
 
 function safeLocale(locale) {
@@ -92,6 +95,57 @@ router.get('/intake', authenticate, async (req, res) => {
     return res.json({ intake: data ?? null });
   } catch (err) {
     return serverError(res, err, 'Failed to load triage intake.', 400);
+  }
+});
+
+// Generates (and caches) a short LLM summary for the home screen health status banner.
+// Cache is invalidated automatically when triage completes (writeTriageIntake).
+// Edit the prompt below to change the wording/style shown on the home screen.
+router.get('/home-summary', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const cacheKey = `home-summary:${userId}`;
+
+    const hit = cache.get(cacheKey);
+    if (hit !== undefined) return res.json({ summary: hit });
+
+    const { data: intake, error } = await supabase
+      .from('triage_intakes')
+      .select('urgency, summary, answers')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) return serverError(res, error, 'An error occurred.', 400);
+    if (!intake) return res.json({ summary: null });
+
+    const answerText = Array.isArray(intake.answers)
+      ? intake.answers.map(({ q, a }) => `Q: ${q}\nA: ${a}`).join('\n\n')
+      : '';
+
+    // ── Edit this prompt to change the home screen health status text ──────────
+    const prompt =
+      `You are writing a 1–2 sentence health status blurb for a patient's app home screen.\n` +
+      `Be direct and clinical. Write in second person ("you", "your").\n` +
+      `Focus on the chief complaint and key symptom details — not demographics.\n` +
+      `Do not mention the patient's name, age, or sex.\n` +
+      `Do not repeat the urgency word (it is already shown as a separate label).\n` +
+      `Do not use bullet points or em dashes. End with a period.\n\n` +
+      `Urgency: ${intake.urgency}\n` +
+      `Clinical summary:\n${intake.summary || '(none)'}\n\n` +
+      `Triage answers:\n${answerText || '(none)'}`;
+    // ──────────────────────────────────────────────────────────────────────────
+
+    const { text } = await generateText({
+      model: openai('gpt-4o-mini'),
+      prompt,
+      maxTokens: 80,
+    });
+
+    const summary = text.trim() || null;
+    cache.set(cacheKey, summary, 24 * 60 * 60 * 1000);
+    return res.json({ summary });
+  } catch (err) {
+    return serverError(res, err, 'Failed to generate home summary.');
   }
 });
 

@@ -1238,6 +1238,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                     setSendingToHospital(true);
                     const res = await threadsCreate({ hospital_id: endConversationData.hospitalId });
                     const threadId = res?.thread?.id;
+                    await handleClearChat();
                     if (threadId && onOpenThread) onOpenThread(threadId);
                   } catch (e: any) {
                     Alert.alert('Error', e?.message ?? 'Could not send summary');
