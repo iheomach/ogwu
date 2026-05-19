@@ -81,7 +81,9 @@ function hasEmergencyKeywordFallback(text) {
 }
 
 function computeUrgencyFromState(state) {
-  const text = (state.answers || []).map((x) => `${x?.q || ''} ${x?.a || ''}`).join(' ');
+  // Scan answers only — questions often contain emergency keywords (e.g. "any confusion?")
+  // which would falsely fire if we included question text.
+  const text = (state.answers || []).map((x) => x?.a || '').join(' ');
   if (hasEmergencyKeywordFallback(text) || state.emergency_signaled) return 'emergency';
   const t = normalizeText(text);
   if (URGENT_KEYWORD_FALLBACKS.some((kw) => t.includes(kw)) || state.urgent_signaled) return 'urgent';
