@@ -370,7 +370,7 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
               <TouchableOpacity
                 onPress={onOpenAssistant}
                 activeOpacity={0.85}
-                style={[styles.btnPrimary, busy && styles.btnPrimaryDisabled]}
+                style={[styles.btnPrimary, busy && styles.btnPrimaryDisabled, { paddingHorizontal: spacing.lg }]}
                 disabled={busy}
               >
                 <Text style={styles.btnPrimaryText}>Start a consultation</Text>

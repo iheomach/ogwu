@@ -1,18 +1,18 @@
 # Ogwu
 
-Ogwu is an AI-powered healthcare platform for patients in Nigeria and emerging markets. Patients complete a short triage, then interact with an AI agent that searches a hospital directory, recommends care options, and books appointments — all in one conversational flow. Clinicians manage their patients, consults, and settings through a separate web admin dashboard.
+Ogwu is an AI-powered healthcare platform for patients in Nigeria and emerging markets. Patients complete a short triage, then interact with OgwuAI — a conversational agent that searches a hospital directory, recommends care options, and books appointments. Clinicians manage their patients, consults, and settings through a separate web admin dashboard.
 
 ---
 
 ## Screenshots
 
-| Triage | AI Agent |
+| Triage | OgwuAI agent |
 |---|---|
-| ![Triage in progress](docs/screenshots/triage.png) | ![AI health assistant](docs/screenshots/agent.png) |
+| ![Triage in progress](docs/screenshots/triage.png) | ![OgwuAI health assistant](docs/screenshots/agent.png) |
 
-| Booking confirmation | Records & consults |
+| Booking confirmation | Inbox |
 |---|---|
-| ![Appointment booked](docs/screenshots/booking.png) | ![Records screen](docs/screenshots/records.png) |
+| ![Appointment booked](docs/screenshots/booking.png) | ![Inbox screen](docs/screenshots/records.png) |
 
 ---
 
@@ -26,7 +26,7 @@ ogwu/
 ```
 
 - Mobile uses the Supabase `anon` key and communicates with the backend for anything requiring secrets
-- Backend uses the Supabase `service_role` key and handles all OpenAI/Google API calls
+- Backend uses the Supabase `service_role` key and handles all OpenAI/AWS/Google API calls
 - Web admin dashboard lives in a separate repo: `ogwu-web-admin-client`
 - Deployed on Railway; database on Supabase Cloud
 
@@ -37,31 +37,42 @@ ogwu/
 ### Patient mobile app
 - Phone OTP authentication
 - Onboarding — name, DOB, sex, allergies, known conditions
-- AI-powered triage (up to 5 questions) with urgency tier classification and safety note
-- AI health assistant with multi-step tool orchestration:
+- AI-powered triage (up to 5 questions) with urgency tier classification (`routine` / `soon` / `urgent` / `emergency`) and safety note
+- AWS Comprehend Medical entity extraction — ICD-10-CM codes extracted from triage responses; emergency ICD-10-CM prefixes (S, T, I, J, K, R, G) upgrade the urgency tier
+- OgwuAI — conversational health agent with multi-step tool orchestration:
   - Hospital directory search ranked by GPS proximity
   - Google Calendar slot availability for onboarded hospitals
   - Appointment booking with Google Meet link generation
   - Emergency escalation, drug interaction checks, consult history retrieval
-- Triage context injected into the agent — no repeated questions
-- Async consultation threads — patient ↔ provider messaging, open/closed states
-- Health report export (shareable summary of records)
+- Triage context injected into OgwuAI — no repeated questions
+- Inbox with async consultation threads:
+  - Active tab shows open threads; inactive tab shows closed threads and threads with cancelled appointments
+  - Each thread shows the matched appointment date and time
+  - Provider reply indicator; three-dot menu to cancel a consult from within the thread
+- Liquid glass design system — dark violet backdrop, frosted surfaces, floating tab bar
 - Multi-language UI: English, Spanish, French, Igbo, Yoruba, Hausa
 
 ### Backend / AI agent
 - LangGraph stateful directed graph — one node per tool, conditional emergency routing, Postgres checkpointing for fault tolerance
 - Human-in-the-loop interrupt before booking confirmation — graph pauses, patient confirms, then resumes from saved state
 - 8 tools: hospital search, slot availability, appointment booking, drug interactions, emergency flag, consult history, consult creation, end-conversation
-- GPT-generated thread titles from triage summaries
-- Triage pipeline: question generation → urgency classification → summary → context injection
+- GPT-4o-mini generated thread titles from triage summaries
+- Triage pipeline: two LangGraph graphs — `nextGraph` drives the interview (question generation, done-check); `completeGraph` runs AWS Comprehend Medical entity extraction → urgency classification → summarization → Supabase write
+- Health data abstraction layer (`healthlake.js`) — Supabase-backed storage for triage intakes, clinical impressions, encounters, conditions, allergies, and medications; API designed for a future drop-in migration to AWS HealthLake when scale warrants it
+- Two-tier rate limiting — global IP limiter (300 req / 15 min) + per-user limiter (20 req / min) on expensive routes
 - Google Calendar + Meet integration per hospital
 - JWT auth middleware scoped to patient identity
+
+### Web admin dashboard
+- Appointment management — view, confirm, reschedule, and cancel appointments
+- Cancelling an appointment automatically posts a system message to the patient's consult thread and closes the thread
+- Hospital-scoped RLS: admin users only see data for their own hospital
 
 ### Database
 - Supabase Postgres with row-level security on all tables
 - Hospital-scoped RLS for admin dashboard access
 - 150+ hospitals seeded across Nigeria, India, and the US
-- 20 migrations covering schema, policies, and seed data
+- 20+ migrations covering schema, policies, and seed data
 
 ---
 
@@ -72,7 +83,9 @@ ogwu/
 | Mobile | React Native (Expo), TypeScript |
 | Backend | Node.js, Express, LangGraph |
 | AI | OpenAI GPT-4o-mini, LangGraph ReAct agent with per-tool nodes |
-| Database | Supabase (Postgres + pgvector + Auth) |
+| Medical NLP | AWS Comprehend Medical (ICD-10-CM entity extraction) |
+| Clinical data | Supabase via `healthlake.js` abstraction layer |
+| Database | Supabase (Postgres + Auth) |
 | Integrations | Google Calendar API, Google Meet |
 | Admin dashboard | React, TypeScript, Vite, Tailwind CSS |
 
@@ -81,7 +94,6 @@ ogwu/
 ## Current limitations
 
 - No retry or fallback logic — tool errors surface to the patient with no exponential backoff or alternative path
-- No guardrails or evals on urgency output; emergency triage produces a badge but no provider alert
 - Zero automated tests; no auth token refresh; missing HTTP security headers (CSP, HSTS)
 
 ---
@@ -92,10 +104,9 @@ See [`FUTURE_IMPLEMENTATION.md`](./FUTURE_IMPLEMENTATION.md) for full implementa
 
 **Agent & AI**
 - [x] LangGraph agentic orchestration — stateful graphs, Postgres checkpointing, human-in-the-loop before booking
-- [ ] AWS Comprehend Medical — medical entity extraction (ICD-10-CM, RxNorm) to ground urgency classification
-- [ ] AWS HealthLake (FHIR R4) — versioned clinical data store replacing raw Supabase JSON
-- [ ] Evaluation & guardrails — urgency output validation, content safety filter, provider alert on emergency
-- [ ] Tool use hardening — Zod schemas on all tool I/O, scoped permissions, tool call logging
+- [x] AWS Comprehend Medical — ICD-10-CM entity extraction to ground urgency classification
+- [x] Evaluation & guardrails — LlamaGuard content safety on every user message and agent response; OpenAI omni-moderation; web push + email alert to hospital admin on emergency escalation
+- [x] Tool use hardening — Zod input schemas on all 8 skills, tool call/result logging, auth-scoped skill context, retry prevention guards in tool dispatcher
 - [ ] Error recovery — exponential backoff, fallback booking paths, escalation on repeated failures
 - [ ] Context & memory management — sliding-window trim to prevent silent token-limit truncation
 
@@ -108,6 +119,7 @@ See [`FUTURE_IMPLEMENTATION.md`](./FUTURE_IMPLEMENTATION.md) for full implementa
 - [ ] Bedrock Data Automation — extract structured data from uploaded health records and policy documents
 - [ ] Hospital knowledge base + regulatory assistant — pgvector RAG powering agent grounding and admin document Q&A
 - [ ] Read receipts & typing indicators — Supabase Realtime presence on consult threads
+- [ ] AWS HealthLake — migrate `healthlake.js` from Supabase to AWS HealthLake FHIR R4; abstraction layer already in place so call sites need no changes; intentionally deferred until user scale justifies the cost
 
 **Infrastructure**
 - [ ] Automated test suite — Jest + Supertest integration tests, GitHub Actions CI
@@ -142,8 +154,11 @@ OPENAI_API_KEY
 GOOGLE_OAUTH_CLIENT_ID
 GOOGLE_OAUTH_CLIENT_SECRET
 GOOGLE_OAUTH_REDIRECT_URI
-DATABASE_URL          # Supabase Postgres connection string — used by LangGraph checkpointer
-OPENAI_MODEL          # optional, defaults to gpt-4o-mini
+DATABASE_URL                  # Supabase Postgres connection string — used by LangGraph checkpointer
+AWS_REGION                    # e.g. us-east-1
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+OPENAI_MODEL                  # optional, defaults to gpt-4o-mini
 ```
 
 ### Mobile
@@ -159,7 +174,7 @@ Required environment variables:
 ```
 EXPO_PUBLIC_SUPABASE_URL
 EXPO_PUBLIC_SUPABASE_ANON_KEY
-EXPO_PUBLIC_API_URL   # backend base URL — use LAN IP (not localhost) on physical devices
+EXPO_PUBLIC_API_URL           # backend base URL — use LAN IP (not localhost) on physical devices
 ```
 
 ### Database

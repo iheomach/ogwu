@@ -37,7 +37,6 @@ export function TriageScreen({
         style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}
       >
         <MaterialIcons name="arrow-back-ios" size={16} color={colors.purpleGlow} />
-        <Text style={[styles.btnGhostText, { marginLeft: 2 }]}>{t('common.back')}</Text>
       </TouchableOpacity>
 
       <KeyboardAvoidingView
@@ -49,9 +48,6 @@ export function TriageScreen({
           keyboardShouldPersistTaps="handled"
           bounces={false}
         >
-          <View style={styles.brandRow}>
-            <Image source={require('../../assets/ogwu-mark.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
-          </View>
 
           <Text style={styles.title}>{t('triage.title')}</Text>
           <Text style={styles.helper}>{t('triage.helper')}</Text>
