@@ -8,6 +8,76 @@ import { colors, styles } from '../ui/styles';
 import { languageLabels, t } from '../i18n';
 import { SUPPORTED_LOCALES, type SupportedLocale } from '../i18n/translations';
 
+function parseTags(raw: string | null | undefined): string[] {
+  return String(raw || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function TagInput({
+  tags,
+  onChange,
+  placeholder,
+  disabled,
+}: {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+  placeholder: string;
+  disabled: boolean;
+}) {
+  const [draft, setDraft] = useState('');
+
+  function addTag() {
+    const val = draft.trim();
+    if (!val) return;
+    if (!tags.map((t) => t.toLowerCase()).includes(val.toLowerCase())) {
+      onChange([...tags, val]);
+    }
+    setDraft('');
+  }
+
+  function removeTag(index: number) {
+    onChange(tags.filter((_, i) => i !== index));
+  }
+
+  return (
+    <View>
+      {tags.length > 0 && (
+        <View style={styles.tagInputWrap}>
+          {tags.map((tag, i) => (
+            <View key={i} style={styles.tagChip}>
+              <Text style={styles.tagChipText}>{tag}</Text>
+              {!disabled && (
+                <TouchableOpacity onPress={() => removeTag(i)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  <MaterialIcons name="close" size={13} color={colors.purple} />
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
+      {!disabled && (
+        <View style={styles.tagAddRow}>
+          <TextInput
+            style={styles.tagAddInput}
+            value={draft}
+            onChangeText={setDraft}
+            placeholder={placeholder}
+            placeholderTextColor={colors.grey300}
+            onSubmitEditing={addTag}
+            returnKeyType="done"
+            blurOnSubmit={false}
+          />
+          <TouchableOpacity style={styles.tagAddBtn} onPress={addTag} activeOpacity={0.8}>
+            <Text style={styles.tagAddBtnText}>Add</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
 function ProfileRow({
   label,
   value,
@@ -39,9 +109,16 @@ export function ProfileScreen({
 }: ProfileScreenProps) {
   const [languageOpen, setLanguageOpen] = useState(false);
   const [languageMenuVisible, setLanguageMenuVisible] = useState(false);
-  const [allergies, setAllergies] = useState(profile?.allergies ?? '');
-  const [conditions, setConditions] = useState(profile?.known_conditions ?? '');
+  const [allergyTags, setAllergyTags] = useState<string[]>(() => parseTags(profile?.allergies));
+  const [conditionTags, setConditionTags] = useState<string[]>(() => parseTags(profile?.known_conditions));
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (profile && !saving) {
+      setAllergyTags(parseTags(profile.allergies));
+      setConditionTags(parseTags(profile.known_conditions));
+    }
+  }, [profile?.allergies, profile?.known_conditions]);
 
   const menuAnim = useRef(new Animated.Value(0)).current;
   const menuMaxHeight = useMemo(() => SUPPORTED_LOCALES.length * 48, []);
@@ -66,6 +143,7 @@ export function ProfileScreen({
       });
     }
   }, [languageOpen, menuAnim]);
+
   const displayFullName = [profile?.first_name, profile?.middle_name, profile?.last_name]
     .filter((p) => (p ?? '').trim().length > 0)
     .join(' ');
@@ -83,30 +161,24 @@ export function ProfileScreen({
           <ProfileRow label={t('home.sex')} value={profile?.biological_sex} />
 
           {/* Editable: allergies */}
-          <View style={[styles.profileField]}>
+          <View style={styles.profileField}>
             <Text style={styles.label}>{t('home.allergies')}</Text>
-            <TextInput
-              value={allergies}
-              onChangeText={setAllergies}
-              placeholder="e.g. Penicillin, peanuts"
-              placeholderTextColor={colors.grey300}
-              style={styles.profileEditInput}
-              editable={!busy && !saving}
-              multiline
+            <TagInput
+              tags={allergyTags}
+              onChange={setAllergyTags}
+              placeholder="e.g. Penicillin"
+              disabled={busy || saving}
             />
           </View>
 
           {/* Editable: conditions */}
           <View style={[styles.profileField, styles.profileFieldLast]}>
             <Text style={styles.label}>{t('home.conditions')}</Text>
-            <TextInput
-              value={conditions}
-              onChangeText={setConditions}
-              placeholder="e.g. Hypertension, diabetes"
-              placeholderTextColor={colors.grey300}
-              style={styles.profileEditInput}
-              editable={!busy && !saving}
-              multiline
+            <TagInput
+              tags={conditionTags}
+              onChange={setConditionTags}
+              placeholder="e.g. Hypertension"
+              disabled={busy || saving}
             />
           </View>
         </View>
@@ -116,7 +188,7 @@ export function ProfileScreen({
           onPress={async () => {
             setSaving(true);
             try {
-              await onSaveProfile(allergies.trim(), conditions.trim());
+              await onSaveProfile(allergyTags.join(', '), conditionTags.join(', '));
             } finally {
               setSaving(false);
             }

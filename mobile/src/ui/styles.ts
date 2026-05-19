@@ -484,6 +484,53 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(69,0,80,0.06)',
   },
 
+  // ─── Tag input ───────────────────────────────────────────────────────────
+  tagInputWrap: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: 8,
+    marginTop: 6,
+  },
+  tagChip: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: 'rgba(69,0,80,0.07)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    gap: 5,
+  },
+  tagChipText: {
+    fontSize: 13,
+    color: colors.purple,
+    fontWeight: '600' as const,
+  },
+  tagAddRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginTop: 10,
+    gap: 8,
+  },
+  tagAddInput: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.grey900,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(69,0,80,0.2)',
+    paddingVertical: 4,
+  },
+  tagAddBtn: {
+    backgroundColor: colors.purple,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  tagAddBtnText: {
+    fontSize: 13,
+    color: colors.white,
+    fontWeight: '600' as const,
+  },
+
   // ─── Home — no-intake empty card ─────────────────────────────────────────
   noIntakeCard: {
     backgroundColor: colors.white,
