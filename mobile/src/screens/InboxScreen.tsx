@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import type { ConsultThread } from '../types';
-import { threadsList, threadsClose } from '../lib/threads';
+import { threadsList } from '../lib/threads';
 import { apiGet } from '../lib/api';
 import { colors, glassSurface, styles, spacing } from '../ui/styles';
 
@@ -91,11 +91,10 @@ function previewText(th: ConsultThread): string | null {
 // ── Thread row ────────────────────────────────────────────────────────────────
 
 function ThreadRow({
-  thread, onPress, onCancel, muted, appointment,
+  thread, onPress, muted, appointment,
 }: {
   thread: ConsultThread;
   onPress: () => void;
-  onCancel?: () => void;
   muted?: boolean;
   appointment?: AppointmentRow | null;
 }) {
@@ -183,16 +182,6 @@ function ThreadRow({
         <MaterialIcons name="chevron-right" size={18} color={colors.grey300} style={{ marginTop: 2 }} />
       </TouchableOpacity>
 
-      {!muted && onCancel && (
-        <TouchableOpacity
-          onPress={onCancel}
-          activeOpacity={0.7}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 6, paddingRight: 2 }}
-        >
-          <MaterialIcons name="cancel" size={12} color={colors.error} />
-          <Text style={{ fontSize: 12, color: colors.error, fontWeight: '500' }}>Cancel consult</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
@@ -244,32 +233,6 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
     })();
     return () => { mounted = false; };
   }, []);
-
-  const handleCancel = (threadId: string) => {
-    Alert.alert(
-      'Cancel consult',
-      'This will close the consultation. The provider will no longer be able to reply.',
-      [
-        { text: 'Keep open', style: 'cancel' },
-        {
-          text: 'Cancel consult',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await threadsClose(threadId);
-              setThreads(prev => {
-                const updated = prev.map(t => t.id === threadId ? { ...t, status: 'closed' as const } : t);
-                onThreadCountChange?.(updated.filter(t => t.status === 'open').length);
-                return updated;
-              });
-            } catch (e: any) {
-              Alert.alert('Error', e?.message ?? 'Could not cancel consult.');
-            }
-          },
-        },
-      ]
-    );
-  };
 
   const openThreads = useMemo(
     () => threads.filter(t => t.status === 'open').sort((a, b) => {
@@ -411,7 +374,6 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
                 thread={th}
                 onPress={() => onOpenThread(th.id)}
                 muted={activeTab === 'inactive'}
-                onCancel={activeTab === 'active' ? () => handleCancel(th.id) : undefined}
                 appointment={bestAppointment(th, appointments)}
               />
             ))}

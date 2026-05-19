@@ -567,9 +567,8 @@ export function AppRouter() {
         <ThreadScreen
           busy={busy}
           threadId={activeThreadId}
-          onBack={() => {
-            setScreen('records');
-          }}
+          onBack={() => setScreen('inbox')}
+          onCancel={() => setScreen('inbox')}
         />
       )}
 

@@ -48,16 +48,16 @@ function renderToolInvocation(part: any): ReactNode {
   let statusColor = colors.grey500;
 
   if (state === 'input-streaming') {
-    statusText = `🔄 ${toolName}: gathering input...`;
+    statusText = `${toolName}: gathering input...`;
     statusColor = colors.purple;
   } else if (state === 'input-available') {
-    statusText = `⚙️ ${toolName}: processing...`;
+    statusText = `${toolName}: processing...`;
     statusColor = colors.purple;
   } else if (state === 'output-available') {
-    statusText = `✓ ${toolName}: found results`;
+    statusText = `${toolName}: found results`;
     statusColor = '#10b981';
   } else if (state === 'output-error') {
-    statusText = `✗ ${toolName}: ${errorText || 'error'}`;
+    statusText = `${toolName}: ${errorText || 'error'}`;
     statusColor = colors.error;
   }
 

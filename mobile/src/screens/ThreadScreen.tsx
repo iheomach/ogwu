@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -13,11 +15,12 @@ import { MaterialIcons } from '@expo/vector-icons';
 import type { ConsultMessage, ConsultThread, ScreenPropsBase } from '../types';
 import { styles, colors, glassSurface, spacing } from '../ui/styles';
 import { t } from '../i18n';
-import { threadMessagesList, threadsList } from '../lib/threads';
+import { threadMessagesList, threadsList, threadsClose } from '../lib/threads';
 
 export type ThreadScreenProps = ScreenPropsBase & {
   threadId: string;
   onBack: () => void;
+  onCancel?: () => void;
 };
 
 function formatTime(iso: string): string {
@@ -31,11 +34,45 @@ function formatTime(iso: string): string {
 }
 
 
-export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
+export function ThreadScreen({ busy, threadId, onBack, onCancel }: ThreadScreenProps) {
   const [loading, setLoading] = useState(true);
   const [thread, setThread] = useState<ConsultThread | null>(null);
   const [messages, setMessages] = useState<ConsultMessage[]>([]);
   const scrollRef = useRef<ScrollView>(null);
+
+  const handleCancelConsult = () => {
+    const doCancel = async () => {
+      try {
+        await threadsClose(threadId);
+        setThread(prev => prev ? { ...prev, status: 'closed' } : prev);
+        onCancel?.();
+      } catch (e: any) {
+        Alert.alert('Error', e?.message ?? 'Could not cancel consult.');
+      }
+    };
+    Alert.alert(
+      'Cancel consult',
+      'This will close the consultation. The provider will no longer be able to reply.',
+      [
+        { text: 'Keep open', style: 'cancel' },
+        { text: 'Cancel consult', style: 'destructive', onPress: doCancel },
+      ]
+    );
+  };
+
+  const handleMenuPress = () => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Dismiss', 'Cancel consult'], destructiveButtonIndex: 1, cancelButtonIndex: 0 },
+        (idx) => { if (idx === 1) handleCancelConsult(); }
+      );
+    } else {
+      Alert.alert('Options', '', [
+        { text: 'Cancel consult', style: 'destructive', onPress: handleCancelConsult },
+        { text: 'Dismiss', style: 'cancel' },
+      ]);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -73,7 +110,7 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
     if (messages.length > 0) return messages;
     const snap = thread?.intake_snapshot;
     if (!snap) return [];
-    const urgencyLabel = { emergency: '🔴 Emergency', urgent: '🟠 Urgent', soon: '🟡 See soon', routine: '🟢 Routine' }[snap.urgency ?? 'routine'] ?? '🟢 Routine';
+    const urgencyLabel = { emergency: 'Emergency', urgent: 'Urgent', soon: 'See soon', routine: 'Routine' }[snap.urgency ?? 'routine'] ?? 'Routine';
     const lines: string[] = [urgencyLabel];
     if (snap.summary) lines.push('\n' + snap.summary);
     if (Array.isArray(snap.answers) && snap.answers.length > 0) {
@@ -105,10 +142,19 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
           <MaterialIcons name="arrow-back" size={20} color={colors.purple} />
           <Text style={styles.newChatButtonText}>Back</Text>
         </TouchableOpacity>
-        <View style={{ alignItems: 'flex-end' }}>
+        <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={styles.assistantToolbarTitle}>{providerName}</Text>
           <Text style={{ fontSize: 11, color: colors.grey500 }}>Health summary sent</Text>
         </View>
+        {thread?.status === 'open' && (
+          <TouchableOpacity
+            onPress={handleMenuPress}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MaterialIcons name="more-vert" size={22} color={colors.grey500} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView

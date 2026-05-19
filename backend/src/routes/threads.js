@@ -39,7 +39,7 @@ function safeText(s, maxLen) {
 
 function formatIntakeSummaryMessage(intake) {
   if (!intake) return null;
-  const urgencyLabel = { emergency: '🔴 Emergency', urgent: '🟠 Urgent', soon: '🟡 See soon', routine: '🟢 Routine' }[intake.urgency] ?? intake.urgency;
+  const urgencyLabel = { emergency: 'Emergency', urgent: 'Urgent', soon: 'See soon', routine: 'Routine' }[intake.urgency] ?? intake.urgency;
   const lines = [urgencyLabel];
   if (intake.summary) lines.push('\n' + intake.summary);
   if (Array.isArray(intake.answers) && intake.answers.length > 0) {
