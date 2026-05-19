@@ -158,7 +158,7 @@ export function buildReportText(data: ReportData): string {
   // ── Footer ──────────────────────────────────────────
   lines.push('');
   lines.push(DIV);
-  lines.push('Powered by Ogwu — AI Health Assistant');
+  lines.push('Powered by OgwuAI');
 
   return lines.join('\n');
 }

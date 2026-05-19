@@ -74,15 +74,13 @@ function AssistantFab({ active, onPress }: { active: boolean; onPress: () => voi
       onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel={t('tabs.newConsult')}
+      accessibilityLabel="OgwuAI"
     >
-      <View style={[styles.assistantFabInner, active && styles.assistantFabInnerActive]}>
-        <Image
-          source={require('../../assets/ogwu-mark.png')}
-          style={{ width: 28, height: 28, tintColor: colors.white }}
-          resizeMode="contain"
-        />
-      </View>
+      <Image
+        source={require('../../assets/ogwu-mark.png')}
+        style={{ width: 46, height: 46, marginTop: -14, opacity: active ? 1 : 0.85 }}
+        resizeMode="contain"
+      />
     </TouchableOpacity>
   );
 }

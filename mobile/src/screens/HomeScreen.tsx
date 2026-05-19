@@ -185,8 +185,8 @@ export function HomeScreen({
             <View style={styles.quickActionsRow}>
               <QuickActionCard
                 icon="add-circle-outline"
-                label="New consultation"
-                subtitle="Talk to the AI assistant"
+                label="OgwuAI"
+                subtitle="Talk to your AI health assistant"
                 onPress={onGoNewConsult}
                 accent={colors.purple}
               />

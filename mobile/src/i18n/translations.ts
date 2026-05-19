@@ -6,12 +6,12 @@ export const translations = {
   en: {
     tabs: {
       home: 'Home',
-      newConsult: 'Assistant',
+      newConsult: 'OgwuAI',
       records: 'Records',
       profile: 'Profile',
     },
     assistant: {
-      title: 'AI Health Assistant',
+      title: 'OgwuAI',
       helper: 'Tell me what’s going on. I can help you decide next steps and suggest nearby hospitals when needed.',
       placeholder: 'e.g. I have a sore throat and fever…',
       send: 'Send',
@@ -256,7 +256,7 @@ export const translations = {
   es: {
     tabs: {
       home: 'Inicio',
-      newConsult: 'Asistente',
+      newConsult: 'OgwuAI',
       records: 'Registros',
       profile: 'Perfil',
       yourAnalytics: 'Tus estadísticas',
@@ -284,7 +284,7 @@ export const translations = {
       impactRoutine2: 'También ayudan a manejar mejor condiciones a largo plazo.',
     },
     assistant: {
-      title: 'Asistente de salud',
+      title: 'OgwuAI',
       helper: 'Cuéntame qué pasa. Puedo ayudarte con los siguientes pasos y sugerir hospitales cercanos si hace falta.',
       placeholder: 'p. ej. tengo dolor de garganta y fiebre…',
       send: 'Enviar',
@@ -471,7 +471,7 @@ export const translations = {
   fr: {
     tabs: {
       home: 'Accueil',
-      newConsult: 'Assistant',
+      newConsult: 'OgwuAI',
       records: 'Dossiers',
       profile: 'Profil',
       yourAnalytics: 'Vos statistiques',
@@ -499,7 +499,7 @@ export const translations = {
       impactRoutine2: "Ils soutiennent aussi une meilleure prise en charge à long terme.",
     },
     assistant: {
-      title: 'Assistant santé',
+      title: 'OgwuAI',
       helper:
         'Dites-moi ce qui se passe. Je peux aider à décider des prochaines étapes et suggérer des hôpitaux proches si nécessaire.',
       placeholder: 'ex. j’ai mal à la gorge et de la fièvre…',
@@ -685,7 +685,7 @@ export const translations = {
   ig: {
     tabs: {
       home: 'Ụlọ',
-      newConsult: 'Enyemaka',
+      newConsult: 'OgwuAI',
       records: 'Ndekọ',
       profile: 'Profaịlụ',
       yourAnalytics: 'Nyocha gị',
@@ -713,7 +713,7 @@ export const translations = {
       impactRoutine2: 'Ọ na-enyekwa aka n’ịlekọta ọrịa ogologo oge.',
     },
     assistant: {
-      title: 'Health Assistant',
+      title: 'OgwuAI',
       helper: 'Kọwaa ihe na-eme. Enwere m ike inyere aka na nzọụkwụ ọzọ ma tụọ aro ụlọ ọgwụ ma ọ bụrụ na achọrọ.',
       placeholder: 'Dịka: akpịrị na-afụ m ụfụ na ahụ ọkụ…',
       send: 'Zipu',
@@ -920,7 +920,7 @@ export const translations = {
   yo: {
     tabs: {
       home: 'Ilé',
-      newConsult: 'Olùrànlọ́wọ́',
+      newConsult: 'OgwuAI',
       records: 'Àkọsílẹ̀',
       useTabs: 'Lo taabu isalẹ lati bẹ̀rẹ̀ consult, wo records, tàbí ṣe àtúnṣe profaili rẹ.',
       profile: 'Profaili',
@@ -949,7 +949,7 @@ export const translations = {
       impactRoutine2: 'Hakanan yana taimakawa wajen kula da cututtuka na dogon lokaci.',
     },
     assistant: {
-      title: 'Health Assistant',
+      title: 'OgwuAI',
       helper: 'Sọ fún mi ohun tó ń ṣẹlẹ̀. Mo lè ràn ẹ́ lọ́wọ́ pẹ̀lú ìgbésẹ̀ tó kàn àti ìmọ̀ràn ilé ìwòsàn tó súnmọ́.',
       placeholder: 'àpẹẹrẹ: ọfun mi ń dun, mo sì ní ìbà…',
       send: 'Ránṣẹ́',
@@ -1131,12 +1131,12 @@ export const translations = {
   ha: {
     tabs: {
       home: 'Gida',
-      newConsult: 'Mataimaki',
+      newConsult: 'OgwuAI',
       records: 'Rikodin',
       profile: 'Bayanai',
     },
     assistant: {
-      title: 'Health Assistant',
+      title: 'OgwuAI',
       helper: 'Ka fada min abin da ke faruwa. Zan taimaka da mataki na gaba kuma in ba da shawarwarin asibitoci idan ya dace.',
       placeholder: 'misali: ina jin ciwon makogwaro da zazzabi…',
       send: 'Aika',

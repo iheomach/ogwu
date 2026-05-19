@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import * as ExpoCalendar from 'expo-calendar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { Calendar } from 'react-native-calendars';
@@ -589,6 +589,11 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
 }
 
 export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospital, onOpenThread }: ScreenPropsBase & { onSendToHospital?: () => void; onOpenThread?: (threadId: string) => void }) {
+  const insets = useSafeAreaInsets();
+  // Floating tab bar sits above the bottom safe area (~66px for pill + marginBottom).
+  // The chat input must clear it entirely.
+  const chatBarBottom = insets.bottom + 72;
+
   const [isInitialized, setIsInitialized] = useState(false);
   const [sendingToHospital, setSendingToHospital] = useState(false);
   const [clearingHistory, setClearingHistory] = useState(false);
@@ -785,7 +790,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? chatBarBottom : 0}
       >
         <View style={{ flex: 1, opacity: busy ? 0.7 : 1 }}>
 
@@ -820,7 +825,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
 
           <ScrollView
             style={{ flex: 1 }}
-            contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 80 }}
+            contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: chatBarBottom + 80 }}
             showsVerticalScrollIndicator={false}
           >
             {/* Greeting — last session card or default bubble */}
@@ -1228,7 +1233,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
           </ScrollView>
 
           {/* Bottom bar — input OR send-to-hospital button */}
-          <View style={styles.chatBottomBar}>
+          <View style={[styles.chatBottomBar, { bottom: chatBarBottom }]}>
             {endConversationData ? (
               /* Conversation ended — replace input with full-width purple send button */
               <TouchableOpacity
