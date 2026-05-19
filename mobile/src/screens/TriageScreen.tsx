@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TriageScreenProps } from '../types';
 import { colors, styles, spacing } from '../ui/styles';
 import { t } from '../i18n';
-import { OgwuMark } from '../ui/OgwuMark';
 
 export function TriageScreen({
   busy,
@@ -42,7 +42,7 @@ export function TriageScreen({
           </TouchableOpacity>
 
           <View style={styles.brandRow}>
-            <OgwuMark size={40} />
+            <Image source={require('../../assets/ogwu-mark.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
           </View>
 
           <Text style={styles.title}>{t('triage.title')}</Text>

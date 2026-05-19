@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { PhoneScreenProps } from '../types';
 import { colors, styles } from '../ui/styles';
 import { t } from '../i18n';
-import { OgwuMark } from '../ui/OgwuMark';
 
 export function PhoneScreen({ busy, phone, setPhone, onSendOtp }: PhoneScreenProps) {
   const [focused, setFocused] = useState(false);
@@ -27,7 +27,7 @@ export function PhoneScreen({ busy, phone, setPhone, onSendOtp }: PhoneScreenPro
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* Brand */}
         <View style={styles.brandRow}>
-          <OgwuMark size={40} />
+          <Image source={require('../../assets/ogwu-mark.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
         </View>
 
         {/* Heading */}
