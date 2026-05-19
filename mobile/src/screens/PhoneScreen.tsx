@@ -25,10 +25,6 @@ export function PhoneScreen({ busy, phone, setPhone, onSendOtp }: PhoneScreenPro
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Brand */}
-        <View style={styles.brandRow}>
-          <Image source={require('../../assets/ogwu-mark.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
-        </View>
 
         {/* Heading */}
         <Text style={styles.title}>{t('phone.title')}</Text>

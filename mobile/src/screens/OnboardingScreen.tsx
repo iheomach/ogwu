@@ -10,11 +10,78 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Picker } from '@react-native-picker/picker';
 
 import type { OnboardingScreenProps } from '../types';
-import { colors, styles } from '../ui/styles';
+import { colors, glassSurface, spacing, styles } from '../ui/styles';
 import { t } from '../i18n';
+
+function TagInput({
+  value,
+  onChange,
+  placeholder,
+  editable = true,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  editable?: boolean;
+}) {
+  const [draft, setDraft] = useState('');
+
+  const tags = value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const addTag = () => {
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    const next = [...tags, trimmed].join(', ');
+    onChange(next);
+    setDraft('');
+  };
+
+  const removeTag = (i: number) => {
+    const next = tags.filter((_, idx) => idx !== i).join(', ');
+    onChange(next);
+  };
+
+  return (
+    <View>
+      {tags.length > 0 && (
+        <View style={styles.tagInputWrap}>
+          {tags.map((tag, i) => (
+            <View key={i} style={styles.tagChip}>
+              <Text style={styles.tagChipText}>{tag}</Text>
+              {editable && (
+                <TouchableOpacity onPress={() => removeTag(i)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  <Text style={{ fontSize: 13, color: colors.grey300, lineHeight: 16 }}>×</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
+      {editable && (
+        <View style={styles.tagAddRow}>
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder={placeholder}
+            placeholderTextColor={colors.grey300}
+            style={styles.tagAddInput}
+            onSubmitEditing={addTag}
+            returnKeyType="done"
+            blurOnSubmit={false}
+          />
+          <TouchableOpacity style={styles.tagAddBtn} onPress={addTag}>
+            <Text style={styles.tagAddBtnText}>+ Add</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
 
 function Field({
   label,
@@ -79,10 +146,6 @@ export function OnboardingScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Brand */}
-        <View style={styles.brandRow}>
-          <Image source={require('../../assets/ogwu-mark.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
-        </View>
 
         {/* Heading */}
         <Text style={styles.title}>{t('onboarding.title')}</Text>
@@ -98,7 +161,7 @@ export function OnboardingScreen({
           <TextInput
             value={firstName}
             onChangeText={setFirstName}
-            placeholder="Ada"
+            placeholder="First"
             placeholderTextColor={colors.grey300}
             autoCapitalize="words"
             style={inputStyle('firstName')}
@@ -112,7 +175,7 @@ export function OnboardingScreen({
           <TextInput
             value={middleName}
             onChangeText={setMiddleName}
-            placeholder="Chinenye"
+            placeholder="Middle"
             placeholderTextColor={colors.grey300}
             autoCapitalize="words"
             style={inputStyle('middleName')}
@@ -126,7 +189,7 @@ export function OnboardingScreen({
           <TextInput
             value={lastName}
             onChangeText={setLastName}
-            placeholder="Obi"
+            placeholder="Last"
             placeholderTextColor={colors.grey300}
             autoCapitalize="words"
             style={inputStyle('lastName')}
@@ -152,48 +215,56 @@ export function OnboardingScreen({
         </Field>
 
         <Field label={t('onboarding.sex')}>
-          <View style={[styles.pickerContainer, focused === 'sex' && styles.inputFocused]}>
-            <Picker
-              selectedValue={biologicalSex}
-              onValueChange={(v) => setBiologicalSex(String(v))}
-              enabled={!busy}
-              style={styles.picker}
-              onFocus={() => setFocused('sex')}
-              onBlur={() => setFocused(null)}
-            >
-              <Picker.Item label={t('common.select')} value="" color={colors.grey500 as any} />
-              <Picker.Item label={t('onboarding.female')} value="Female" />
-              <Picker.Item label={t('onboarding.male')} value="Male" />
-              <Picker.Item label={t('onboarding.preferNotToSay')} value="prefer_not_to_say" />
-            </Picker>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.md }}>
+            {([
+              { value: 'Male',   label: t('onboarding.male') },
+              { value: 'Female', label: t('onboarding.female') },
+              { value: 'Other',  label: t('onboarding.other') },
+            ] as const).map(({ value, label }) => {
+              const selected = biologicalSex === value;
+              return (
+                <TouchableOpacity
+                  key={value}
+                  onPress={() => !busy && setBiologicalSex(value)}
+                  activeOpacity={0.8}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 11,
+                    borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: selected ? colors.purple : glassSurface.borderSoft,
+                    backgroundColor: selected ? 'rgba(123,77,217,0.18)' : glassSurface.bg,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: selected ? colors.purpleGlow : colors.grey500,
+                  }}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </Field>
 
         <Field label={t('onboarding.allergies')}>
-          <TextInput
+          <TagInput
             value={allergies}
-            onChangeText={setAllergies}
+            onChange={setAllergies}
             placeholder={t('onboarding.allergiesPlaceholder')}
-            placeholderTextColor={colors.grey300}
-            multiline
-            style={[inputStyle('allergies'), styles.textArea]}
             editable={!busy}
-            onFocus={() => setFocused('allergies')}
-            onBlur={() => setFocused(null)}
           />
         </Field>
 
         <Field label={t('onboarding.conditions')}>
-          <TextInput
+          <TagInput
             value={knownConditions}
-            onChangeText={setKnownConditions}
+            onChange={setKnownConditions}
             placeholder={t('onboarding.conditionsPlaceholder')}
-            placeholderTextColor={colors.grey300}
-            multiline
-            style={[inputStyle('conditions'), styles.textArea]}
             editable={!busy}
-            onFocus={() => setFocused('conditions')}
-            onBlur={() => setFocused(null)}
           />
         </Field>
 

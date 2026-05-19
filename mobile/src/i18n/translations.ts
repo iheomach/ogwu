@@ -75,6 +75,7 @@ export const translations = {
       missingSexBody: 'Select biological sex',
       female: 'Female',
       male: 'Male',
+      other: 'Other',
       preferNotToSay: 'Prefer not to say',
     },
     triage: {
@@ -349,6 +350,7 @@ export const translations = {
       missingSexBody: 'Selecciona el sexo biológico',
       female: 'Femenino',
       male: 'Masculino',
+      other: 'Otro',
       preferNotToSay: 'Prefiero no decirlo',
     },
     triage: {
@@ -563,6 +565,7 @@ export const translations = {
       missingSexBody: 'Sélectionnez le sexe biologique',
       female: 'Femme',
       male: 'Homme',
+      other: 'Autre',
       preferNotToSay: 'Préfère ne pas dire',
     },
     triage: {
@@ -776,6 +779,7 @@ export const translations = {
       missingSexBody: 'Họrọ biological sex',
       female: 'Nwaanyị',
       male: 'Nwoke',
+      other: 'Ọzọ',
       preferNotToSay: 'Achọghị m ikwu',
     },
     triage: {
@@ -1012,6 +1016,7 @@ export const translations = {
       missingSexBody: 'Yàn biological sex',
       female: 'Obìnrin',
       male: 'Ọkùnrin',
+      other: 'Míràn',
       preferNotToSay: 'Kò fẹ́ sọ',
     },
     triage: {
@@ -1200,6 +1205,7 @@ export const translations = {
       missingSexBody: 'Zaɓi biological sex',
       female: 'Mace',
       male: 'Namiji',
+      other: 'Wani',
       preferNotToSay: 'Ba na so in faɗa',
     },
     triage: {
