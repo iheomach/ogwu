@@ -347,8 +347,6 @@ export const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 32,
     paddingHorizontal: spacing.lg,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
   },
   heroGreeting: {
     fontSize: 13,

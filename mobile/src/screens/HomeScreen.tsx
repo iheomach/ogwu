@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import type { HomeScreenProps } from '../types';
@@ -160,6 +161,7 @@ export function HomeScreen({
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.purple }]}>
+      <StatusBar style="light" />
       <ScrollView
         style={[styles.spacer, { backgroundColor: colors.bg }]}
         contentContainerStyle={{ paddingBottom: 100 }}
