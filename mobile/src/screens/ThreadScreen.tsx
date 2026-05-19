@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import type { ConsultMessage, ConsultThread, ScreenPropsBase } from '../types';
-import { styles, colors, spacing } from '../ui/styles';
+import { styles, colors, glassSurface, spacing } from '../ui/styles';
 import { t } from '../i18n';
 import { threadMessagesList, threadsList } from '../lib/threads';
 
@@ -133,9 +133,9 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
                 return (
                   <View key={m.id} style={{ alignItems: 'center', marginVertical: spacing.sm, paddingHorizontal: spacing.md }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(69,0,80,0.08)' }} />
+                      <View style={{ flex: 1, height: 1, backgroundColor: glassSurface.divider }} />
                       <Text style={{ fontSize: 12, color: colors.grey500, textAlign: 'center' }}>{m.body}</Text>
-                      <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(69,0,80,0.08)' }} />
+                      <View style={{ flex: 1, height: 1, backgroundColor: glassSurface.divider }} />
                     </View>
                     <Text style={{ fontSize: 11, color: colors.grey300, marginTop: 4 }}>{formatTime(m.created_at)}</Text>
                   </View>
@@ -176,7 +176,7 @@ export function ThreadScreen({ busy, threadId, onBack }: ThreadScreenProps) {
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.md,
         borderTopWidth: 1,
-        borderTopColor: 'rgba(69,0,80,0.07)',
+        borderTopColor: glassSurface.divider,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,

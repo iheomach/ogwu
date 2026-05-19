@@ -14,7 +14,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import type { HomeScreenProps } from '../types';
 import type { TriageIntake } from '../types';
 import { triageGetIntake, triageHomeSummary } from '../lib/triage';
-import { colors, styles, spacing } from '../ui/styles';
+import { colors, glassSurface, styles, spacing } from '../ui/styles';
 import { t } from '../i18n';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -22,13 +22,13 @@ import { t } from '../i18n';
 function urgencyConfig(urgency: TriageIntake['urgency']) {
   switch (urgency) {
     case 'emergency':
-      return { bg: 'rgba(239,68,68,0.1)', fg: '#EF4444', icon: 'emergency' as const, label: 'Emergency' };
+      return { bg: 'rgba(239,68,68,0.18)', fg: '#EF4444', icon: 'emergency' as const, label: 'Emergency' };
     case 'urgent':
-      return { bg: 'rgba(249,115,22,0.1)', fg: '#F97316', icon: 'warning' as const, label: 'Urgent' };
+      return { bg: 'rgba(249,115,22,0.18)', fg: '#F97316', icon: 'warning' as const, label: 'Urgent' };
     case 'soon':
-      return { bg: 'rgba(245,158,11,0.1)', fg: '#F59E0B', icon: 'schedule' as const, label: 'See soon' };
+      return { bg: 'rgba(245,158,11,0.18)', fg: '#F59E0B', icon: 'schedule' as const, label: 'See soon' };
     default:
-      return { bg: 'rgba(22,163,74,0.1)', fg: '#16A34A', icon: 'check-circle' as const, label: 'Routine' };
+      return { bg: 'rgba(22,163,74,0.18)', fg: '#16A34A', icon: 'check-circle' as const, label: 'Routine' };
   }
 }
 
@@ -84,7 +84,7 @@ function QuickActionCard({
         activeOpacity={1}
         style={styles.quickActionCard}
       >
-        <View style={[styles.quickActionIconBox, { backgroundColor: accent ? `${accent}18` : 'rgba(69,0,80,0.07)' }]}>
+        <View style={[styles.quickActionIconBox, { backgroundColor: accent ? `${accent}22` : glassSurface.bgMid }]}>
           <MaterialIcons name={icon} size={20} color={accent ?? colors.purple} />
         </View>
         <View>
@@ -160,10 +160,10 @@ export function HomeScreen({
   const tags = useMemo(() => deriveSituationTags(intake), [intake]);
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.purple }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
       <StatusBar style="light" />
       <ScrollView
-        style={[styles.spacer, { backgroundColor: colors.bg }]}
+        style={styles.spacer}
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >

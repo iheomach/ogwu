@@ -20,7 +20,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
 import { threadsCreate } from '../lib/threads';
 import type { ScreenPropsBase } from '../types';
-import { colors, spacing, styles } from '../ui/styles';
+import { colors, glassSurface, spacing, styles } from '../ui/styles';
 import { t } from '../i18n';
 import { useAgentChat } from '../lib/useAgentChat';
 import { supabase } from '../../lib/supabase';
@@ -346,13 +346,13 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
           onBlur={() => setInputFocused(false)}
           style={{
             borderWidth: 1.5,
-            borderColor: inputFocused ? colors.purple : 'rgba(69,0,80,0.15)',
+            borderColor: inputFocused ? colors.purple : glassSurface.borderSoft,
             borderRadius: 10,
             paddingHorizontal: 14,
             paddingVertical: 10,
             fontSize: 15,
             color: colors.grey900,
-            backgroundColor: 'rgba(69,0,80,0.02)',
+            backgroundColor: glassSurface.bg,
             letterSpacing: 1,
           }}
         />
@@ -366,15 +366,15 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
         disableAllTouchEventsForDisabledDays
         enableSwipeMonths
         theme={{
-          calendarBackground: '#fff',
+          calendarBackground: 'rgba(30,10,55,0.95)',
           selectedDayBackgroundColor: colors.purple,
           selectedDayTextColor: '#fff',
-          todayTextColor: colors.purple,
-          dayTextColor: colors.grey900,
-          textDisabledColor: 'rgba(0,0,0,0.18)',
+          todayTextColor: colors.purpleGlow,
+          dayTextColor: colors.grey700,
+          textDisabledColor: 'rgba(255,255,255,0.18)',
           dotColor: colors.purple,
           selectedDotColor: '#fff',
-          arrowColor: colors.purple,
+          arrowColor: colors.purpleGlow,
           monthTextColor: colors.grey900,
           textDayFontWeight: '500',
           textMonthFontWeight: '700',
@@ -407,9 +407,9 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
                       paddingHorizontal: 14,
                       paddingVertical: 8,
                       borderRadius: 10,
-                      backgroundColor: active ? colors.purple : 'rgba(69,0,80,0.04)',
+                      backgroundColor: active ? colors.purple : glassSurface.bg,
                       borderWidth: 1,
-                      borderColor: active ? colors.purple : 'rgba(69,0,80,0.12)',
+                      borderColor: active ? colors.purple : glassSurface.borderSoft,
                       minWidth: 80,
                       alignItems: 'center',
                     }}
@@ -431,7 +431,7 @@ function SlotPicker({ slots, hospitalName, hospitalId, onSelect, disabled }: {
           onPress={handleConfirm}
           disabled={!selectedSlot || disabled}
           style={{
-            backgroundColor: selectedSlot ? colors.purple : 'rgba(69,0,80,0.2)',
+            backgroundColor: selectedSlot ? colors.purple : glassSurface.bgMid,
             borderRadius: 12,
             paddingVertical: 13,
             alignItems: 'center',
@@ -460,7 +460,7 @@ function HospitalCard({ h, selected, onPress, disabled }: {
       activeOpacity={0.75}
       style={[
         styles.hospitalCard,
-        { borderWidth: selected ? 2 : 1, borderColor: selected ? colors.purple : 'rgba(69, 0, 80, 0.1)' },
+        { borderWidth: selected ? 2 : 1, borderColor: selected ? colors.purple : glassSurface.borderSoft },
       ]}
     >
       <View style={styles.hospitalCardHeader}>
@@ -781,7 +781,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
   );
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: '#ffffff' }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -864,7 +864,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
               <>
                 <View style={{
                   flexDirection: 'row', alignItems: 'center', gap: 6,
-                  backgroundColor: 'rgba(69,0,80,0.05)', borderRadius: 10,
+                  backgroundColor: glassSurface.bg, borderRadius: 10,
                   paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16,
                 }}>
                   <MaterialIcons name="history" size={14} color={colors.purple} />
@@ -888,13 +888,13 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                     return (
                       <View key={`ps-${idx}`} style={{
                         flexDirection: 'row', alignItems: 'center', gap: 10,
-                        backgroundColor: 'rgba(69,0,80,0.05)', borderRadius: 12,
-                        borderWidth: 1, borderColor: 'rgba(69,0,80,0.12)',
+                        backgroundColor: glassSurface.bg, borderRadius: 12,
+                        borderWidth: 1, borderColor: glassSurface.borderSoft,
                         padding: 12, marginBottom: 8, alignSelf: 'flex-end', maxWidth: '85%',
                       }}>
                         <View style={{
                           width: 28, height: 28, borderRadius: 8,
-                          backgroundColor: 'rgba(69,0,80,0.1)', alignItems: 'center', justifyContent: 'center',
+                          backgroundColor: glassSurface.bgMid, alignItems: 'center', justifyContent: 'center',
                         }}>
                           <MaterialIcons name="local-hospital" size={15} color={colors.purple} />
                         </View>
@@ -917,13 +917,13 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                     return (
                       <View key={`ps-${idx}`} style={{
                         flexDirection: 'row', alignItems: 'center', gap: 10,
-                        backgroundColor: 'rgba(69,0,80,0.05)', borderRadius: 12,
-                        borderWidth: 1, borderColor: 'rgba(69,0,80,0.12)',
+                        backgroundColor: glassSurface.bg, borderRadius: 12,
+                        borderWidth: 1, borderColor: glassSurface.borderSoft,
                         padding: 12, marginBottom: 8, alignSelf: 'flex-end', maxWidth: '85%',
                       }}>
                         <View style={{
                           width: 28, height: 28, borderRadius: 8,
-                          backgroundColor: 'rgba(69,0,80,0.1)', alignItems: 'center', justifyContent: 'center',
+                          backgroundColor: glassSurface.bgMid, alignItems: 'center', justifyContent: 'center',
                         }}>
                           <MaterialIcons name="event" size={15} color={colors.purple} />
                         </View>
@@ -1219,7 +1219,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
             )}
 
             {!!error && (
-              <View style={[styles.assistantBubble, { backgroundColor: 'rgba(239, 68, 68, 0.06)', borderColor: 'rgba(239, 68, 68, 0.2)' }]}>
+              <View style={[styles.assistantBubble, { backgroundColor: colors.errorLight, borderColor: 'rgba(239, 68, 68, 0.2)' }]}>
                 <Text style={{ color: colors.error, fontSize: 14, lineHeight: 20 }}>
                   {String((error as any)?.message || error)}
                 </Text>
@@ -1267,14 +1267,14 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                   value={input}
                   onChangeText={(text) => setInput(text)}
                   placeholder={t('assistant.placeholder')}
-                  placeholderTextColor="rgba(107, 114, 128, 0.65)"
+                  placeholderTextColor="rgba(255,255,255,0.35)"
                   style={styles.chatTextInput}
                   multiline
                 />
                 <TouchableOpacity
                   style={[
                     styles.chatSendButton,
-                    { backgroundColor: (busy || isLoading || !apiBase) ? 'rgba(69, 0, 80, 0.35)' : 'rgba(69, 0, 80, 0.6)' },
+                    { backgroundColor: (busy || isLoading || !apiBase) ? 'rgba(123,77,217,0.35)' : colors.purple },
                   ]}
                   onPress={() => handleSubmit()}
                   disabled={busy || isLoading || !apiBase}

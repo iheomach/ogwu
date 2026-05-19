@@ -33,7 +33,7 @@ function TabButton({
         <MaterialIcons
           name={icon}
           size={18}
-          color={active ? colors.white : colors.purpleMid}
+          color={active ? colors.white : 'rgba(184,160,245,0.55)'}
           style={styles.tabButtonIcon}
         />
         {badge > 0 && (
@@ -79,7 +79,7 @@ function AssistantFab({ active, onPress }: { active: boolean; onPress: () => voi
       <View style={[styles.assistantFabInner, active && styles.assistantFabInnerActive]}>
         <Image
           source={require('../../assets/ogwu-mark.png')}
-          style={{ width: 30, height: 30, tintColor: colors.white }}
+          style={{ width: 28, height: 28, tintColor: colors.white }}
           resizeMode="contain"
         />
       </View>
@@ -101,7 +101,7 @@ export function TabScaffold({
   openThreadCount?: number;
 }) {
   return (
-    <View style={{ flex: 1, backgroundColor: colors.purpleDark }}>
+    <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>{children}</View>
 
       <SafeAreaView edges={['bottom']} style={styles.tabBarSafeArea}>

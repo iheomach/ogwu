@@ -6,6 +6,8 @@ import {
   Text,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import type { Session } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
@@ -438,22 +440,35 @@ export function AppRouter() {
   // ─── Boot splash ─────────────────────────────────────────────────────────
   if (isBooting) {
     return (
-      <View style={[styles.center, { backgroundColor: '#fff' }]}>
+      <LinearGradient
+        colors={['#1a0a2e', '#3d1670', '#1a0a2e']}
+        locations={[0, 0.55, 1]}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
+        style={styles.center}
+      >
         <Image
           source={require('../assets/ogwu-ios.png')}
           style={styles.bootSplashLogo}
           resizeMode="contain"
         />
-        <ActivityIndicator color={colors.purple} />
-      </View>
+        <ActivityIndicator color={colors.purpleGlow} />
+      </LinearGradient>
     );
   }
 
   // ─── Screens ─────────────────────────────────────────────────────────────
   // Each screen manages its own KeyboardAvoidingView + ScrollView.
-  // AppRouter is a plain View — no extra wrapping.
+  // AppRouter wraps everything in a LinearGradient for the dark glass backdrop.
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#1a0a2e', '#3d1670', '#1a0a2e']}
+      locations={[0, 0.55, 1]}
+      start={{ x: 0.2, y: 0 }}
+      end={{ x: 0.8, y: 1 }}
+      style={{ flex: 1 }}
+    >
+      <StatusBar style="light" />
       {screen === 'phone' && (
         <PhoneScreen busy={busy} phone={phone} setPhone={setPhone} onSendOtp={onSendOtp} />
       )}
@@ -603,7 +618,7 @@ export function AppRouter() {
           />
         </TabScaffold>
       )}
-    </View>
+    </LinearGradient>
   );
 }
 

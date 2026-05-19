@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 import type { RecordsScreenProps } from '../types';
 import { fetchReport, buildReportText } from '../lib/report';
-import { styles, colors, spacing } from '../ui/styles';
+import { styles, colors, glassSurface, spacing } from '../ui/styles';
 import { t } from '../i18n';
 
 export function RecordsScreen({ busy, onOpenThread: _onOpenThread }: RecordsScreenProps) {
@@ -49,10 +49,10 @@ export function RecordsScreen({ busy, onOpenThread: _onOpenThread }: RecordsScre
         <Text style={[styles.label, { marginBottom: 12 }]}>AI Document Analysis</Text>
 
         <View style={{
-          backgroundColor: colors.white,
+          backgroundColor: glassSurface.bg,
           borderRadius: 16,
           borderWidth: 1.5,
-          borderColor: 'rgba(69,0,80,0.10)',
+          borderColor: glassSurface.border,
           borderStyle: 'dashed',
           padding: spacing.lg,
           alignItems: 'center',
@@ -61,7 +61,7 @@ export function RecordsScreen({ busy, onOpenThread: _onOpenThread }: RecordsScre
             width: 56,
             height: 56,
             borderRadius: 28,
-            backgroundColor: 'rgba(69,0,80,0.07)',
+            backgroundColor: glassSurface.bgMid,
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: 14,

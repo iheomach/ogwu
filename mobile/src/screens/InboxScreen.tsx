@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 import type { ConsultThread } from '../types';
 import { threadsList } from '../lib/threads';
-import { colors, styles, spacing } from '../ui/styles';
+import { colors, glassSurface, styles, spacing } from '../ui/styles';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -77,16 +77,16 @@ function ThreadRow({ thread, onPress, muted }: { thread: ConsultThread; onPress:
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 12,
-        backgroundColor: colors.white,
+        backgroundColor: glassSurface.bg,
         borderRadius: 14,
         padding: 14,
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: muted ? 'rgba(69,0,80,0.07)' : hasProviderReply ? `${color}30` : 'rgba(69,0,80,0.07)',
+        borderColor: muted ? glassSurface.borderSoft : hasProviderReply ? `${color}40` : glassSurface.borderSoft,
         opacity: muted ? 0.7 : 1,
-        shadowColor: colors.purple,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
+        shadowOpacity: 0.18,
         shadowRadius: 8,
         elevation: 2,
       }}
@@ -231,10 +231,10 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
                     paddingHorizontal: 10,
                     borderRadius: 10,
                     borderWidth: 1.5,
-                    borderColor: isSelected ? dotColor : 'rgba(0,0,0,0.07)',
+                    borderColor: isSelected ? dotColor : glassSurface.borderSoft,
                     backgroundColor: isSelected
-                      ? (tab === 'active' ? 'rgba(22,163,74,0.08)' : 'rgba(0,0,0,0.04)')
-                      : 'transparent',
+                      ? (tab === 'active' ? 'rgba(22,163,74,0.15)' : glassSurface.bgMid)
+                      : glassSurface.bg,
                   }}
                 >
                   <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: dotColor }} />
@@ -280,7 +280,7 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
               width: 64,
               height: 64,
               borderRadius: 32,
-              backgroundColor: 'rgba(69,0,80,0.07)',
+              backgroundColor: glassSurface.bgMid,
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 16,
