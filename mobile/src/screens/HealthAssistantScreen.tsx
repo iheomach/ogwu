@@ -825,7 +825,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
 
           <ScrollView
             style={{ flex: 1 }}
-            contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: chatBarBottom + 80 }}
+            contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.lg }}
             showsVerticalScrollIndicator={false}
           >
             {/* Greeting — last session card or default bubble */}
@@ -1233,7 +1233,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
           </ScrollView>
 
           {/* Bottom bar — input OR send-to-hospital button */}
-          <View style={[styles.chatBottomBar, { bottom: chatBarBottom }]}>
+          <View style={[styles.chatBottomBar, { paddingBottom: chatBarBottom }]}>
             {endConversationData ? (
               /* Conversation ended — replace input with full-width purple send button */
               <TouchableOpacity
