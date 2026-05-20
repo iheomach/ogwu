@@ -13,7 +13,8 @@
 const { ComprehendMedicalClient, InferICD10CMCommand } = require('@aws-sdk/client-comprehendmedical');
 
 const REGION = process.env.AWS_REGION || 'us-east-1';
-const ENTITY_MIN_SCORE = 0.80; // entity-level confidence — the meaningful gate
+const ENTITY_MIN_SCORE = 0.80;   // entity-level confidence gate
+const CONCEPT_MIN_SCORE = 0.70;  // ICD-10 concept must also clear this before urgent/emergency can fire
 
 // ICD-10-CM prefixes that map to immediately life-threatening conditions.
 // Matching any of these in a high-confidence entity upgrades urgency to emergency.
@@ -127,8 +128,8 @@ async function extractEntitiesFromAnswers(answers) {
           icd10Code: topConcept?.Code ?? null,
           icd10Description: topConcept?.Description ?? null,
           icd10Score: topConcept ? Math.round((topConcept.Score ?? 0) * 100) / 100 : null,
-          isEmergency: matchesPrefix(topConcept?.Code, EMERGENCY_PREFIXES),
-          isUrgent: matchesPrefix(topConcept?.Code, URGENT_PREFIXES),
+          isEmergency: (topConcept?.Score ?? 0) >= CONCEPT_MIN_SCORE && matchesPrefix(topConcept?.Code, EMERGENCY_PREFIXES),
+          isUrgent:    (topConcept?.Score ?? 0) >= CONCEPT_MIN_SCORE && matchesPrefix(topConcept?.Code, URGENT_PREFIXES),
         };
       });
 
