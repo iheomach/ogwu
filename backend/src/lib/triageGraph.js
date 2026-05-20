@@ -32,6 +32,7 @@ const LANGUAGE_NAMES = { en: 'English', es: 'Spanish', fr: 'French', ig: 'Igbo',
 
 const TriageAnnotation = Annotation.Root({
   answers:            Annotation({ reducer: (_, v) => v ?? [],    default: () => [] }),
+  suggestions:        Annotation({ reducer: (_, v) => v ?? [],    default: () => [] }),
   question_count:     Annotation({ reducer: (_, v) => v ?? 0,    default: () => 0 }),
   max_questions:      Annotation({ reducer: (_, v) => v,         default: () => parseInt(process.env.TRIAGE_MAX_QUESTIONS || '10', 10) }),
   locale:             Annotation({ reducer: (_, v) => v,         default: () => 'en' }),
@@ -136,6 +137,22 @@ function routeFromCheckDone(state) {
 }
 
 async function askQuestionNode(state) {
+  // Q1 and Q2 are always the same — skip LLM call entirely
+  if (state.question_count === 0) {
+    return {
+      next_question: 'What is your main complaint or symptom today?',
+      suggestions: ['Sore throat', 'Headache', 'Stomach pain'],
+      done: false,
+    };
+  }
+  if (state.question_count === 1) {
+    return {
+      next_question: 'On a scale of 0 to 10, how severe are your symptoms?',
+      suggestions: ['3 out of 10', '5 out of 10', '7 out of 10'],
+      done: false,
+    };
+  }
+
   const language = LANGUAGE_NAMES[state.locale] || 'English';
   const canSignalDone = state.question_count >= MIN_ANSWERS_BEFORE_DONE;
   const history = (state.answers || []).map(({ q, a }) => `Q: ${q}\nA: ${a}`).join('\n\n');
@@ -145,13 +162,14 @@ async function askQuestionNode(state) {
       role: 'system',
       content:
         `You are a clinical triage intake assistant. Ask ONE focused question to assess the patient.\n` +
-        `Priority: main complaint → onset/duration → severity (0–10) → red flag symptoms → location/spread → associated symptoms → medications tried.\n` +
+        `Priority: onset/duration → severity (0–10) → red flag symptoms → location/spread → associated symptoms → medications tried.\n` +
         `Do NOT repeat any question already answered above.\n` +
         (canSignalDone
           ? `You may set "done": true if you have enough information to assess urgency.\n`
           : `Always set "done": false — not enough answers yet to conclude.\n`) +
+        `Also provide 2–3 short suggested answers the patient could tap (each under 6 words, contextually relevant to both the question and prior answers).\n` +
         `Never diagnose. Ask in ${language}.\n` +
-        `Return ONLY JSON: { "question": string, "done": boolean }`,
+        `Return ONLY JSON: { "question": string, "done": boolean, "suggestions": string[] }`,
     },
     {
       role: 'user',
@@ -163,10 +181,13 @@ async function askQuestionNode(state) {
     const result = await openaiJsonCall(messages);
     const question = typeof result.question === 'string' ? result.question.trim() : null;
     const done = canSignalDone && result.done === true;
-    return { next_question: question, done };
+    const suggestions = Array.isArray(result.suggestions)
+      ? result.suggestions.slice(0, 3).map((s) => String(s).trim()).filter(Boolean)
+      : [];
+    return { next_question: question, suggestions, done };
   } catch (err) {
     console.warn('[triageGraph] ask_question failed:', err.message);
-    return { next_question: 'Please describe any other symptoms you are experiencing.', done: false };
+    return { next_question: 'Please describe any other symptoms you are experiencing.', suggestions: [], done: false };
   }
 }
 
@@ -334,7 +355,7 @@ async function runTriageNext({ locale, profile, answers }) {
     locale,
     profile,
   });
-  return { done: state.done, question: state.done ? null : state.next_question };
+  return { done: state.done, question: state.done ? null : state.next_question, suggestions: state.suggestions ?? [] };
 }
 
 async function runTriageComplete({ locale, profile, answers, location, patientId }) {

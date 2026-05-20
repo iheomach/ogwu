@@ -8,6 +8,7 @@ export type NextQuestionResponse = {
   question: string | null;
   summary: string | null;
   safety_note: string | null;
+  suggestions: string[];
 };
 
 export type CompleteResponse = {
