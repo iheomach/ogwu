@@ -35,8 +35,8 @@ router.post('/next', authenticate, async (req, res) => {
     const locale = safeLocale(req.body?.locale);
     const profile = req.body?.profile || {};
     const qa = Array.isArray(req.body?.qa) ? req.body.qa : [];
-    const { done, question } = await runTriageNext({ locale, profile, answers: qa });
-    return res.json({ done, question, summary: null, safety_note: null });
+    const { done, question, suggestions } = await runTriageNext({ locale, profile, answers: qa });
+    return res.json({ done, question, suggestions, summary: null, safety_note: null });
   } catch (err) {
     return serverError(res, err, 'Failed to generate triage question.', 400);
   }
