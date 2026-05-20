@@ -141,14 +141,14 @@ async function askQuestionNode(state) {
   if (state.question_count === 0) {
     return {
       next_question: 'What is your main complaint or symptom today?',
-      suggestions: ['Sore throat', 'Headache', 'Stomach pain'],
+      suggestions: ['Sore throat / throat pain', 'Headache or dizziness', 'Stomach pain or nausea', 'Chest pain or breathing'],
       done: false,
     };
   }
   if (state.question_count === 1) {
     return {
       next_question: 'On a scale of 0 to 10, how severe are your symptoms?',
-      suggestions: ['3 out of 10', '5 out of 10', '7 out of 10'],
+      suggestions: [],
       done: false,
     };
   }
@@ -167,7 +167,7 @@ async function askQuestionNode(state) {
         (canSignalDone
           ? `You may set "done": true if you have enough information to assess urgency.\n`
           : `Always set "done": false — not enough answers yet to conclude.\n`) +
-        `Also provide 2–3 short suggested answers the patient could tap (each under 6 words, contextually relevant to both the question and prior answers).\n` +
+        `Also provide 2–4 short suggested answers the patient could tap (each under 6 words, contextually grounded in the question and prior answers).\n` +
         `Never diagnose. Ask in ${language}.\n` +
         `Return ONLY JSON: { "question": string, "done": boolean, "suggestions": string[] }`,
     },
@@ -182,7 +182,7 @@ async function askQuestionNode(state) {
     const question = typeof result.question === 'string' ? result.question.trim() : null;
     const done = canSignalDone && result.done === true;
     const suggestions = Array.isArray(result.suggestions)
-      ? result.suggestions.slice(0, 3).map((s) => String(s).trim()).filter(Boolean)
+      ? result.suggestions.slice(0, 4).map((s) => String(s).trim()).filter(Boolean)
       : [];
     return { next_question: question, suggestions, done };
   } catch (err) {

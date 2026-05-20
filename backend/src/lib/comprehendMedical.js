@@ -73,7 +73,6 @@ const URGENT_PREFIXES = [
   'R31',                       // Haematuria
   'R41',                       // Altered consciousness / confusion
   'R42',                       // Dizziness / vertigo
-  'R51',                       // Headache
 ];
 
 function isConfigured() {

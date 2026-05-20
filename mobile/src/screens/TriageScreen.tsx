@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -18,6 +19,7 @@ import { t } from '../i18n';
 export function TriageScreen({
   busy,
   question,
+  questionIndex,
   answer,
   setAnswer,
   onBack,
@@ -25,7 +27,19 @@ export function TriageScreen({
   suggestions = [],
 }: TriageScreenProps) {
   const [focused, setFocused] = useState(false);
-  const canContinue = answer.trim().length > 0 && !busy;
+  const [sliderValue, setSliderValue] = useState(5);
+  const isQ2 = questionIndex === 1;
+  const canContinue = !busy && (isQ2 ? true : answer.trim().length > 0);
+
+  // Keep answer in sync with slider for Q2
+  const onSliderChange = (val: number) => {
+    const rounded = Math.round(val);
+    setSliderValue(rounded);
+    setAnswer(String(rounded));
+  };
+
+  // Ensure Q2 always has an answer set (default 5)
+  if (isQ2 && !answer) setAnswer('5');
 
   return (
     <SafeAreaView style={styles.container}>
@@ -52,8 +66,8 @@ export function TriageScreen({
 
           <Text style={[styles.inputLabel, { marginTop: 28 }]}>{question}</Text>
 
-          {/* Quick reply chips */}
-          {!busy && suggestions.length > 0 && (
+          {/* Quick reply chips — hidden on Q2 and while loading */}
+          {!busy && !isQ2 && suggestions.length > 0 && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -89,19 +103,53 @@ export function TriageScreen({
             </ScrollView>
           )}
 
-          <TextInput
-            value={answer}
-            onChangeText={setAnswer}
-            placeholder={t('triage.placeholder')}
-            placeholderTextColor={colors.grey300}
-            multiline
-            style={[styles.input, focused && styles.inputFocused, styles.textArea]}
-            editable={!busy}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-          />
+          {/* Q2: severity slider */}
+          {isQ2 ? (
+            <View style={{ marginTop: 16, marginBottom: 8 }}>
+              <Text style={{
+                textAlign: 'center',
+                fontSize: 48,
+                fontWeight: '700',
+                color: colors.white,
+                marginBottom: 4,
+              }}>
+                {sliderValue}
+              </Text>
+              <Text style={{ textAlign: 'center', fontSize: 12, color: colors.grey500, marginBottom: 20 }}>
+                {sliderValue === 0 ? 'No pain' : sliderValue <= 3 ? 'Mild' : sliderValue <= 6 ? 'Moderate' : sliderValue <= 8 ? 'Severe' : 'Extreme'}
+              </Text>
+              <Slider
+                minimumValue={0}
+                maximumValue={10}
+                step={1}
+                value={sliderValue}
+                onValueChange={onSliderChange}
+                minimumTrackTintColor={colors.purple}
+                maximumTrackTintColor="rgba(255,255,255,0.15)"
+                thumbTintColor={colors.purple}
+                style={{ width: '100%', height: 40 }}
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                <Text style={{ fontSize: 11, color: colors.grey500 }}>0</Text>
+                <Text style={{ fontSize: 11, color: colors.grey500 }}>10</Text>
+              </View>
+            </View>
+          ) : (
+            <TextInput
+              value={answer}
+              onChangeText={setAnswer}
+              placeholder={t('triage.placeholder')}
+              placeholderTextColor={colors.grey300}
+              multiline
+              style={[styles.input, focused && styles.inputFocused, styles.textArea]}
+              editable={!busy}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+            />
+          )}
+
           <TouchableOpacity
-            style={[styles.btnPrimary, (!canContinue || busy) && styles.btnPrimaryDisabled]}
+            style={[styles.btnPrimary, (!canContinue || busy) && styles.btnPrimaryDisabled, { marginTop: isQ2 ? 24 : 0 }]}
             onPress={onNext}
             disabled={!canContinue || busy}
             activeOpacity={0.85}

@@ -522,6 +522,7 @@ export function AppRouter() {
         <TriageScreen
           busy={busy}
           question={triageQuestion || t('triage.loadingQuestion')}
+          questionIndex={triageQa.length}
           answer={triageAnswer}
           setAnswer={setTriageAnswer}
           onBack={() => setScreen('profile')}

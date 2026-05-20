@@ -207,6 +207,7 @@ export type TriageQA = {
 
 export type TriageScreenProps = ScreenPropsBase & {
   question: string;
+  questionIndex: number;
   answer: string;
   setAnswer: (value: string) => void;
   onBack: () => void;
