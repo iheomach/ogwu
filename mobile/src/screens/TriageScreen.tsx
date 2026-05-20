@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -38,8 +38,10 @@ export function TriageScreen({
     setAnswer(String(rounded));
   };
 
-  // Ensure Q2 always has an answer set (default 5)
-  if (isQ2 && !answer) setAnswer('5');
+  // Initialize Q2 answer to '5' when we arrive at the severity question
+  useEffect(() => {
+    if (isQ2 && !answer) setAnswer('5');
+  }, [isQ2]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <SafeAreaView style={styles.container}>
