@@ -441,7 +441,7 @@ export function AppRouter() {
   if (isBooting) {
     return (
       <LinearGradient
-        colors={['#1a0a2e', '#3d1670', '#1a0a2e']}
+        colors={['#3A1890', '#7040C8', '#3A1890']}
         locations={[0, 0.55, 1]}
         start={{ x: 0.2, y: 0 }}
         end={{ x: 0.8, y: 1 }}
@@ -462,7 +462,7 @@ export function AppRouter() {
   // AppRouter wraps everything in a LinearGradient for the dark glass backdrop.
   return (
     <LinearGradient
-      colors={['#1a0a2e', '#3d1670', '#1a0a2e']}
+      colors={['#3A1890', '#7040C8', '#3A1890']}
       locations={[0, 0.55, 1]}
       start={{ x: 0.2, y: 0 }}
       end={{ x: 0.8, y: 1 }}

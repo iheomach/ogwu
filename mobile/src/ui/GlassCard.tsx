@@ -1,17 +1,19 @@
 import { BlurView } from 'expo-blur';
 import { Platform, StyleSheet, View, ViewStyle } from 'react-native';
 
+// Light tint samples the background and LIGHTENS it, so cards appear brighter
+// than the purple gradient behind them — the effect the reference design has.
 const TINT = Platform.OS === 'ios'
-  ? ('systemThinMaterialDark' as const)
-  : ('dark' as const);
+  ? ('systemUltraThinMaterialLight' as const)
+  : ('light' as const);
 
 export function GlassCard({
   children,
   style,
   innerStyle,
-  intensity = 65,
+  intensity = 80,
   borderRadius = 20,
-  borderColor = 'rgba(255,255,255,0.18)',
+  borderColor = 'rgba(255,255,255,0.30)',
   onLayout,
 }: {
   children: React.ReactNode;
@@ -47,7 +49,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   tint: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   highlight: {
     position: 'absolute',
@@ -55,6 +57,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.45)',
+    backgroundColor: 'rgba(255,255,255,0.60)',
   },
 });

@@ -2,19 +2,19 @@ import { StyleSheet } from 'react-native';
 
 // Ogwu Design System — Liquid Glass Dark
 // Palette: deep violet backdrop + translucent white glass surfaces
-// Reference: #1a0a2e deep → #3d1670 mid → #7b4dd9 accent → #b8a0f5 glow
+// Reference: #3A1890 deep → #7040C8 mid → #7b4dd9 accent → #b8a0f5 glow
 
 export const colors = {
   // ── Backdrop ───────────────────────────────────────────────────────────────
-  bg:       '#1a0a2e',     // deepest background
-  bgMid:    '#3d1670',     // mid-tone backdrop for gradients
+  bg:       '#3A1890',     // deepest background
+  bgMid:    '#7040C8',     // mid-tone backdrop for gradients
 
   // ── Purple accent ─────────────────────────────────────────────────────────
   purple:     '#7b4dd9',              // vibrant CTAs and active states
   purpleGlow: '#b8a0f5',             // light purple for text accents
   purpleLight: 'rgba(123,77,217,0.30)', // disabled / muted
   purpleMid:   'rgba(184,160,245,0.40)', // inactive tab labels
-  purpleDark:  '#1a0a2e',            // same as bg (compat alias)
+  purpleDark:  '#3A1890',            // same as bg (compat alias)
 
   // ── Text (white spectrum on dark bg) ─────────────────────────────────────
   black:   'rgba(255,255,255,0.95)',
