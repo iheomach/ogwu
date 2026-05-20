@@ -15,6 +15,7 @@ import type { HomeScreenProps } from '../types';
 import type { TriageIntake } from '../types';
 import { triageGetIntake, triageHomeSummary } from '../lib/triage';
 import { colors, glassSurface, styles, spacing } from '../ui/styles';
+import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -85,17 +86,25 @@ function QuickActionCard({
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        onLayout={onLayout}
         activeOpacity={1}
-        style={[styles.quickActionCard, cardHeight ? { minHeight: cardHeight } : undefined]}
       >
-        <View style={[styles.quickActionIconBox, { backgroundColor: accent ? `${accent}22` : glassSurface.bgMid }]}>
-          <MaterialIcons name={icon} size={20} color={accent ?? colors.purple} />
-        </View>
-        <View>
-          <Text style={styles.quickActionLabel}>{label}</Text>
-          <Text style={styles.quickActionSubtitle}>{subtitle}</Text>
-        </View>
+        <GlassCard
+          borderRadius={18}
+          innerStyle={{
+            padding: spacing.md,
+            minHeight: cardHeight || 110,
+            justifyContent: 'space-between',
+          }}
+          onLayout={onLayout}
+        >
+          <View style={[styles.quickActionIconBox, { backgroundColor: accent ? `${accent}22` : glassSurface.bgMid }]}>
+            <MaterialIcons name={icon} size={20} color={accent ?? colors.purple} />
+          </View>
+          <View>
+            <Text style={styles.quickActionLabel}>{label}</Text>
+            <Text style={styles.quickActionSubtitle}>{subtitle}</Text>
+          </View>
+        </GlassCard>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -180,11 +189,16 @@ export function HomeScreen({
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
           {/* ── Hero header ── */}
-          <View style={styles.heroHeader}>
+          <GlassCard
+            borderRadius={28}
+            intensity={70}
+            style={{ marginHorizontal: spacing.lg, marginTop: spacing.md }}
+            innerStyle={{ paddingTop: 22, paddingBottom: 24, paddingHorizontal: spacing.lg }}
+          >
             <Text style={styles.heroGreeting}>{getGreeting()}</Text>
             <Text style={styles.heroName}>{displayName ? displayName : 'Welcome'}</Text>
             <Text style={styles.heroTagline}>Your health, managed with care.</Text>
-          </View>
+          </GlassCard>
 
           <View style={{ paddingHorizontal: spacing.lg }}>
 
@@ -223,7 +237,7 @@ export function HomeScreen({
                 <ActivityIndicator color={colors.purple} />
               </View>
             ) : intake ? (
-              <View style={styles.healthStatusCard}>
+              <GlassCard borderRadius={18} innerStyle={{ padding: spacing.md, gap: 14 }}>
                 <UrgencyBanner intake={intake} homeSummary={homeSummary} />
 
                 {tags.length > 0 && (
@@ -245,20 +259,22 @@ export function HomeScreen({
                 <Text style={{ fontSize: 12, color: colors.grey500, lineHeight: 18 }}>
                   {t('home.impactDisclaimer')}
                 </Text>
-              </View>
+              </GlassCard>
             ) : (
-              <TouchableOpacity onPress={onRunTriage} style={styles.noIntakeCard}>
-                <View style={styles.noIntakeIconBox}>
-                  <MaterialIcons name="assignment" size={22} color={colors.purple} />
-                </View>
-                <Text style={styles.noIntakeTitle}>No intake on file</Text>
-                <Text style={styles.noIntakeBody}>
-                  Complete a quick intake to get personalised health insights.
-                </Text>
-                <View style={styles.noIntakeAction}>
-                  <Text style={styles.noIntakeLinkText}>Start intake</Text>
-                  <MaterialIcons name="arrow-forward" size={14} color={colors.purple} />
-                </View>
+              <TouchableOpacity onPress={onRunTriage} activeOpacity={0.85}>
+                <GlassCard borderRadius={18} innerStyle={{ padding: spacing.md, alignItems: 'center', gap: 8, paddingVertical: 24 }}>
+                  <View style={styles.noIntakeIconBox}>
+                    <MaterialIcons name="assignment" size={22} color={colors.purple} />
+                  </View>
+                  <Text style={styles.noIntakeTitle}>No intake on file</Text>
+                  <Text style={styles.noIntakeBody}>
+                    Complete a quick intake to get personalised health insights.
+                  </Text>
+                  <View style={styles.noIntakeAction}>
+                    <Text style={styles.noIntakeLinkText}>Start intake</Text>
+                    <MaterialIcons name="arrow-forward" size={14} color={colors.purple} />
+                  </View>
+                </GlassCard>
               </TouchableOpacity>
             )}
 
@@ -268,7 +284,7 @@ export function HomeScreen({
                 <Text style={[styles.sectionLabel, { marginTop: 28, marginBottom: 12 }]}>
                   {t('home.impactTitle')}
                 </Text>
-                <View style={styles.impactCard}>
+                <GlassCard borderRadius={18}>
                   {[
                     { icon: 'bolt' as const, text: (intake.urgency === 'emergency' || intake.urgency === 'urgent') ? t('home.impactUrgent1') : t('home.impactRoutine1') },
                     { icon: 'favorite' as const, text: (intake.urgency === 'emergency' || intake.urgency === 'urgent') ? t('home.impactUrgent2') : t('home.impactRoutine2') },
@@ -280,7 +296,7 @@ export function HomeScreen({
                       <Text style={styles.impactItemText}>{item.text}</Text>
                     </View>
                   ))}
-                </View>
+                </GlassCard>
               </>
             )}
 

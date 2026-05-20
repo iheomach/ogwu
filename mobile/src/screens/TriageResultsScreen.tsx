@@ -8,7 +8,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TriageIntake, TriageResultsScreenProps } from '../types';
-import { styles, colors } from '../ui/styles';
+import { styles, colors, spacing } from '../ui/styles';
+import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
 import { triageGetIntake } from '../lib/triage';
 
@@ -72,49 +73,49 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
         )}
 
         {!loading && error && (
-          <View style={[styles.card, { marginTop: 16 }]}>
+          <GlassCard style={{ marginTop: 16 }} innerStyle={{ padding: spacing.lg }}>
             <Text style={styles.value}>{t('triageResults.errorTitle')}</Text>
             <Text style={[styles.helper, { marginBottom: 0 }]}>{error}</Text>
-          </View>
+          </GlassCard>
         )}
 
         {!loading && !error && !intake && (
-          <View style={[styles.card, { marginTop: 16 }]}>
+          <GlassCard style={{ marginTop: 16 }} innerStyle={{ padding: spacing.lg }}>
             <Text style={styles.value}>{t('triageResults.emptyTitle')}</Text>
             <Text style={[styles.helper, { marginBottom: 0 }]}>{t('triageResults.emptyBody')}</Text>
-          </View>
+          </GlassCard>
         )}
 
         {!loading && !error && intake && (
           <>
             <Text style={[styles.label, { marginBottom: 12 }]}>{t('triageResults.urgency')}</Text>
-            <View style={styles.card}>
+            <GlassCard innerStyle={{ padding: spacing.lg }}>
               <View style={[styles.pill, { backgroundColor: urgencyColors(intake.urgency ?? 'routine').bg }]}>
                 <Text style={[styles.pillText, { color: urgencyColors(intake.urgency ?? 'routine').fg }]}>
                   {t(`triageResults.urgency_${(intake.urgency ?? 'routine') as any}`)}
                 </Text>
               </View>
-            </View>
+            </GlassCard>
             <View style={styles.mt16} />
 
             {intake.summary && (
               <>
                 <Text style={[styles.label, { marginBottom: 12 }]}>{t('triageResults.summary')}</Text>
-                <View style={styles.card}>
+                <GlassCard innerStyle={{ padding: spacing.lg }}>
                   <Text style={[styles.helper, { marginBottom: 0, color: colors.grey900 }]}>
                     {intake.summary}
                   </Text>
-                </View>
+                </GlassCard>
                 <View style={styles.mt16} />
               </>
             )}
 
             <Text style={[styles.label, { marginBottom: 12 }]}>{t('triageResults.answers')}</Text>
             {intake.answers.map((qa, idx) => (
-              <View key={`${idx}:${qa.q}`} style={[styles.card, idx > 0 && styles.mt16]}>
+              <GlassCard key={`${idx}:${qa.q}`} style={idx > 0 ? { marginTop: spacing.md } : undefined} innerStyle={{ padding: spacing.lg }}>
                 <Text style={styles.label}>{qa.q}</Text>
                 <Text style={[styles.value, { marginTop: 6 }]}>{qa.a || t('common.dash')}</Text>
-              </View>
+              </GlassCard>
             ))}
           </>
         )}

@@ -14,7 +14,8 @@ import type { SendToHospitalScreenProps } from '../types';
 import { hospitalsList, type Hospital } from '../lib/hospitals';
 import { triageGetIntake, type TriageIntake } from '../lib/triage';
 import { threadsCreate } from '../lib/threads';
-import { colors, styles } from '../ui/styles';
+import { colors, styles, spacing } from '../ui/styles';
+import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
 
 function urgencyColors(urgency: TriageIntake['urgency']) {
@@ -119,7 +120,7 @@ export function SendToHospitalScreen({ busy, onBack, onSent }: SendToHospitalScr
         {!intakeLoading && intake && (
           <>
             <Text style={[styles.label, { marginBottom: 8 }]}>Your summary</Text>
-            <View style={[styles.card, { marginBottom: 24 }]}>
+            <GlassCard style={{ marginBottom: 24 }} innerStyle={{ padding: spacing.lg }}>
               <View style={[styles.pill, { backgroundColor: urgencyStyle?.bg, alignSelf: 'flex-start', marginBottom: 8 }]}>
                 <Text style={[styles.pillText, { color: urgencyStyle?.fg }]}>
                   {t(`triageResults.urgency_${(intake.urgency ?? 'routine') as any}`)}
@@ -130,7 +131,7 @@ export function SendToHospitalScreen({ busy, onBack, onSent }: SendToHospitalScr
                   {intake.summary}
                 </Text>
               ) : null}
-            </View>
+            </GlassCard>
           </>
         )}
 
@@ -157,31 +158,33 @@ export function SendToHospitalScreen({ busy, onBack, onSent }: SendToHospitalScr
           filtered.map((h, idx) => (
             <TouchableOpacity
               key={h.id}
-              style={[styles.card, idx > 0 && styles.mt16]}
+              style={idx > 0 ? { marginTop: spacing.md } : undefined}
               onPress={() => onSend(h)}
               disabled={busy || !!sending}
               activeOpacity={0.85}
             >
-              <View style={styles.rowBetween}>
-                <View style={{ flex: 1, marginRight: 12 }}>
-                  <Text style={styles.value}>{h.name}</Text>
-                  <Text style={[styles.helper, { marginBottom: 0, marginTop: 4 }]}>
-                    {[h.location, h.admin1, h.country].filter(Boolean).join(' · ')}
-                  </Text>
-                  {h.specialty_tags && h.specialty_tags.length > 0 && (
-                    <Text style={[styles.helper, { marginBottom: 0, marginTop: 4, color: colors.purple, fontSize: 12 }]}>
-                      {h.specialty_tags.slice(0, 3).join(' · ')}
+              <GlassCard innerStyle={{ padding: spacing.lg }}>
+                <View style={styles.rowBetween}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text style={styles.value}>{h.name}</Text>
+                    <Text style={[styles.helper, { marginBottom: 0, marginTop: 4 }]}>
+                      {[h.location, h.admin1, h.country].filter(Boolean).join(' · ')}
                     </Text>
+                    {h.specialty_tags && h.specialty_tags.length > 0 && (
+                      <Text style={[styles.helper, { marginBottom: 0, marginTop: 4, color: colors.purple, fontSize: 12 }]}>
+                        {h.specialty_tags.slice(0, 3).join(' · ')}
+                      </Text>
+                    )}
+                  </View>
+                  {sending === h.id ? (
+                    <ActivityIndicator color={colors.purple} />
+                  ) : (
+                    <View style={[styles.pill, { backgroundColor: colors.purpleLight }]}>
+                      <Text style={[styles.pillText, { color: colors.purple }]}>Send</Text>
+                    </View>
                   )}
                 </View>
-                {sending === h.id ? (
-                  <ActivityIndicator color={colors.purple} />
-                ) : (
-                  <View style={[styles.pill, { backgroundColor: colors.purpleLight }]}>
-                    <Text style={[styles.pillText, { color: colors.purple }]}>Send</Text>
-                  </View>
-                )}
-              </View>
+              </GlassCard>
             </TouchableOpacity>
           ))
         )}

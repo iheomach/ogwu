@@ -5,7 +5,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 import type { RecordsScreenProps } from '../types';
 import { fetchReport, buildReportText } from '../lib/report';
-import { styles, colors, glassSurface, spacing } from '../ui/styles';
+import { styles, colors, spacing } from '../ui/styles';
+import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
 
 export function RecordsScreen({ busy, onOpenThread: _onOpenThread }: RecordsScreenProps) {
@@ -48,20 +49,12 @@ export function RecordsScreen({ busy, onOpenThread: _onOpenThread }: RecordsScre
         {/* ── OgwuAI Document Upload ── */}
         <Text style={[styles.label, { marginBottom: 12 }]}>AI Document Analysis</Text>
 
-        <View style={{
-          backgroundColor: glassSurface.bg,
-          borderRadius: 16,
-          borderWidth: 1.5,
-          borderColor: glassSurface.border,
-          borderStyle: 'dashed',
-          padding: spacing.lg,
-          alignItems: 'center',
-        }}>
+        <GlassCard borderRadius={16} innerStyle={{ padding: spacing.lg, alignItems: 'center' }}>
           <View style={{
             width: 56,
             height: 56,
             borderRadius: 28,
-            backgroundColor: glassSurface.bgMid,
+            backgroundColor: 'rgba(123,77,217,0.20)',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: 14,
@@ -77,7 +70,7 @@ export function RecordsScreen({ busy, onOpenThread: _onOpenThread }: RecordsScre
           <View style={[styles.btnPrimary, styles.btnPrimaryDisabled, { width: '100%' }]}>
             <Text style={styles.btnPrimaryText}>Upload document — coming soon</Text>
           </View>
-        </View>
+        </GlassCard>
       </ScrollView>
     </SafeAreaView>
   );

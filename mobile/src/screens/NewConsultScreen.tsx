@@ -19,7 +19,8 @@ import { encountersCreateShare } from '../lib/encounters';
 import { providersLookup } from '../lib/providers';
 import { threadsCreate } from '../lib/threads';
 import { triageGetIntake, type TriageIntake } from '../lib/triage';
-import { colors, styles } from '../ui/styles';
+import { colors, styles, spacing } from '../ui/styles';
+import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
 
 function urgencyColors(urgency: TriageIntake['urgency']) {
@@ -278,7 +279,7 @@ export function NewConsultScreen({ busy, onViewIntake, onOpenThread }: NewConsul
             <Text style={styles.helper}>{t('consult.helper')}</Text>
 
             <Text style={[styles.label, { marginBottom: 12 }]}>{t('consult.intakeReady')}</Text>
-            <View style={styles.card}>
+            <GlassCard innerStyle={{ padding: spacing.lg }}>
               <View style={styles.rowBetween}>
                 <View>
                   <Text style={styles.value}>{t('triageResults.urgency')}</Text>
@@ -303,8 +304,7 @@ export function NewConsultScreen({ busy, onViewIntake, onOpenThread }: NewConsul
               </View>
 
               {intake && intake.urgency === 'emergency' && (
-                <View style={[styles.mt16, { backgroundColor: colors.errorLight, borderRadius: 12, padding: 12 }]}
-                >
+                <View style={[styles.mt16, { backgroundColor: colors.errorLight, borderRadius: 12, padding: 12 }]}>
                   <Text style={[styles.helper, { marginBottom: 0, color: colors.grey900 }]}>
                     {t('consult.emergencyBody')}
                   </Text>
@@ -334,7 +334,7 @@ export function NewConsultScreen({ busy, onViewIntake, onOpenThread }: NewConsul
                   {t('consult.noIntakeBody')}
                 </Text>
               )}
-            </View>
+            </GlassCard>
 
             <View style={styles.mt24} />
             <Text style={[styles.label, { marginBottom: 12 }]}>{t('consult.doctors')}</Text>
@@ -353,35 +353,37 @@ export function NewConsultScreen({ busy, onViewIntake, onOpenThread }: NewConsul
             {doctors.map((doc, idx) => (
               <TouchableOpacity
                 key={doc.id}
-                style={[styles.card, idx > 0 && styles.mt16]}
+                style={idx > 0 ? { marginTop: spacing.md } : undefined}
                 onPress={() => setSelectedDoctorId(doc.id)}
                 disabled={busy}
                 activeOpacity={0.9}
               >
-                <Text style={styles.value}>
-                  {doc.name} {doc.title ? `• ${doc.title}` : ''}
-                </Text>
-                <Text style={[styles.helper, { marginBottom: 10 }]}>
-                  {doc.primary_specialty}
-                  {doc.tags.length > 0 ? ` • ${doc.tags.slice(0, 2).join(' • ')}` : ''}
-                </Text>
-
-                <View style={styles.rowBetween}>
-                  <Text style={[styles.helper, { marginBottom: 0, flex: 1, marginRight: 12 }]} numberOfLines={1}>
-                    {doc.hospital_name} • {doc.location}
+                <GlassCard innerStyle={{ padding: spacing.lg }}>
+                  <Text style={styles.value}>
+                    {doc.name} {doc.title ? `• ${doc.title}` : ''}
                   </Text>
-                  <View style={[styles.pill, { maxWidth: '45%' }]}>
-                    <Text style={styles.pillText} numberOfLines={1} ellipsizeMode="tail">
-                      {doc.languages.slice(0, 2).join(' / ')}
+                  <Text style={[styles.helper, { marginBottom: 10 }]}>
+                    {doc.primary_specialty}
+                    {doc.tags.length > 0 ? ` • ${doc.tags.slice(0, 2).join(' • ')}` : ''}
+                  </Text>
+
+                  <View style={styles.rowBetween}>
+                    <Text style={[styles.helper, { marginBottom: 0, flex: 1, marginRight: 12 }]} numberOfLines={1}>
+                      {doc.hospital_name} • {doc.location}
                     </Text>
+                    <View style={[styles.pill, { maxWidth: '45%' }]}>
+                      <Text style={styles.pillText} numberOfLines={1} ellipsizeMode="tail">
+                        {doc.languages.slice(0, 2).join(' / ')}
+                      </Text>
+                    </View>
                   </View>
-                </View>
+                </GlassCard>
               </TouchableOpacity>
             ))}
 
             <View style={styles.mt24} />
             <Text style={[styles.label, { marginBottom: 12 }]}>{t('consult.externalProviders')}</Text>
-            <View style={styles.card}>
+            <GlassCard innerStyle={{ padding: spacing.lg }}>
               <Text style={[styles.helper, { marginBottom: 12 }]}>{t('consult.externalProvidersBody')}</Text>
 
               <Text style={styles.inputLabel}>{t('consult.externalSearchLabel')}</Text>
@@ -425,7 +427,7 @@ export function NewConsultScreen({ busy, onViewIntake, onOpenThread }: NewConsul
               {externalProviders.length > 0 && (
                 <View style={styles.mt16}>
                   {externalProviders.map((p: any, i: number) => (
-                    <View key={`${p?.source_url || p?.website || p?.phone || 'p'}:${i}`} style={[styles.card, i > 0 && styles.mt16]}>
+                    <GlassCard key={`${p?.source_url || p?.website || p?.phone || 'p'}:${i}`} style={i > 0 ? { marginTop: spacing.md } : undefined} innerStyle={{ padding: spacing.lg }}>
                       <Text style={styles.value}>{String(p?.name || t('consult.externalProvider'))}</Text>
                       {!!p?.address && (
                         <Text style={[styles.helper, { marginBottom: 0, marginTop: 6 }]}>{String(p.address)}</Text>
@@ -483,11 +485,11 @@ export function NewConsultScreen({ busy, onViewIntake, onOpenThread }: NewConsul
                           </TouchableOpacity>
                         )}
                       </View>
-                    </View>
+                    </GlassCard>
                   ))}
                 </View>
               )}
-            </View>
+            </GlassCard>
           </>
         )}
 
@@ -500,29 +502,29 @@ export function NewConsultScreen({ busy, onViewIntake, onOpenThread }: NewConsul
             </Text>
 
             <Text style={[styles.label, { marginBottom: 12 }]}>{t('consult.hospital')}</Text>
-            <View style={styles.card}>
+            <GlassCard innerStyle={{ padding: spacing.lg }}>
               <Text style={styles.value}>{selectedDoctor.hospital_name}</Text>
               <Text style={[styles.helper, { marginBottom: 0 }]}>{selectedDoctor.location}</Text>
-            </View>
+            </GlassCard>
 
             <Text style={[styles.label, { marginBottom: 12 }]}>{t('consult.aboutDoctor')}</Text>
-            <View style={styles.card}>
+            <GlassCard innerStyle={{ padding: spacing.lg }}>
               <Text style={[styles.helper, { marginBottom: 0, color: colors.grey900 }]}>
                 {selectedDoctor.about}
               </Text>
-            </View>
+            </GlassCard>
 
             <Text style={[styles.label, { marginBottom: 12 }]}>{t('consult.howItWorks')}</Text>
-            <View style={styles.card}>
+            <GlassCard innerStyle={{ padding: spacing.lg }}>
               <Text style={[styles.helper, { marginBottom: 0, color: colors.grey900 }]}>
                 {t('consult.howItWorksBody')}
               </Text>
-            </View>
+            </GlassCard>
 
             {selectedDoctor.price_guide && selectedDoctor.price_guide.length > 0 && (
               <>
                 <Text style={[styles.label, { marginBottom: 12 }]}>{t('consult.priceGuide')}</Text>
-                <View style={styles.card}>
+                <GlassCard innerStyle={{ padding: spacing.lg }}>
                   {selectedDoctor.price_guide.map((row, i) => (
                     <View
                       key={`${selectedDoctor.id}:${i}:${row.label}`}
@@ -535,7 +537,7 @@ export function NewConsultScreen({ busy, onViewIntake, onOpenThread }: NewConsul
                   <Text style={[styles.helper, { marginBottom: 0, marginTop: 10 }]}>
                     {t('consult.priceGuideDisclaimer')}
                   </Text>
-                </View>
+                </GlassCard>
               </>
             )}
 

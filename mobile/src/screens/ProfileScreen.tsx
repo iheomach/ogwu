@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import type { ProfileScreenProps } from '../types';
-import { colors, styles } from '../ui/styles';
+import { colors, styles, spacing } from '../ui/styles';
+import { GlassCard } from '../ui/GlassCard';
 import { languageLabels, t } from '../i18n';
 import { SUPPORTED_LOCALES, type SupportedLocale } from '../i18n/translations';
 
@@ -155,7 +156,7 @@ export function ProfileScreen({
         <Text style={styles.helper}>{phoneLabel}</Text>
 
         <Text style={[styles.label, { marginBottom: 12 }]}>{t('profile.details')}</Text>
-        <View style={styles.card}>
+        <GlassCard innerStyle={{ padding: spacing.lg }}>
           <ProfileRow label={t('home.fullName')} value={displayFullName || null} />
           <ProfileRow label={t('home.dob')} value={profile?.dob} />
           <ProfileRow label={t('home.sex')} value={profile?.biological_sex} />
@@ -181,7 +182,7 @@ export function ProfileScreen({
               disabled={busy || saving}
             />
           </View>
-        </View>
+        </GlassCard>
 
         <TouchableOpacity
           style={[styles.btnPrimary, (busy || saving) && styles.btnPrimaryDisabled, { marginBottom: 24 }]}
@@ -256,7 +257,7 @@ export function ProfileScreen({
         </View>
 
         <Text style={[styles.label, { marginBottom: 12 }]}>{t('profile.intake')}</Text>
-        <View style={styles.card}>
+        <GlassCard innerStyle={{ padding: spacing.lg }}>
           <Text style={[styles.helper, { marginBottom: 16 }]}>{t('profile.intakeHelper')}</Text>
 
           <TouchableOpacity
@@ -271,7 +272,7 @@ export function ProfileScreen({
           <TouchableOpacity style={styles.btnGhost} onPress={onViewTriageResults} disabled={busy}>
             <Text style={styles.btnGhostText}>{t('profile.viewTriage')}</Text>
           </TouchableOpacity>
-        </View>
+        </GlassCard>
 
         <TouchableOpacity
           style={styles.btnDestructive}

@@ -7,6 +7,7 @@ import type { ConsultThread } from '../types';
 import { threadsList } from '../lib/threads';
 import { apiGet } from '../lib/api';
 import { colors, glassSurface, styles, spacing } from '../ui/styles';
+import { GlassCard } from '../ui/GlassCard';
 
 type AppointmentRow = {
   id: string;
@@ -105,27 +106,13 @@ function ThreadRow({
   const hasProviderReply = thread.last_message?.sender_role === 'provider';
 
   return (
-    <View style={{ marginBottom: 10 }}>
-      <TouchableOpacity
-        onPress={onPress}
-        activeOpacity={0.8}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'flex-start',
-          gap: 12,
-          backgroundColor: glassSurface.bg,
-          borderRadius: 14,
-          padding: 14,
-          borderWidth: 1,
-          borderColor: muted ? glassSurface.borderSoft : hasProviderReply ? `${color}40` : glassSurface.borderSoft,
-          opacity: muted ? 0.7 : 1,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.18,
-          shadowRadius: 8,
-          elevation: 2,
-        }}
-      >
+    <View style={{ marginBottom: 10, opacity: muted ? 0.7 : 1 }}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+        <GlassCard
+          borderRadius={14}
+          borderColor={hasProviderReply && !muted ? `${color}55` : 'rgba(255,255,255,0.18)'}
+          innerStyle={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 }}
+        >
         <View style={{
           width: 10,
           height: 10,
@@ -179,9 +166,9 @@ function ThreadRow({
           )}
         </View>
 
-        <MaterialIcons name="chevron-right" size={18} color={colors.grey300} style={{ marginTop: 2 }} />
+          <MaterialIcons name="chevron-right" size={18} color={colors.grey300} style={{ marginTop: 2 }} />
+        </GlassCard>
       </TouchableOpacity>
-
     </View>
   );
 }
