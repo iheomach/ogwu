@@ -521,6 +521,7 @@ export function AppRouter() {
           setAnswer={setTriageAnswer}
           onBack={() => setScreen('profile')}
           onNext={onTriageNext}
+          suggestions={suggestionsForQuestion(triageQuestion)}
         />
       )}
 
@@ -658,6 +659,31 @@ function SoftBlob({ color, size, cx, cy }: { color: string; size: number; cx: nu
       <Ellipse cx={r} cy={r} rx={r} ry={r} fill={`url(#g${color})`} />
     </Svg>
   );
+}
+
+function suggestionsForQuestion(q: string): string[] {
+  const lq = q.toLowerCase();
+  if (/how long|how many day|duration|when did|how long ago|started|onset|how long have/.test(lq))
+    return ['Started today', 'A few days ago', 'Over a week'];
+  if (/scale|0.*10|1.*10|rate.*pain|how severe|how bad|severity/.test(lq))
+    return ['3 out of 10', '5 out of 10', '7 out of 10'];
+  if (/allerg/.test(lq))
+    return ['No allergies', 'Yes, to penicillin', 'Not sure'];
+  if (/medic|drug|taking|prescribed|supplement/.test(lq))
+    return ['None', 'Over the counter only', 'Yes, prescribed'];
+  if (/condition|diagnos|history|chronic|disease/.test(lq))
+    return ['None', 'Hypertension', 'Diabetes'];
+  if (/fever/.test(lq))
+    return ['No fever', 'Below 38°C', 'Above 39°C'];
+  if (/red flag|difficult.*breath|shortness|chest|vision|confusion|stiff neck|swallow/.test(lq))
+    return ['No, none of those', 'Some mild ones', 'Yes, I have some'];
+  if (/other symptom|anything else|additional|also experienc|along with/.test(lq))
+    return ['No other symptoms', 'Mild headache', 'Some fatigue'];
+  if (/spread|radiat|travel|move|where.*feel|location/.test(lq))
+    return ['Stays in one spot', 'Spreads nearby', 'All over'];
+  if (/better|worse|chang|improv|progress/.test(lq))
+    return ['Getting worse', 'About the same', 'Slightly better'];
+  return [];
 }
 
 function dobInputToIso(input: string): string | null {

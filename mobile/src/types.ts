@@ -211,4 +211,5 @@ export type TriageScreenProps = ScreenPropsBase & {
   setAnswer: (value: string) => void;
   onBack: () => void;
   onNext: () => void;
+  suggestions?: string[];
 };

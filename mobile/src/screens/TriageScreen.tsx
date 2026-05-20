@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -23,13 +22,13 @@ export function TriageScreen({
   setAnswer,
   onBack,
   onNext,
+  suggestions = [],
 }: TriageScreenProps) {
   const [focused, setFocused] = useState(false);
   const canContinue = answer.trim().length > 0 && !busy;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Fixed top-left back button */}
       <TouchableOpacity
         onPress={onBack}
         disabled={busy}
@@ -48,11 +47,48 @@ export function TriageScreen({
           keyboardShouldPersistTaps="handled"
           bounces={false}
         >
-
           <Text style={styles.title}>{t('triage.title')}</Text>
           <Text style={styles.helper}>{t('triage.helper')}</Text>
 
           <Text style={[styles.inputLabel, { marginTop: 28 }]}>{question}</Text>
+
+          {/* Quick reply chips */}
+          {!busy && suggestions.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ gap: 8, paddingVertical: 10 }}
+            >
+              {suggestions.map((chip) => {
+                const selected = answer === chip;
+                return (
+                  <TouchableOpacity
+                    key={chip}
+                    onPress={() => setAnswer(selected ? '' : chip)}
+                    activeOpacity={0.75}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: selected ? colors.purple : 'rgba(255,255,255,0.25)',
+                      backgroundColor: selected ? colors.purple : 'rgba(255,255,255,0.07)',
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 13,
+                      fontWeight: '500',
+                      color: selected ? colors.white : colors.grey700,
+                    }}>
+                      {chip}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+
           <TextInput
             value={answer}
             onChangeText={setAnswer}
