@@ -598,7 +598,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     return () => { show.remove(); hide.remove(); };
   }, []);
   // When keyboard is up the tab bar is hidden behind it; keyboard already includes safe area.
-  const chatBarBottom = keyboardVisible ? 0 : insets.bottom + 72;
+  const chatBarBottom = keyboardVisible ? 12 : insets.bottom + 72;
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [sendingToHospital, setSendingToHospital] = useState(false);
