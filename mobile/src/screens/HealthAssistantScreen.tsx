@@ -3,6 +3,7 @@ import {
   Alert,
   Animated,
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -590,9 +591,14 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
 
 export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospital, onOpenThread }: ScreenPropsBase & { onSendToHospital?: () => void; onOpenThread?: (threadId: string) => void }) {
   const insets = useSafeAreaInsets();
-  // Floating tab bar sits above the bottom safe area (~66px for pill + marginBottom).
-  // The chat input must clear it entirely.
-  const chatBarBottom = insets.bottom + 72;
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+  // When keyboard is up the tab bar is hidden behind it; keyboard already includes safe area.
+  const chatBarBottom = keyboardVisible ? 0 : insets.bottom + 72;
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [sendingToHospital, setSendingToHospital] = useState(false);
@@ -790,7 +796,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? chatBarBottom : 0}
+        keyboardVerticalOffset={0}
       >
         <View style={{ flex: 1, opacity: busy ? 0.7 : 1 }}>
 

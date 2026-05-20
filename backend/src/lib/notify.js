@@ -20,7 +20,7 @@ async function sendPush({ hospitalId, patientName, reason }) {
   if (!subs?.length) return;
 
   const payload = JSON.stringify({
-    title: '🚨 Emergency Alert',
+    title: 'Emergency Alert',
     body: [patientName, reason].filter(Boolean).join(' — '),
   });
 
@@ -64,7 +64,7 @@ async function sendEmail({ hospitalId, patientName, reason }) {
     body: JSON.stringify({
       from: 'Ogwu Alerts <alerts@ogwu.app>',
       to: [user.email],
-      subject: `🚨 Emergency — ${patientName || 'Patient'}`,
+      subject: `Emergency — ${patientName || 'Patient'}`,
       html: `
         <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
           <h2 style="color:#dc2626;margin-bottom:4px">Emergency Alert</h2>
