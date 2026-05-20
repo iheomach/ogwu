@@ -101,7 +101,7 @@ async function extractEntitiesFromAnswers(answers) {
 
   // One API call: answers only — question text often contains medical terms
   // (e.g. "any vision changes or confusion?") that Comprehend would extract as
-  // patient symptoms even when the answer is "No."
+  // patient symptoms even when the answer is "No." 
   const text = answers
     .filter(({ a }) => a)
     .map(({ a }) => a)
