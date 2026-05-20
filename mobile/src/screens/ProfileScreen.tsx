@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import type { ProfileScreenProps } from '../types';
-import { colors, styles, spacing } from '../ui/styles';
+import { colors, styles, spacing, TAB_BAR_HEIGHT } from '../ui/styles';
 import { GlassCard } from '../ui/GlassCard';
 import { languageLabels, t } from '../i18n';
 import { SUPPORTED_LOCALES, type SupportedLocale } from '../i18n/translations';
@@ -151,7 +151,7 @@ export function ProfileScreen({
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { justifyContent: 'flex-start' }]}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { justifyContent: 'flex-start', paddingBottom: TAB_BAR_HEIGHT }]}>
         <Text style={styles.title}>{t('profile.title')}</Text>
         <Text style={styles.helper}>{phoneLabel}</Text>
 

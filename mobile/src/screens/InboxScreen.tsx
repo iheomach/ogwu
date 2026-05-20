@@ -110,7 +110,6 @@ function ThreadRow({
       <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
         <GlassCard
           borderRadius={14}
-          borderColor={hasProviderReply && !muted ? `${color}55` : 'rgba(255,255,255,0.18)'}
           innerStyle={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 }}
         >
         <View style={{

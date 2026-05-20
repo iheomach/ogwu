@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 import type { RecordsScreenProps } from '../types';
 import { fetchReport, buildReportText } from '../lib/report';
-import { styles, colors, spacing } from '../ui/styles';
+import { styles, colors, spacing, TAB_BAR_HEIGHT } from '../ui/styles';
 import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
 
@@ -30,7 +30,7 @@ export function RecordsScreen({ busy, onOpenThread: _onOpenThread }: RecordsScre
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.content, { justifyContent: 'flex-start', opacity: busy ? 0.7 : 1 }]}
+        contentContainerStyle={[styles.content, { justifyContent: 'flex-start', opacity: busy ? 0.7 : 1, paddingBottom: TAB_BAR_HEIGHT }]}
       >
         <Text style={styles.title}>{t('records.title')}</Text>
         <Text style={styles.helper}>{t('records.helper')}</Text>

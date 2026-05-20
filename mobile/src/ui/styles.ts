@@ -2,19 +2,19 @@ import { StyleSheet } from 'react-native';
 
 // Ogwu Design System — Liquid Glass Dark
 // Palette: deep violet backdrop + translucent white glass surfaces
-// Reference: #3A1890 deep → #7040C8 mid → #7b4dd9 accent → #b8a0f5 glow
+// Reference: #1a0a2e deep → #3d1670 mid → #7b4dd9 accent → #b8a0f5 glow
 
 export const colors = {
   // ── Backdrop ───────────────────────────────────────────────────────────────
-  bg:       '#3A1890',     // deepest background
-  bgMid:    '#7040C8',     // mid-tone backdrop for gradients
+  bg:       '#080412',     // deepest background
+  bgMid:    '#0f0620',     // mid-tone backdrop for gradients
 
   // ── Purple accent ─────────────────────────────────────────────────────────
   purple:     '#7b4dd9',              // vibrant CTAs and active states
   purpleGlow: '#b8a0f5',             // light purple for text accents
   purpleLight: 'rgba(123,77,217,0.30)', // disabled / muted
   purpleMid:   'rgba(184,160,245,0.40)', // inactive tab labels
-  purpleDark:  '#3A1890',            // same as bg (compat alias)
+  purpleDark:  '#080412',            // same as bg (compat alias)
 
   // ── Text (white spectrum on dark bg) ─────────────────────────────────────
   black:   'rgba(255,255,255,0.95)',
@@ -84,6 +84,9 @@ export const spacing = {
   xl:  32,
   xxl: 48,
 };
+
+// Extra bottom padding for screens under the floating tab bar
+export const TAB_BAR_HEIGHT = 100;
 
 export const styles = StyleSheet.create({
   // ─── Layout ────────────────────────────────────────────────────────────
@@ -998,7 +1001,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingTop: 6,
     paddingBottom: 8,
-    backgroundColor: 'rgba(30,10,55,0.82)',
+    backgroundColor: 'rgba(8,4,18,0.88)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
     borderRadius: 32,

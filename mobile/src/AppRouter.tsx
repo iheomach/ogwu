@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
+  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -441,7 +443,7 @@ export function AppRouter() {
   if (isBooting) {
     return (
       <LinearGradient
-        colors={['#3A1890', '#7040C8', '#3A1890']}
+        colors={['#080412', '#0f0620', '#080412']}
         locations={[0, 0.55, 1]}
         start={{ x: 0.2, y: 0 }}
         end={{ x: 0.8, y: 1 }}
@@ -462,12 +464,18 @@ export function AppRouter() {
   // AppRouter wraps everything in a LinearGradient for the dark glass backdrop.
   return (
     <LinearGradient
-      colors={['#3A1890', '#7040C8', '#3A1890']}
+      colors={['#080412', '#0f0620', '#080412']}
       locations={[0, 0.55, 1]}
       start={{ x: 0.2, y: 0 }}
       end={{ x: 0.8, y: 1 }}
       style={{ flex: 1 }}
     >
+      {/* Soft glows — concentric rings simulate CSS filter:blur(60px) radial falloff */}
+      <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+        {BLOBS.map((b, i) => (
+          <SoftBlob key={i} color={b.color} size={b.size} cx={b.cx} cy={b.cy} />
+        ))}
+      </View>
       <StatusBar style="light" />
       {screen === 'phone' && (
         <PhoneScreen busy={busy} phone={phone} setPhone={setPhone} onSendOtp={onSendOtp} />
@@ -618,6 +626,37 @@ export function AppRouter() {
         </TabScaffold>
       )}
     </LinearGradient>
+  );
+}
+
+const { width: W, height: H } = Dimensions.get('window');
+
+// Blob center-points matching the reference screenshot
+const BLOBS = [
+  { color: '#3d1470', size: 660, cx: W * 0.38, cy: H * 0.18 },
+  { color: '#6b1a8f', size: 400, cx: W * 0.82, cy: H * 0.72 },
+];
+
+// True radial gradient blob — perfectly smooth, no visible edges
+function SoftBlob({ color, size, cx, cy }: { color: string; size: number; cx: number; cy: number }) {
+  const { Svg, Defs, RadialGradient, Stop, Ellipse } = require('react-native-svg');
+  const r = size / 2;
+  return (
+    <Svg
+      width={size}
+      height={size}
+      style={{ position: 'absolute', left: cx - r, top: cy - r }}
+    >
+      <Defs>
+        <RadialGradient id={`g${color}`} cx="50%" cy="50%" rx="50%" ry="50%" fx="50%" fy="50%">
+          <Stop offset="0%"   stopColor={color} stopOpacity="0.85" />
+          <Stop offset="40%"  stopColor={color} stopOpacity="0.45" />
+          <Stop offset="75%"  stopColor={color} stopOpacity="0.15" />
+          <Stop offset="100%" stopColor={color} stopOpacity="0"    />
+        </RadialGradient>
+      </Defs>
+      <Ellipse cx={r} cy={r} rx={r} ry={r} fill={`url(#g${color})`} />
+    </Svg>
   );
 }
 

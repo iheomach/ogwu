@@ -259,6 +259,8 @@ export function OnboardingScreen({
           />
         </Field>
 
+        <View style={{ height: spacing.md }} />
+
         <Field label={t('onboarding.conditions')}>
           <TagInput
             value={knownConditions}

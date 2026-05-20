@@ -20,7 +20,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
 import { threadsCreate } from '../lib/threads';
 import type { ScreenPropsBase } from '../types';
-import { colors, glassSurface, spacing, styles } from '../ui/styles';
+import { colors, glassSurface, spacing, styles, TAB_BAR_HEIGHT } from '../ui/styles';
 import { t } from '../i18n';
 import { useAgentChat } from '../lib/useAgentChat';
 import { supabase } from '../../lib/supabase';
@@ -825,7 +825,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
 
           <ScrollView
             style={{ flex: 1 }}
-            contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.lg }}
+            contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: TAB_BAR_HEIGHT }}
             showsVerticalScrollIndicator={false}
           >
             {/* Greeting — last session card or default bubble */}
