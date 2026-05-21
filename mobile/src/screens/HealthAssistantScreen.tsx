@@ -470,15 +470,27 @@ function HospitalCard({ h, selected, onPress, disabled }: {
           <Text style={styles.hospitalCardDistance}>{h.distance_km} km</Text>
         )}
       </View>
-      <Text style={styles.hospitalCardLocation}>
-        {[h.city, h.state].filter(Boolean).join(', ')}
-      </Text>
+      {/* Location line — Places gives address, Supabase gives city/state */}
+      {(h.address || h.city || h.state) ? (
+        <Text style={styles.hospitalCardLocation} numberOfLines={1}>
+          {h.address || [h.city, h.state].filter(Boolean).join(', ')}
+        </Text>
+      ) : null}
+      {/* Supabase specialties array */}
       {Array.isArray(h.specialties) && h.specialties.length > 0 && (
         <Text style={styles.hospitalCardLocation} numberOfLines={1}>
           {h.specialties.slice(0, 3).join(' · ')}
         </Text>
       )}
       <View style={styles.hospitalCardBadgesRow}>
+        {/* Places specialty chip */}
+        {typeof h.specialty === 'string' && h.specialty && (
+          <View style={[styles.emergencyBadge, { backgroundColor: 'rgba(109,50,180,0.22)', borderColor: 'rgba(109,50,180,0.45)' }]}>
+            <Text style={[styles.emergencyBadgeText, { color: colors.purpleGlow }]}>
+              {h.specialty.charAt(0).toUpperCase() + h.specialty.slice(1).replace(/-/g, ' ')}
+            </Text>
+          </View>
+        )}
         {h.has_emergency && (
           <View style={styles.emergencyBadge}>
             <Text style={styles.emergencyBadgeText}>Emergency</Text>
