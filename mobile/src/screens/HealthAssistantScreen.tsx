@@ -569,7 +569,7 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
     <View style={{ marginBottom: spacing.sm }}>
       {hospitals.map((h: any, idx: number) => (
         <Animated.View
-          key={h.id}
+          key={h.id ?? h.place_id ?? h.name ?? idx}
           onLayout={(e) => { cardHeights.current[idx] = e.nativeEvent.layout.height; }}
           style={{
             transform: [{ translateY: anims[idx].translateY }, { scale: anims[idx].scale }],

@@ -200,7 +200,7 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
             const contact = phone || place.googleMapsUri || null;
 
             return {
-              id: onboarded?.id || null,
+              id: onboarded?.id || place.id,
               place_id: place.id,
               name: place.displayName?.text || 'Hospital',
               address: place.formattedAddress || null,
