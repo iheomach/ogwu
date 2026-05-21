@@ -476,21 +476,17 @@ function HospitalCard({ h, selected, onPress, disabled }: {
           {h.address || [h.city, h.state].filter(Boolean).join(', ')}
         </Text>
       ) : null}
-      {/* Supabase specialties array */}
+      {/* Supabase specialties dot-list */}
       {Array.isArray(h.specialties) && h.specialties.length > 0 && (
         <Text style={styles.hospitalCardLocation} numberOfLines={1}>
           {h.specialties.slice(0, 3).join(' · ')}
         </Text>
       )}
+      {/* Patient-specific standout phrase (Places results) */}
+      {typeof h.standout_phrase === 'string' && h.standout_phrase ? (
+        <Text style={styles.hospitalCardStandout} numberOfLines={2}>{h.standout_phrase}</Text>
+      ) : null}
       <View style={styles.hospitalCardBadgesRow}>
-        {/* Places specialty chip */}
-        {typeof h.specialty === 'string' && h.specialty && (
-          <View style={[styles.emergencyBadge, { backgroundColor: 'rgba(109,50,180,0.22)', borderColor: 'rgba(109,50,180,0.45)' }]}>
-            <Text style={[styles.emergencyBadgeText, { color: colors.purpleGlow }]}>
-              {h.specialty.charAt(0).toUpperCase() + h.specialty.slice(1).replace(/-/g, ' ')}
-            </Text>
-          </View>
-        )}
         {h.has_emergency && (
           <View style={styles.emergencyBadge}>
             <Text style={styles.emergencyBadgeText}>Emergency</Text>

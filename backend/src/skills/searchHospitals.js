@@ -22,9 +22,9 @@ async function openaiJsonCall(messages) {
   return JSON.parse(choices?.[0]?.message?.content ?? '{}');
 }
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;       // 24 h — Places API cache
-const SPECIALTY_TTL_DAYS = 30;                    // 30-day TTL for LLM specialty inference
-const GEO_PRECISION = 3;                          // bucket lat/lon to ~111 m grid
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const SPECIALTY_TTL_DAYS = 30;
+const GEO_PRECISION = 3;
 const DEFAULT_RADIUS_M = googlePlaces.DEFAULT_RADIUS_M;
 
 const VALID_SPECIALTIES = [
@@ -32,7 +32,6 @@ const VALID_SPECIALTIES = [
   'ophthalmology', 'multi-specialty', 'dental', 'psychiatric',
 ];
 
-// ICD-10 prefix → preferred specialty
 const ICD_TO_SPECIALTY = {
   I: 'cardiology',
   O: 'maternity',
@@ -61,7 +60,7 @@ function preferredSpecialtyFromTriage(triageContext) {
   return null;
 }
 
-async function inferSpecialty(place, openaiJsonCall) {
+async function inferSpecialty(place) {
   const name = place.displayName?.text || '';
   const summary = place.editorialSummary?.text || '';
   const types = (place.types || []).join(', ');
@@ -75,10 +74,7 @@ async function inferSpecialty(place, openaiJsonCall) {
         `specialty must be one of: ${VALID_SPECIALTIES.join(', ')}. ` +
         `confidence is 0.0–1.0.`,
     },
-    {
-      role: 'user',
-      content: `Name: ${name}\nGoogle types: ${types}\nDescription: ${summary}`,
-    },
+    { role: 'user', content: `Name: ${name}\nGoogle types: ${types}\nDescription: ${summary}` },
   ];
 
   try {
@@ -88,6 +84,71 @@ async function inferSpecialty(place, openaiJsonCall) {
     return { specialty, confidence };
   } catch {
     return { specialty: 'general', confidence: 0.5 };
+  }
+}
+
+// Generates a patient-specific one-liner explaining why this hospital suits them.
+// Not cached — patient context makes it unique per call.
+async function generateStandoutPhrase(place, specialty, { profile, triageContext, conversationContext }) {
+  const reviews = (place.reviews || [])
+    .map((r) => r.text?.text || r.originalText?.text || '')
+    .filter(Boolean)
+    .slice(0, 5)
+    .join('\n---\n');
+
+  const editorial = place.editorialSummary?.text || '';
+
+  // Extract the patient's own words from recent conversation (user turns only)
+  const recentUserMessages = (conversationContext || [])
+    .filter((m) => m.role === 'user')
+    .map((m) => (typeof m.content === 'string' ? m.content : ''))
+    .filter(Boolean)
+    .slice(-3)
+    .join(' | ');
+
+  // Build concise patient context
+  const patientContext = {
+    chief_complaint: triageContext?.answers?.[0]?.a || null,
+    triage_summary: triageContext?.summary || null,
+    urgency: triageContext?.urgency || null,
+    known_conditions: profile?.known_conditions || null,
+    allergies: profile?.allergies || null,
+    recent_messages: recentUserMessages || null,
+  };
+
+  // Strip nulls to keep prompt lean
+  Object.keys(patientContext).forEach((k) => { if (!patientContext[k]) delete patientContext[k]; });
+
+  const messages = [
+    {
+      role: 'system',
+      content:
+        `You are matching a patient to a hospital based on their specific medical situation. ` +
+        `Write ONE short phrase (8–12 words) explaining why this hospital is a good fit for THIS patient's situation specifically. ` +
+        `Base it on the patient's complaint, urgency, and any relevant signals from the hospital's reviews or description. ` +
+        `Be direct and clinically grounded — not generic marketing language. ` +
+        `If reviews have no relevant signal, derive the phrase from urgency and specialty match. ` +
+        `Do not mention the hospital name. Do not use em dashes. ` +
+        `Return ONLY JSON: { "standout_phrase": string }`,
+    },
+    {
+      role: 'user',
+      content: JSON.stringify({
+        hospital: {
+          specialty,
+          editorial: editorial || undefined,
+          reviews: reviews || undefined,
+        },
+        patient: patientContext,
+      }),
+    },
+  ];
+
+  try {
+    const result = await openaiJsonCall(messages);
+    return typeof result.standout_phrase === 'string' ? result.standout_phrase.trim() : null;
+  } catch {
+    return null;
   }
 }
 
@@ -101,7 +162,7 @@ function haversineKmFn(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patientLon, haversineKm, triageContext }) {
+module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patientLon, haversineKm, triageContext, profile, conversationContext }) {
   const _haversine = haversineKm || haversineKmFn;
 
   return {
@@ -123,7 +184,7 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
           const lonKey = bucket(patientLon);
           const radiusM = DEFAULT_RADIUS_M;
 
-          // 1. Check 24h cache
+          // 1. Check 24h geo cache
           let places;
           const { data: cached } = await supabase
             .from('hospital_places_cache')
@@ -144,14 +205,13 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
               return { error: 'no_hospitals', message: 'No hospitals found nearby. Tell the patient to call emergency services (199 or 112) or search Google Maps.' };
             }
 
-            // Upsert cache
             await supabase.from('hospital_places_cache').upsert(
               { lat_key: latKey, lon_key: lonKey, radius_m: radiusM, results: places, cached_at: new Date().toISOString() },
               { onConflict: 'lat_key,lon_key,radius_m' },
             );
           }
 
-          // 2. Merge with hospitals table for is_onboarded + phone overrides
+          // 2. Merge with hospitals_directory for is_onboarded + phone overrides
           const placeIds = places.map((p) => p.id).filter(Boolean);
           const { data: onboardedRows = [] } = await supabase
             .from('hospitals_directory')
@@ -160,7 +220,7 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
 
           const onboardedMap = Object.fromEntries((onboardedRows || []).map((r) => [r.place_id, r]));
 
-          // 3. Specialty inference — batch check cache, infer missing
+          // 3. Specialty — check 30-day cache, infer missing
           const cutoff = new Date(Date.now() - SPECIALTY_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
           const { data: cachedSpecialties = [] } = await supabase
             .from('hospital_specialties')
@@ -170,12 +230,11 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
 
           const specialtyMap = Object.fromEntries((cachedSpecialties || []).map((r) => [r.place_id, r]));
 
-          // Infer missing specialties
           if (process.env.OPENAI_API_KEY) {
             const missing = places.filter((p) => p.id && !specialtyMap[p.id]);
             await Promise.allSettled(
               missing.map(async (place) => {
-                const inferred = await inferSpecialty(place, openaiJsonCall);
+                const inferred = await inferSpecialty(place);
                 specialtyMap[place.id] = inferred;
                 await supabase.from('hospital_specialties').upsert(
                   { place_id: place.id, specialty: inferred.specialty, confidence: inferred.confidence, inferred_at: new Date().toISOString() },
@@ -185,9 +244,9 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
             );
           }
 
-          // 4. Build result objects
+          // 4. Compute distance + ranking score
           const preferred = preferredSpecialtyFromTriage(triageContext);
-          const results = places.map((place) => {
+          const withDistance = places.map((place) => {
             const onboarded = onboardedMap[place.id];
             const specialtyInfo = specialtyMap[place.id] || { specialty: 'general', confidence: 0.5 };
             const lat2 = place.location?.latitude;
@@ -197,34 +256,48 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
               : null;
 
             const phone = onboarded?.phone || place.nationalPhoneNumber || place.internationalPhoneNumber || null;
-            const contact = phone || place.googleMapsUri || null;
 
             return {
+              _place: place,
               id: onboarded?.id || place.id,
               place_id: place.id,
               name: place.displayName?.text || 'Hospital',
               address: place.formattedAddress || null,
-              phone: contact,
+              phone: phone || place.googleMapsUri || null,
               is_onboarded: onboarded?.is_onboarded ?? false,
               specialty: specialtyInfo.specialty,
-              specialty_confidence: specialtyInfo.confidence,
               distance_km: distanceKm,
               _specialtyMatch: preferred ? specialtyInfo.specialty === preferred : false,
             };
           });
 
           // 5. Rank: specialty match first, then distance
-          results.sort((a, b) => {
+          withDistance.sort((a, b) => {
             if (a._specialtyMatch !== b._specialtyMatch) return a._specialtyMatch ? -1 : 1;
             return (a.distance_km ?? 99999) - (b.distance_km ?? 99999);
           });
 
-          const top = results.slice(0, 5).map(({ _specialtyMatch, ...r }) => r);
-          console.log(`[searchHospitals] top: ${top.map((h) => `${h.name} ${h.distance_km}km [${h.specialty}]`).join(' | ')}`);
+          const top5 = withDistance.slice(0, 5);
+
+          // 6. Generate patient-specific standout phrases in parallel
+          if (process.env.OPENAI_API_KEY) {
+            await Promise.allSettled(
+              top5.map(async (h) => {
+                h.standout_phrase = await generateStandoutPhrase(
+                  h._place,
+                  h.specialty,
+                  { profile, triageContext, conversationContext },
+                );
+              }),
+            );
+          }
+
+          const top = top5.map(({ _place, _specialtyMatch, specialty: _sp, ...r }) => r);
+          console.log(`[searchHospitals] top: ${top.map((h) => `${h.name} ${h.distance_km}km`).join(' | ')}`);
           return { hospitals: top };
         }
 
-        // ── Supabase fallback path (no Places key or no GPS) ──────────────
+        // ── Supabase fallback path ─────────────────────────────────────────
         let q = supabase
           .from('hospitals_directory')
           .select('id,name,city,state,country,type,tier,specialties,phone,website,has_emergency,is_onboarded,lat,lon')

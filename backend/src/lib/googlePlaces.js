@@ -21,6 +21,7 @@ const FIELD_MASK = [
   'places.editorialSummary',
   'places.googleMapsUri',
   'places.rating',
+  'places.reviews',
 ].join(',');
 
 function isConfigured() {

@@ -884,6 +884,13 @@ export const styles = StyleSheet.create({
     color: colors.grey500,
     marginTop: 3,
   },
+  hospitalCardStandout: {
+    fontSize: 12,
+    color: colors.purpleGlow,
+    fontStyle: 'italic' as const,
+    marginTop: 5,
+    lineHeight: 17,
+  },
   hospitalCardBadgesRow: {
     flexDirection: 'row' as const,
     flexWrap: 'wrap' as const,

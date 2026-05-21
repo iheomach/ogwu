@@ -486,6 +486,8 @@ router.post('/chat', authenticate, async (req, res) => {
       safeText, normalizeUrgency,
       patientTimeZone,
       triageContext: triageIntake,
+      conversationContext: messages.slice(-8),
+      profile,
     };
 
     // Only surface lastHospital once there's prior conversation context.
