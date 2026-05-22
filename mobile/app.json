@@ -7,17 +7,17 @@
     "icon": "./assets/ogwu-ios.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/ogwu-ios.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#1A0530"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff",
-        "foregroundImage": "./assets/ogwu-ios.png"
+        "backgroundColor": "#1A0530",
+        "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -26,7 +26,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/ogwu-ios.png"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-localization",

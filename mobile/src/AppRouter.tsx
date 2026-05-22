@@ -459,7 +459,7 @@ export function AppRouter() {
         style={styles.center}
       >
         <Image
-          source={require('../assets/ogwu-ios.png')}
+          source={require('../assets/ogwu-mark.png')}
           style={styles.bootSplashLogo}
           resizeMode="contain"
         />

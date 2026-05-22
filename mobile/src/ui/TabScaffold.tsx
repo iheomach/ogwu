@@ -1,4 +1,4 @@
-import { Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { Image, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -77,8 +77,11 @@ function AssistantFab({ active, onPress }: { active: boolean; onPress: () => voi
       accessibilityLabel={t('tabs.newConsult')}
     >
       <View style={[styles.assistantFabInner, active && styles.assistantFabInnerActive]}>
-        <View style={{ position: 'absolute', width: 24, height: 8, borderRadius: 1.7, backgroundColor: colors.white }} />
-        <View style={{ position: 'absolute', width: 8, height: 24, borderRadius: 1.7, backgroundColor: colors.white }} />
+        <Image
+          source={require('../../assets/ogwu-mark.png')}
+          style={{ width: 42, height: 42 }}
+          resizeMode="contain"
+        />
       </View>
     </TouchableOpacity>
   );

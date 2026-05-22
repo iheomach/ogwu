@@ -355,9 +355,8 @@ export const styles = StyleSheet.create({
 
   // ─── Boot splash ────────────────────────────────────────────────────────
   bootSplashLogo: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
+    width: 80,
+    height: 80,
     marginBottom: 24,
   },
 

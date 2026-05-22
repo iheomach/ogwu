@@ -1060,8 +1060,11 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                 if (toolName !== 'searchHospitals') return false;
                 if (invState !== 'output-available' && invState !== 'result' && !part.output && !part.result) return false;
                 const hospitals =
-                  part.output?.hospitals ?? part.result?.hospitals ??
-                  invocation?.result?.hospitals ?? invocation?.output?.hospitals ??
+                  part.output?.data?.hospitals ?? part.output?.hospitals ??
+                  part.result?.data?.hospitals ?? part.result?.hospitals ??
+                  invocation?.result?.data?.hospitals ?? invocation?.result?.hospitals ??
+                  invocation?.output?.data?.hospitals ?? invocation?.output?.hospitals ??
+                  (Array.isArray(part.output?.data) ? part.output.data : null) ??
                   (Array.isArray(part.output) ? part.output : null) ??
                   (Array.isArray(part.result) ? part.result : null);
                 return Array.isArray(hospitals) && hospitals.length > 0;
@@ -1176,10 +1179,11 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                       if (!displayText) return null;
                       // Try every possible field path across SDK versions
                       const hospitals =
-                        part.output?.hospitals ??
-                        part.result?.hospitals ??
-                        invocation?.result?.hospitals ??
-                        invocation?.output?.hospitals ??
+                        part.output?.data?.hospitals ?? part.output?.hospitals ??
+                        part.result?.data?.hospitals ?? part.result?.hospitals ??
+                        invocation?.result?.data?.hospitals ?? invocation?.result?.hospitals ??
+                        invocation?.output?.data?.hospitals ?? invocation?.output?.hospitals ??
+                        (Array.isArray(part.output?.data) ? part.output.data : null) ??
                         (Array.isArray(part.output) ? part.output : null) ??
                         (Array.isArray(part.result) ? part.result : null);
 

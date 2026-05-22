@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 216">
+<defs>
+  <radialGradient id="g_disc" cx="35%" cy="32%" r="80%">
+    <stop offset="0%" stop-color="#6B2BA8"></stop>
+    <stop offset="55%" stop-color="#4A0E8A"></stop>
+    <stop offset="100%" stop-color="#1A0530"></stop>
+  </radialGradient>
+  <linearGradient id="g_petal" x1="50%" y1="0%" x2="50%" y2="100%">
+    <stop offset="0%" stop-color="#FFFFFF"></stop>
+    <stop offset="50%" stop-color="#F6EBD4"></stop>
+    <stop offset="100%" stop-color="#FBD79A"></stop>
+  </linearGradient>
+</defs>
+
+<g transform="translate(8 8)">
+  <circle cx="100" cy="100" r="84" fill="url(#g_disc)"></circle>
+  <g fill="url(#g_petal)">
+    <path d="M 100 38 C 124 60, 124 88, 100 100 C 76 88, 76 60, 100 38 Z"></path>
+    <path d="M 100 162 C 76 140, 76 112, 100 100 C 124 112, 124 140, 100 162 Z"></path>
+    <path d="M 38 100 C 60 76, 88 76, 100 100 C 88 124, 60 124, 38 100 Z"></path>
+    <path d="M 162 100 C 140 124, 112 124, 100 100 C 112 76, 140 76, 162 100 Z"></path>
+  </g>
+  <circle cx="100" cy="100" r="9" fill="#F2A93B"></circle>
+</g>
+</svg>
