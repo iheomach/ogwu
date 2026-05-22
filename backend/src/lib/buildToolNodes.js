@@ -1,4 +1,92 @@
 const { ToolMessage } = require('@langchain/core/messages');
+const z = require('zod');
+
+// ── Output schemas — validate the `data` field of the envelope ───────────────
+// Uses .passthrough() so extra fields don't cause false rejections.
+
+const HospitalItemSchema = z.object({
+  id:             z.string().nullable(),
+  name:           z.string(),
+  is_onboarded:   z.boolean(),
+  phone:          z.string().nullable().optional(),
+  distance_km:    z.number().nullable().optional(),
+  standout_phrase: z.string().nullable().optional(),
+  address:        z.string().nullable().optional(),
+}).passthrough();
+
+const OUTPUT_SCHEMAS = {
+  searchHospitals: z.object({
+    hospitals: z.array(HospitalItemSchema),
+    note: z.string().optional(),
+  }),
+
+  getHospitalBookingInfo: z.discriminatedUnion('type', [
+    z.object({
+      type:             z.literal('onboarded'),
+      hospital_id:      z.string(),
+      hospital_name:    z.string(),
+      available_slots:  z.array(z.any()),
+      instructions:     z.string(),
+    }),
+    z.object({
+      type:    z.literal('onboarded_no_slots'),
+      message: z.string(),
+      phone:   z.string().nullable().optional(),
+    }),
+    z.object({
+      type:          z.literal('not_onboarded'),
+      hospital_name: z.string(),
+      phone:         z.string().nullable().optional(),
+      call_script:   z.string(),
+      instructions:  z.string(),
+    }),
+  ]),
+
+  bookAppointment: z.object({
+    success:        z.literal(true),
+    appointment_id: z.string(),
+    starts_at:      z.string(),
+    meeting_url:    z.string().nullable(),
+    hospital_id:    z.string(),
+    hospital_name:  z.string(),
+    message:        z.string(),
+  }),
+
+  flagEmergency: z.object({
+    flagged:  z.literal(true),
+    reason:   z.string(),
+    message:  z.string(),
+  }),
+
+  checkDrugInteraction: z.object({
+    medications:   z.array(z.string()),
+    allergy_risks: z.array(z.string()),
+    interactions:  z.array(z.object({
+      drugs: z.array(z.string()),
+      risk:  z.string(),
+      note:  z.string(),
+    })),
+    overall_risk: z.string(),
+    flagged:      z.boolean(),
+    safe:         z.boolean(),
+    note:         z.string(),
+  }),
+
+  createConsult: z.object({
+    success:    z.boolean(),
+    consult_id: z.string().nullable().optional(),
+  }),
+
+  endConversation: z.object({
+    ended:         z.literal(true),
+    hospital_id:   z.string(),
+    hospital_name: z.string(),
+  }),
+
+  getPatientHistory: z.object({
+    history: z.array(z.any()),
+  }),
+};
 
 const SKILL_NAMES = [
   'searchHospitals',
@@ -121,6 +209,18 @@ function buildToolDispatcher(skillCtx) {
       try {
         rawResult = await skill.execute(parsed.data);
         envelope = toEnvelope(rawResult);
+
+        // Validate output shape if a schema exists for this tool
+        if (envelope.ok && OUTPUT_SCHEMAS[toolCall.name]) {
+          const outParsed = OUTPUT_SCHEMAS[toolCall.name].safeParse(envelope.data);
+          if (!outParsed.success) {
+            const detail = outParsed.error.issues
+              .map((i) => `${i.path.join('.') || 'root'}: ${i.message}`)
+              .join('; ');
+            console.error(`[tool] ${toolCall.name} output contract violated: ${detail}`);
+            envelope = { ok: false, data: null, error: `Output contract violated — ${detail}` };
+          }
+        }
       } catch (err) {
         envelope = { ok: false, data: null, error: err?.message ?? 'Tool execution failed' };
       }
