@@ -19,7 +19,11 @@
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/ogwu-ios.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ]
     },
     "web": {
       "favicon": "./assets/ogwu-ios.png"
@@ -33,6 +37,12 @@
           "calendarPermission": "Allow Ogwu to add your appointment to Apple Calendar."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a9b03c5a-29e7-493c-9f5b-612f2895fbfa"
+      }
+    },
+    "owner": "iheoma"
   }
-}
+  }
