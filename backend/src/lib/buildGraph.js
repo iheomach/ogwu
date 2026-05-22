@@ -51,7 +51,52 @@ function makeEscalateNode(skillCtx) {
   };
 }
 
+// ── Failure escalation node ───────────────────────────────────────────────────
+// Triggered after 3 cumulative tool failures in a session. Logs to
+// session_escalations and sends the patient a plain-language message.
+
+function makeFailureEscalateNode(skillCtx) {
+  return async function failureEscalateNode(state) {
+    const patientId = state.patient_id;
+    const lastErrors = Object.entries(state.tool_results ?? {})
+      .filter(([, v]) => v?.error || v?.ok === false)
+      .map(([name, v]) => `${name}: ${v?.error ?? v?.message ?? 'unknown'}`)
+      .join('; ') || 'repeated tool failures';
+
+    console.warn(`[agent] failure escalation — patient ${patientId} — ${lastErrors}`);
+
+    // Log to session_escalations (fire-and-forget)
+    try {
+      await skillCtx.supabase.from('session_escalations').insert({
+        patient_id: patientId ?? null,
+        failure_count: state.failure_count ?? 3,
+        last_error: lastErrors.slice(0, 500),
+        message_context: (state.messages ?? []).slice(-6).map((m) => ({
+          role: m._getType?.() ?? 'unknown',
+          content: typeof m.content === 'string'
+            ? m.content.slice(0, 300)
+            : Array.isArray(m.content)
+              ? m.content.filter((p) => p.type === 'text').map((p) => p.text).join('').slice(0, 300)
+              : '',
+        })),
+      });
+    } catch (e) {
+      console.warn('[session_escalations] write failed:', e?.message);
+    }
+
+    const msg = new AIMessage(
+      'I\'ve run into repeated issues completing your request, and I want to make sure you get the help you need. ' +
+      'I\'ve flagged this for our team. In the meantime, please call emergency services at 199 or 112 if this is urgent, ' +
+      'or search Google Maps for hospitals near you. I\'m sorry for the difficulty.'
+    );
+
+    return { messages: [msg], failure_count: 0 };
+  };
+}
+
 // ── Routing ───────────────────────────────────────────────────────────────────
+
+const FAILURE_ESCALATION_THRESHOLD = 3;
 
 function routeFromAgent(state) {
   if (state.urgency === 'emergency') return 'escalate';
@@ -66,6 +111,7 @@ function routeFromAgent(state) {
 
 function routeFromTool(state) {
   if (state.urgency === 'emergency') return 'escalate';
+  if ((state.failure_count ?? 0) >= FAILURE_ESCALATION_THRESHOLD) return 'failure_escalate';
   return 'agent';
 }
 
@@ -92,13 +138,15 @@ function buildGraph(skillCtx, systemPrompt, checkpointer = null) {
     .addNode('input_guard', inputGuardNode)
     .addNode('agent', agentNode)
     .addNode('tools', buildToolDispatcher(skillCtx))
-    .addNode('escalate', makeEscalateNode(skillCtx));
+    .addNode('escalate', makeEscalateNode(skillCtx))
+    .addNode('failure_escalate', makeFailureEscalateNode(skillCtx));
 
   graph.addEdge('__start__', 'input_guard');
   graph.addConditionalEdges('input_guard', routeFromInputGuard, ['agent', END]);
   graph.addConditionalEdges('agent', routeFromAgent, ['tools', 'escalate', END]);
-  graph.addConditionalEdges('tools', routeFromTool, ['escalate', 'agent']);
+  graph.addConditionalEdges('tools', routeFromTool, ['escalate', 'failure_escalate', 'agent']);
   graph.addEdge('escalate', 'agent');
+  graph.addEdge('failure_escalate', END);
 
   return graph.compile({ checkpointer: checkpointer ?? undefined });
 }

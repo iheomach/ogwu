@@ -127,6 +127,53 @@ function toEnvelope(rawResult) {
   return { ok: true, data: rawResult ?? null, error: null };
 }
 
+// ── Retry logic ───────────────────────────────────────────────────────────────
+
+const RETRY_DELAYS_MS = [1000, 2000, 4000];
+
+function isRetriable(msg) {
+  const s = String(msg ?? '').toLowerCase();
+  return (
+    s.includes('econnreset') || s.includes('etimedout') || s.includes('enotfound') ||
+    s.includes('fetch failed') || s.includes('rate limit') || s.includes('429') ||
+    s.includes('503') || s.includes('service unavailable') || s.includes('network error')
+  );
+}
+
+async function executeWithRetry(skill, args, toolName) {
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      const result = await skill.execute(args);
+      // Retry on unexpected errors whose message signals a transient network issue
+      if (result?.error === 'unexpected' && isRetriable(result?.message) && attempt < RETRY_DELAYS_MS.length) {
+        const delay = RETRY_DELAYS_MS[attempt];
+        console.warn(`[tool] ${toolName} retriable result (attempt ${attempt + 1}), retrying in ${delay}ms`);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      if (attempt > 0 && !(result?.error === 'unexpected' && isRetriable(result?.message))) {
+        console.log(`[tool] ${toolName} recovered after ${attempt} retry(s)`);
+      }
+      return result;
+    } catch (err) {
+      if (!isRetriable(err?.message) || attempt === RETRY_DELAYS_MS.length) throw err;
+      const delay = RETRY_DELAYS_MS[attempt];
+      console.warn(`[tool] ${toolName} threw retriable error (attempt ${attempt + 1}), retrying in ${delay}ms: ${err.message}`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+}
+
+function extractLastAiReasoning(messages) {
+  const lastAi = [...(messages ?? [])].reverse().find((m) => m._getType?.() === 'ai');
+  if (!lastAi) return null;
+  const c = lastAi.content;
+  const text = typeof c === 'string' ? c : Array.isArray(c) ? c.filter((p) => p.type === 'text').map((p) => p.text).join('') : '';
+  return text.slice(0, 600) || null;
+}
+
+// ── Logging ───────────────────────────────────────────────────────────────────
+
 // Fire-and-forget — never throws; a logging failure must not abort a tool call.
 async function logToolCall(supabase, { patientId, toolName, inputArgs, output, ok, errorMsg, latencyMs }) {
   if (!supabase) return;
@@ -162,6 +209,7 @@ function buildToolDispatcher(skillCtx) {
     const toolMessages = [];
     const toolResults = { ...state.tool_results };
     const stateUpdate = {};
+    let batchFailures = 0;
 
     for (const toolCall of toolCalls) {
       // ── Session guards ────────────────────────────────────────────────────
@@ -207,7 +255,7 @@ function buildToolDispatcher(skillCtx) {
       let envelope;
 
       try {
-        rawResult = await skill.execute(parsed.data);
+        rawResult = await executeWithRetry(skill, parsed.data, toolCall.name);
         envelope = toEnvelope(rawResult);
 
         // Validate output shape if a schema exists for this tool
@@ -228,11 +276,13 @@ function buildToolDispatcher(skillCtx) {
       const latencyMs = Date.now() - startMs;
       console.log(`[tool] ${toolCall.name} ok=${envelope.ok} ${latencyMs}ms`);
 
+      if (!envelope.ok) batchFailures++;
+
       logToolCall(skillCtx.supabase, {
         patientId,
         toolName: toolCall.name,
         inputArgs: parsed.data,
-        output: envelope,
+        output: envelope.ok ? envelope : { ...envelope, model_reasoning: extractLastAiReasoning(state.messages) },
         ok: envelope.ok,
         errorMsg: envelope.ok ? null : envelope.error,
         latencyMs,
@@ -254,7 +304,8 @@ function buildToolDispatcher(skillCtx) {
       }
     }
 
-    return { ...stateUpdate, messages: toolMessages, tool_results: toolResults };
+    const newFailureCount = (state.failure_count ?? 0) + batchFailures;
+    return { ...stateUpdate, messages: toolMessages, tool_results: toolResults, failure_count: newFailureCount };
   };
 }
 
