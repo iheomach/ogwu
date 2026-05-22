@@ -173,15 +173,33 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
     execute: async ({ state, has_emergency }) => {
       try {
         const stateClean = String(state || '').trim();
-        const hasCoords = patientLat != null && patientLon != null;
+        let resolvedLat = patientLat;
+        let resolvedLon = patientLon;
+        let hasCoords = resolvedLat != null && resolvedLon != null;
+
+        // Geocode city/state string to coordinates when GPS is unavailable
+        if (!hasCoords && stateClean && googlePlaces.isConfigured()) {
+          try {
+            const geocoded = await googlePlaces.geocodeCity(stateClean);
+            if (geocoded) {
+              resolvedLat = geocoded.lat;
+              resolvedLon = geocoded.lon;
+              hasCoords = true;
+              console.log(`[searchHospitals] geocoded "${stateClean}" → (${resolvedLat}, ${resolvedLon})`);
+            }
+          } catch (geoErr) {
+            console.warn(`[searchHospitals] geocoding failed for "${stateClean}": ${geoErr.message}`);
+          }
+        }
+
         const usePlaces = googlePlaces.isConfigured() && hasCoords;
 
         console.log(`[searchHospitals] state="${stateClean}" has_emergency=${has_emergency} coords=${hasCoords} places=${usePlaces}`);
 
         // ── Google Places path ─────────────────────────────────────────────
         if (usePlaces) {
-          const latKey = bucket(patientLat);
-          const lonKey = bucket(patientLon);
+          const latKey = bucket(resolvedLat);
+          const lonKey = bucket(resolvedLon);
           const radiusM = DEFAULT_RADIUS_M;
 
           // 1. Check 24h geo cache
@@ -198,7 +216,7 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
             places = cached.results;
             console.log(`[searchHospitals] cache hit (${places.length} places)`);
           } else {
-            places = await googlePlaces.searchNearbyHospitals({ lat: patientLat, lon: patientLon, radius: radiusM });
+            places = await googlePlaces.searchNearbyHospitals({ lat: resolvedLat, lon: resolvedLon, radius: radiusM });
             console.log(`[searchHospitals] Places API returned ${places.length} results`);
 
             if (places.length === 0) {
@@ -252,7 +270,7 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
             const lat2 = place.location?.latitude;
             const lon2 = place.location?.longitude;
             const distanceKm = lat2 != null && lon2 != null
-              ? Math.round(_haversine(patientLat, patientLon, lat2, lon2) * 10) / 10
+              ? Math.round(_haversine(resolvedLat, resolvedLon, lat2, lon2) * 10) / 10
               : null;
 
             const phone = onboarded?.phone || place.nationalPhoneNumber || place.internationalPhoneNumber || null;
@@ -316,7 +334,7 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
             .map((h) => ({
               ...h,
               distance_km: (h.lat != null && h.lon != null)
-                ? Math.round(_haversine(patientLat, patientLon, h.lat, h.lon))
+                ? Math.round(_haversine(resolvedLat, resolvedLon, h.lat, h.lon))
                 : 99999,
             }))
             .sort((a, b) => a.distance_km - b.distance_km)

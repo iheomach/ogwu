@@ -62,4 +62,21 @@ async function searchNearbyHospitals({ lat, lon, radius = DEFAULT_RADIUS_M }) {
   return places;
 }
 
-module.exports = { isConfigured, searchNearbyHospitals, DEFAULT_RADIUS_M };
+async function geocodeCity(cityString) {
+  const key = process.env.GOOGLE_PLACES_API_KEY;
+  if (!key || !cityString) return null;
+
+  const query = encodeURIComponent(`${cityString.trim()}, Nigeria`);
+  const res = await fetch(
+    `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${key}`,
+  );
+  if (!res.ok) throw new Error(`Geocoding API ${res.status}`);
+
+  const { status, results } = await res.json();
+  if (status !== 'OK' || !results?.length) return null;
+
+  const { lat, lng } = results[0].geometry.location;
+  return { lat, lon: lng };
+}
+
+module.exports = { isConfigured, searchNearbyHospitals, geocodeCity, DEFAULT_RADIUS_M };
