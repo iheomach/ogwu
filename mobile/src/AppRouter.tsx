@@ -35,6 +35,7 @@ import { triageComplete, triageNext, triageStatus } from './lib/triage';
 import { apiDelete } from './lib/api';
 import { TabScaffold, type TabKey } from './ui/TabScaffold';
 import { requestAndGetLocation, formatLocation, type LocationSummary } from './lib/location';
+import { registerForPushNotifications } from './lib/notifications';
 
 export function AppRouter() {
   const [isBooting, setIsBooting] = useState(true);
@@ -131,6 +132,9 @@ export function AppRouter() {
         const loaded = await loadProfile(user);
         if (!isMounted) return;
         setProfile(loaded);
+
+        // Register / refresh push token on every login — handles re-registration after expiry.
+        registerForPushNotifications(user.id).catch(() => {});
 
         if (isProfileComplete(loaded)) {
           // If profile is complete, run triage once after signup.

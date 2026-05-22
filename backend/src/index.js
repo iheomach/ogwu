@@ -77,6 +77,7 @@ app.use('/api/report',       authenticate, userLimiter, require('./routes/report
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  require('./lib/notifyProviderReply').startProviderReplyNotifier();
 });
 
 module.exports = app;
