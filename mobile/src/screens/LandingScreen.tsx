@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import {
   Animated,
   Dimensions,
+  Easing,
   Image,
   StyleSheet,
   Text,
@@ -29,6 +30,64 @@ const DOTS: Array<{ ring: number; angle: number; size: number; color: string; gl
   { ring: 1, angle:  Math.PI * 0.68, size:  6, color: 'rgba(184,160,245,0.70)',   glow: false },
   { ring: 2, angle:  Math.PI * 1.35, size:  5, color: 'rgba(255,255,255,0.30)',   glow: false },
 ];
+
+function OrbitingDot({
+  ring,
+  startAngle,
+  size,
+  color,
+  duration,
+}: {
+  ring: number;
+  startAngle: number;
+  size: number;
+  color: string;
+  duration: number;
+}) {
+  const rot = useRef(new Animated.Value(0)).current;
+  const radius = RINGS[ring].size / 2;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(rot, {
+        toValue: 1,
+        duration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ).start();
+  }, []);
+
+  const rotate = rot.interpolate({
+    inputRange: [0, 1],
+    outputRange: [`${startAngle}rad`, `${startAngle + Math.PI * 2}rad`],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: CX,
+        top: CY,
+        width: 0,
+        height: 0,
+        transform: [{ rotate }],
+      }}
+    >
+      <View
+        style={{
+          position: 'absolute',
+          left: radius - size / 2,
+          top: -size / 2,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: color,
+        }}
+      />
+    </Animated.View>
+  );
+}
 
 export function LandingScreen({ onGetStarted }: { onGetStarted: () => void }) {
   const fade  = useRef(new Animated.Value(0)).current;
@@ -63,11 +122,12 @@ export function LandingScreen({ onGetStarted }: { onGetStarted: () => void }) {
           />
         ))}
 
-        {DOTS.map(({ ring, angle, size, color, glow }, i) => {
+        {/* Large glow dot — static */}
+        {(() => {
+          const { ring, angle, size, color } = DOTS[0];
           const r = RINGS[ring].size / 2;
           return (
             <View
-              key={i}
               style={{
                 position: 'absolute',
                 width: size,
@@ -76,17 +136,19 @@ export function LandingScreen({ onGetStarted }: { onGetStarted: () => void }) {
                 backgroundColor: color,
                 left: CX + r * Math.cos(angle) - size / 2,
                 top:  CY + r * Math.sin(angle) - size / 2,
-                ...(glow ? {
-                  shadowColor: colors.purple,
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 1,
-                  shadowRadius: 18,
-                  elevation: 8,
-                } : {}),
+                shadowColor: colors.purple,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 1,
+                shadowRadius: 18,
+                elevation: 8,
               }}
             />
           );
-        })}
+        })()}
+
+        {/* Tiny orbiting planets */}
+        <OrbitingDot ring={1} startAngle={DOTS[1].angle} size={DOTS[1].size} color={DOTS[1].color} duration={14000} />
+        <OrbitingDot ring={2} startAngle={DOTS[2].angle} size={DOTS[2].size} color={DOTS[2].color} duration={9000} />
       </View>
 
       {/* ── Logo row ─────────────────────────────────────────────────────── */}
