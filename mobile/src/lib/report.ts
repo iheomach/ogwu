@@ -78,6 +78,15 @@ function urgencyLabel(urgency: string): string {
   }
 }
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1') // bold
+    .replace(/\*(.*?)\*/g, '$1')     // italic
+    .replace(/^#{1,6}\s+/gm, '')    // headings
+    .replace(/^\s*[-*]\s+/gm, '')   // list markers
+    .trim();
+}
+
 // Parses the LLM narrative into labelled sections
 function parseNarrative(text: string): Array<{ heading: string; body: string }> {
   const HEADINGS = [
@@ -109,7 +118,7 @@ function parseNarrative(text: string): Array<{ heading: string; body: string }> 
 }
 
 function narrativeHtml(narrative: string): string {
-  const sections = parseNarrative(narrative);
+  const sections = parseNarrative(stripMarkdown(narrative));
   if (sections.length === 0) {
     return `<p class="body">${narrative.replace(/\n/g, '<br/>')}</p>`;
   }

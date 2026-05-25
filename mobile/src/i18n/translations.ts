@@ -193,7 +193,7 @@ export const translations = {
       doctorVisits: 'Doctor visits / assessments',
       asyncConsults: 'Async consults',
       asyncEmpty: 'No async consults yet.',
-      exportReport: 'Share health report',
+      exportReport: 'Generate health report',
       exportTitle: 'Ogwu Health Report',
       exportErrorTitle: 'Could not export report',
       exportErrorBody: 'Failed to generate health report',

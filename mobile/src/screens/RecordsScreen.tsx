@@ -36,7 +36,7 @@ export function RecordsScreen({ busy, onOpenThread: _onOpenThread, onUpload }: R
         <Text style={styles.helper}>{t('records.helper')}</Text>
 
         <TouchableOpacity
-          style={[styles.btnPrimary, (busy || exportLoading) ? styles.btnPrimaryDisabled : null, { marginBottom: 24 }]}
+          style={[styles.btnPrimary, (busy || exportLoading) ? styles.btnPrimaryDisabled : null, { marginBottom: 8 }]}
           onPress={handleExport}
           disabled={busy || exportLoading}
         >
@@ -45,6 +45,10 @@ export function RecordsScreen({ busy, onOpenThread: _onOpenThread, onUpload }: R
             : <Text style={styles.btnPrimaryText}>{t('records.exportReport')}</Text>
           }
         </TouchableOpacity>
+
+        <Text style={{ fontSize: 11, color: colors.grey500, lineHeight: 16, marginBottom: 24 }}>
+          Generated from patient-reported information only. Not a clinical assessment — always consult a qualified healthcare provider.
+        </Text>
 
         {/* ── OgwuAI Document Upload ── */}
         <Text style={[styles.label, { marginBottom: 12 }]}>AI Document Analysis</Text>

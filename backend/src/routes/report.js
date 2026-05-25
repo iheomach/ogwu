@@ -56,7 +56,7 @@ ${intakeBlock}
 AI ASSISTANT SESSIONS:
 ${consultsBlock}
 
-Write the following sections using clinical third-person language. Be concise but thorough. Do not use bullet points in the narrative sections — write in flowing prose. Use the patient's name and correct pronouns throughout.
+Write the following sections using clinical third-person language. Be concise but thorough. Do not use bullet points in the narrative sections — write in flowing prose. Use the patient's name and correct pronouns throughout. Do not use any markdown formatting (no **, no *, no #, no dashes as list markers).
 
 Sections to produce (output exactly these headings):
 
