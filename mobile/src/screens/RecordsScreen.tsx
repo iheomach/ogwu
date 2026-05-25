@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import type { RecordsScreenProps } from '../types';
-import { fetchReport, buildReportText } from '../lib/report';
+import { fetchReport, shareReportAsPdf } from '../lib/report';
 import { styles, colors, spacing, TAB_BAR_HEIGHT } from '../ui/styles';
 import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
@@ -17,8 +17,8 @@ export function RecordsScreen({ busy, onOpenThread: _onOpenThread, onUpload }: R
     try {
       setExportLoading(true);
       const data = await fetchReport();
-      const message = buildReportText(data);
-      await Share.share({ message, title: t('records.exportTitle') });
+      const fullName = [data.profile?.first_name, data.profile?.last_name].filter(Boolean).join(' ') || 'Patient';
+      await shareReportAsPdf(data, fullName);
     } catch (e: any) {
       Alert.alert(t('records.exportErrorTitle'), e?.message ?? t('records.exportErrorBody'));
     } finally {

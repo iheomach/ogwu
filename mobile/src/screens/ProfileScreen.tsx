@@ -274,6 +274,7 @@ export function ProfileScreen({
           </TouchableOpacity>
         </GlassCard>
 
+        <Text style={[styles.label, { marginBottom: 12 }]}>Account</Text>
         <TouchableOpacity
           style={styles.btnDestructive}
           onPress={onLogout}
@@ -304,6 +305,8 @@ export function ProfileScreen({
         >
           <Text style={[styles.btnDestructiveText, { color: colors.error }]}>Delete Account</Text>
         </TouchableOpacity>
+
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
     </SafeAreaView>
   );
