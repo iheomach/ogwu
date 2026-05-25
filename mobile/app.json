@@ -15,6 +15,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Ogwu uses your location to find hospitals and care providers near you.",
+        "NSCameraUsageDescription": "Ogwu uses your camera to capture documents, lab results, and prescriptions.",
+        "NSPhotoLibraryUsageDescription": "Ogwu accesses your photo library to upload documents and medical images.",
         "NSCalendarsUsageDescription": "Ogwu adds your appointments to Apple Calendar so you don't miss them.",
         "NSUserNotificationsUsageDescription": "Ogwu sends you a notification when a provider replies to your consult."
       }
@@ -26,6 +28,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
+        "android.permission.CAMERA",
         "android.permission.READ_CALENDAR",
         "android.permission.WRITE_CALENDAR"
       ]
@@ -41,6 +44,7 @@
           "locationWhenInUsePermission": "Ogwu uses your location to find hospitals and care providers near you."
         }
       ],
+      "expo-image-picker",
       "expo-notifications",
       [
         "expo-calendar",

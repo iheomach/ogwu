@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 
 import type { RecordsUploadScreenProps } from '../types';
 import {
@@ -100,25 +101,13 @@ export function RecordsUploadScreen({ onDone }: RecordsUploadScreenProps) {
     }, POLL_INTERVAL_MS);
   }, []);
 
-  const handlePick = useCallback(async () => {
+  const beginUpload = useCallback(async (uri: string, mimeType: string, fileName: string) => {
+    setStage('uploading');
+    setUploadPct(0);
+    setErrorMsg(null);
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ALLOWED_TYPES,
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled || !result.assets?.length) return;
-      const asset = result.assets[0];
-      const mimeType = asset.mimeType ?? 'application/octet-stream';
-      const fileName = asset.name;
-
-      setStage('uploading');
-      setUploadPct(0);
-      setErrorMsg(null);
-
       const { documentId, uploadUrl } = await documentsInitUpload(fileName, mimeType);
-      await uploadFileToS3(uploadUrl, asset.uri, mimeType, setUploadPct);
-
+      await uploadFileToS3(uploadUrl, uri, mimeType, setUploadPct);
       setStage('processing');
       startPolling(documentId);
     } catch (e: any) {
@@ -126,6 +115,45 @@ export function RecordsUploadScreen({ onDone }: RecordsUploadScreenProps) {
       setStage('failed');
     }
   }, [startPolling]);
+
+  const handlePick = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ALLOWED_TYPES,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      await beginUpload(asset.uri, asset.mimeType ?? 'application/octet-stream', asset.name);
+    } catch (e: any) {
+      setErrorMsg(e?.message ?? 'Something went wrong. Please try again.');
+      setStage('failed');
+    }
+  }, [beginUpload]);
+
+  const handleCamera = useCallback(async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Camera permission is required to capture documents.');
+        setStage('failed');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.92,
+        allowsEditing: false,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType ?? 'image/jpeg';
+      const fileName = `capture_${Date.now()}.jpg`;
+      await beginUpload(asset.uri, mimeType, fileName);
+    } catch (e: any) {
+      setErrorMsg(e?.message ?? 'Something went wrong. Please try again.');
+      setStage('failed');
+    }
+  }, [beginUpload]);
 
   const handleRetry = useCallback(() => {
     setStage('idle');
@@ -150,31 +178,57 @@ export function RecordsUploadScreen({ onDone }: RecordsUploadScreenProps) {
 
         <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, flex: 1 }}>
 
-          {/* Idle state — file picker */}
+          {/* Idle state — two tiles */}
           {stage === 'idle' && (
-            <TouchableOpacity onPress={handlePick} activeOpacity={0.85}>
-              <GlassCard
-                borderRadius={10}
-                innerStyle={{ padding: spacing.xl, alignItems: 'center', gap: 12 }}
-              >
-                <View style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 32,
-                  backgroundColor: 'rgba(123,77,217,0.18)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <MaterialIcons name="upload-file" size={30} color={colors.purple} />
-                </View>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.grey900, textAlign: 'center' }}>
-                  Tap to choose a file
-                </Text>
-                <Text style={{ fontSize: 13, color: colors.grey500, textAlign: 'center', lineHeight: 20 }}>
-                  PDF, Word, JPEG, PNG, or HEIC{'\n'}up to any size
-                </Text>
-              </GlassCard>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <TouchableOpacity onPress={handlePick} activeOpacity={0.85} style={{ flex: 1 }}>
+                <GlassCard
+                  borderRadius={10}
+                  innerStyle={{ padding: spacing.lg, alignItems: 'center', gap: 12, minHeight: 160, justifyContent: 'center' }}
+                >
+                  <View style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    backgroundColor: 'rgba(123,77,217,0.18)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <MaterialIcons name="upload-file" size={26} color={colors.purple} />
+                  </View>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.grey900, textAlign: 'center' }}>
+                    Upload file
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.grey500, textAlign: 'center', lineHeight: 18 }}>
+                    PDF, Word,{'\n'}JPEG, PNG, HEIC
+                  </Text>
+                </GlassCard>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={handleCamera} activeOpacity={0.85} style={{ flex: 1 }}>
+                <GlassCard
+                  borderRadius={10}
+                  innerStyle={{ padding: spacing.lg, alignItems: 'center', gap: 12, minHeight: 160, justifyContent: 'center' }}
+                >
+                  <View style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    backgroundColor: 'rgba(123,77,217,0.18)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <MaterialIcons name="camera-alt" size={26} color={colors.purple} />
+                  </View>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.grey900, textAlign: 'center' }}>
+                    Capture
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.grey500, textAlign: 'center', lineHeight: 18 }}>
+                    Take a photo{'\n'}of a document
+                  </Text>
+                </GlassCard>
+              </TouchableOpacity>
+            </View>
           )}
 
           {/* Active / complete / failed */}
