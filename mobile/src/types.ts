@@ -16,6 +16,7 @@ export type Profile = {
 export type UrgencyTier = 'routine' | 'soon' | 'urgent' | 'emergency';
 
 export type AppScreen =
+  | 'landing'
   | 'phone'
   | 'otp'
   | 'onboarding'
@@ -26,6 +27,7 @@ export type AppScreen =
   | 'sendToHospital'
   | 'thread'
   | 'records'
+  | 'recordsUpload'
   | 'inbox'
   | 'profile';
 
@@ -89,6 +91,11 @@ export type SendToHospitalScreenProps = ScreenPropsBase & {
 
 export type RecordsScreenProps = ScreenPropsBase & {
   onOpenThread: (threadId: string) => void;
+  onUpload: () => void;
+};
+
+export type RecordsUploadScreenProps = {
+  onDone: () => void;
 };
 
 export type ProfileScreenProps = ScreenPropsBase & {

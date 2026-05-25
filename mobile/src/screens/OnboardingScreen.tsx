@@ -123,11 +123,25 @@ export function OnboardingScreen({
     focused === name && styles.inputFocused,
   ];
 
+  const isUnderThirteen = (() => {
+    if (dob.trim().length !== 10) return false;
+    const [mm, dd, yyyy] = dob.split('/').map(Number);
+    if (!mm || !dd || !yyyy) return false;
+    const birth = new Date(Date.UTC(yyyy, mm - 1, dd));
+    const today = new Date();
+    const age = today.getUTCFullYear() - birth.getUTCFullYear();
+    const notYetHadBirthday =
+      today.getUTCMonth() < birth.getUTCMonth() ||
+      (today.getUTCMonth() === birth.getUTCMonth() && today.getUTCDate() < birth.getUTCDate());
+    return (notYetHadBirthday ? age - 1 : age) < 13;
+  })();
+
   const canContinue =
     firstName.trim().length > 0 &&
     lastName.trim().length > 0 &&
     dob.trim().length === 10 &&
-    biologicalSex.trim().length > 0;
+    biologicalSex.trim().length > 0 &&
+    !isUnderThirteen;
 
   const formatDobInput = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 8);
@@ -212,6 +226,11 @@ export function OnboardingScreen({
             onBlur={() => setFocused(null)}
             maxLength={10}
           />
+          {isUnderThirteen && (
+            <Text style={{ fontSize: 12, color: colors.error, marginTop: 4 }}>
+              Ogwu is only available to users aged 13 and over.
+            </Text>
+          )}
         </Field>
 
         <Field label={t('onboarding.sex')}>

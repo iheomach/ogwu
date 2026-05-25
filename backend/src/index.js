@@ -69,6 +69,7 @@ app.use('/api/hospitals',           require('./routes/hospitals'));
 app.use('/api/integrations/google', require('./routes/google'));
 
 // Expensive routes — per-user limiter applied after authenticate
+app.use('/api/documents',    authenticate, userLimiter, require('./routes/documents'));
 app.use('/api/triage',       authenticate, userLimiter, require('./routes/triage'));
 app.use('/api/threads',      authenticate, userLimiter, require('./routes/threads'));
 app.use('/api/appointments', authenticate, userLimiter, require('./routes/appointments'));

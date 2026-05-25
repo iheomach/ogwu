@@ -12,7 +12,12 @@
       "backgroundColor": "#1A0530"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Ogwu uses your location to find hospitals and care providers near you.",
+        "NSCalendarsUsageDescription": "Ogwu adds your appointments to Apple Calendar so you don't miss them.",
+        "NSUserNotificationsUsageDescription": "Ogwu sends you a notification when a provider replies to your consult."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -30,6 +35,12 @@
     },
     "plugins": [
       "expo-localization",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Ogwu uses your location to find hospitals and care providers near you."
+        }
+      ],
       "expo-notifications",
       [
         "expo-calendar",

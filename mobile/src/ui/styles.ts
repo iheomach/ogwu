@@ -295,7 +295,7 @@ export const styles = StyleSheet.create({
   // ─── Card / surface ──────────────────────────────────────────────────────
   card: {
     ...glass,
-    borderRadius: radius.lg,
+    borderRadius: 10,
     padding: spacing.lg,
   },
 
@@ -364,7 +364,7 @@ export const styles = StyleSheet.create({
   heroHeader: {
     ...glass,
     backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: radius.xl,
+    borderRadius: 10,
     paddingTop: 22,
     paddingBottom: 24,
     paddingHorizontal: spacing.lg,
@@ -411,7 +411,7 @@ export const styles = StyleSheet.create({
   quickActionCard: {
     ...glass,
     backgroundColor: 'rgba(255,255,255,0.09)',
-    borderRadius: 18,
+    borderRadius: 10,
     padding: spacing.md,
     minHeight: 110,
     justifyContent: 'space-between' as const,
@@ -438,7 +438,7 @@ export const styles = StyleSheet.create({
   // ─── Home — health status card ───────────────────────────────────────────
   healthStatusCard: {
     ...glass,
-    borderRadius: 18,
+    borderRadius: 10,
     padding: spacing.md,
     gap: 14,
   },
@@ -550,7 +550,7 @@ export const styles = StyleSheet.create({
   // ─── Home — no-intake empty card ─────────────────────────────────────────
   noIntakeCard: {
     ...glass,
-    borderRadius: 18,
+    borderRadius: 10,
     padding: spacing.md,
     borderStyle: 'dashed' as const,
     alignItems: 'center' as const,
@@ -590,7 +590,7 @@ export const styles = StyleSheet.create({
   // ─── Home — impact card ──────────────────────────────────────────────────
   impactCard: {
     ...glass,
-    borderRadius: 18,
+    borderRadius: 10,
     overflow: 'hidden' as const,
   },
   impactItem: {
@@ -678,7 +678,7 @@ export const styles = StyleSheet.create({
   // ─── Assistant — last session recap card ──────────────────────────────────
   lastSessionCard: {
     backgroundColor: glassSurface.bgMid,
-    borderRadius: 16,
+    borderRadius: 10,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
@@ -857,7 +857,7 @@ export const styles = StyleSheet.create({
   // ─── Assistant — hospital card ────────────────────────────────────────────
   hospitalCard: {
     ...glass,
-    borderRadius: 14,
+    borderRadius: 10,
     padding: spacing.md,
     marginBottom: 12,
   },

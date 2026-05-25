@@ -9,7 +9,7 @@ export function GlassCard({
   style,
   innerStyle,
   intensity = 55,
-  borderRadius = 20,
+  borderRadius = 10,
   onLayout,
 }: {
   children: React.ReactNode;

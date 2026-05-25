@@ -23,13 +23,13 @@ import { t } from '../i18n';
 function urgencyConfig(urgency: TriageIntake['urgency']) {
   switch (urgency) {
     case 'emergency':
-      return { bg: 'rgba(239,68,68,0.18)', fg: '#EF4444', icon: 'emergency' as const, label: 'Emergency' };
+      return { bg: 'rgba(239,68,68,0.18)', fg: '#EF4444', icon: 'emergency' as const, label: 'Seek care now' };
     case 'urgent':
-      return { bg: 'rgba(249,115,22,0.18)', fg: '#F97316', icon: 'warning' as const, label: 'Urgent' };
+      return { bg: 'rgba(249,115,22,0.18)', fg: '#F97316', icon: 'warning' as const, label: 'See a doctor today' };
     case 'soon':
-      return { bg: 'rgba(245,158,11,0.18)', fg: '#F59E0B', icon: 'schedule' as const, label: 'See soon' };
+      return { bg: 'rgba(245,158,11,0.18)', fg: '#F59E0B', icon: 'schedule' as const, label: 'See a doctor this week' };
     default:
-      return { bg: 'rgba(22,163,74,0.18)', fg: '#16A34A', icon: 'check-circle' as const, label: 'Routine' };
+      return { bg: 'rgba(22,163,74,0.18)', fg: '#16A34A', icon: 'check-circle' as const, label: 'Monitor your symptoms' };
   }
 }
 
@@ -89,7 +89,7 @@ function QuickActionCard({
         activeOpacity={1}
       >
         <GlassCard
-          borderRadius={18}
+          borderRadius={10}
           innerStyle={{
             padding: spacing.md,
             minHeight: cardHeight || 110,
@@ -189,16 +189,11 @@ export function HomeScreen({
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
           {/* ── Hero header ── */}
-          <GlassCard
-            borderRadius={28}
-            intensity={70}
-            style={{ marginHorizontal: spacing.lg, marginTop: spacing.md }}
-            innerStyle={{ paddingTop: 22, paddingBottom: 24, paddingHorizontal: spacing.lg }}
-          >
+          <View style={{ marginHorizontal: spacing.lg, marginTop: spacing.md, paddingTop: 22, paddingBottom: 24 }}>
             <Text style={styles.heroGreeting}>{getGreeting()}</Text>
             <Text style={styles.heroName}>{displayName ? displayName : 'Welcome'}</Text>
             <Text style={styles.heroTagline}>Your health, managed with care.</Text>
-          </GlassCard>
+          </View>
 
           <View style={{ paddingHorizontal: spacing.lg }}>
 
@@ -237,32 +232,33 @@ export function HomeScreen({
                 <ActivityIndicator color={colors.purple} />
               </View>
             ) : intake ? (
-              <GlassCard borderRadius={18} innerStyle={{ padding: spacing.md, gap: 14 }}>
+              <GlassCard borderRadius={10} innerStyle={{ padding: spacing.md, gap: 14 }}>
                 <UrgencyBanner intake={intake} homeSummary={homeSummary} />
 
-                {tags.length > 0 && (
-                  <View>
-                    <Text style={styles.symptomTagsLabel}>Flagged symptoms</Text>
-                    <View style={styles.symptomTagsRow}>
-                      {tags.map((tag) => (
-                        <View key={tag.label} style={styles.symptomTag}>
-                          <MaterialIcons name={tag.icon as any} size={12} color={colors.purple} />
-                          <Text style={styles.symptomTagText}>{tag.label}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
-
-                <View style={styles.thinDivider} />
-
-                <Text style={{ fontSize: 12, color: colors.grey500, lineHeight: 18 }}>
+                <Text style={{ fontSize: 11, color: colors.grey500, lineHeight: 16 }}>
                   {t('home.impactDisclaimer')}
                 </Text>
+
+                {tags.length > 0 && (
+                  <>
+                    <View style={styles.thinDivider} />
+                    <View>
+                      <Text style={styles.symptomTagsLabel}>Flagged symptoms</Text>
+                      <View style={styles.symptomTagsRow}>
+                        {tags.map((tag) => (
+                          <View key={tag.label} style={styles.symptomTag}>
+                            <MaterialIcons name={tag.icon as any} size={12} color={colors.purple} />
+                            <Text style={styles.symptomTagText}>{tag.label}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </>
+                )}
               </GlassCard>
             ) : (
               <TouchableOpacity onPress={onRunTriage} activeOpacity={0.85}>
-                <GlassCard borderRadius={18} innerStyle={{ padding: spacing.md, alignItems: 'center', gap: 8, paddingVertical: 24 }}>
+                <GlassCard borderRadius={10} innerStyle={{ padding: spacing.md, alignItems: 'center', gap: 8, paddingVertical: 24 }}>
                   <View style={styles.noIntakeIconBox}>
                     <MaterialIcons name="assignment" size={22} color={colors.purple} />
                   </View>
@@ -282,9 +278,9 @@ export function HomeScreen({
             {intake && (
               <>
                 <Text style={[styles.sectionLabel, { marginTop: 28, marginBottom: 12 }]}>
-                  {t('home.impactTitle')}
+                  {t('home.checkInInsights')}
                 </Text>
-                <GlassCard borderRadius={18}>
+                <GlassCard borderRadius={10}>
                   {[
                     { icon: 'bolt' as const, text: (intake.urgency === 'emergency' || intake.urgency === 'urgent') ? t('home.impactUrgent1') : t('home.impactRoutine1') },
                     { icon: 'favorite' as const, text: (intake.urgency === 'emergency' || intake.urgency === 'urgent') ? t('home.impactUrgent2') : t('home.impactRoutine2') },

@@ -16,6 +16,7 @@ import { supabase } from '../lib/supabase';
 import type { AppScreen, Profile } from './types';
 import { loadProfile, isProfileComplete } from './lib/profile';
 import { colors, styles } from './ui/styles';
+import { LandingScreen } from './screens/LandingScreen';
 import { PhoneScreen } from './screens/PhoneScreen';
 import { OtpScreen } from './screens/OtpScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
@@ -24,6 +25,7 @@ import { TriageScreen } from './screens/TriageScreen';
 import { TriageResultsScreen } from './screens/TriageResultsScreen';
 import { HealthAssistantScreen } from './screens/HealthAssistantScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
+import { RecordsUploadScreen } from './screens/RecordsUploadScreen';
 import { InboxScreen } from './screens/InboxScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { ThreadScreen } from './screens/ThreadScreen';
@@ -43,7 +45,7 @@ export function AppRouter() {
   const [session, setSession] = useState<Session | null>(null);
   const [locationSummary, setLocationSummary] = useState<LocationSummary | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [screen, setScreen] = useState<AppScreen>('phone');
+  const [screen, setScreen] = useState<AppScreen>('landing');
   const [locale, setLocale] = useState<SupportedLocale>('en');
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [openThreadCount, setOpenThreadCount] = useState(0);
@@ -89,11 +91,6 @@ export function AppRouter() {
         const initialLocale = await initI18n();
         if (isMounted) setLocale(initialLocale);
 
-        // Request location on launch — runs in parallel with session restore.
-        requestAndGetLocation()
-          .then((loc) => { if (isMounted) setLocationSummary(loc); })
-          .catch(() => {});
-
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
         if (!isMounted) return;
@@ -122,7 +119,7 @@ export function AppRouter() {
     (async () => {
       if (!user) {
         setProfile(null);
-        setScreen('phone');
+        setScreen('landing');
         resetTriage();
         return;
       }
@@ -177,6 +174,16 @@ export function AppRouter() {
       isMounted = false;
     };
   }, [user?.id]);
+
+  // ─── Location: request on-demand when user opens the health assistant ───
+  // Deferred from boot so the OS permission dialog has clear context.
+  useEffect(() => {
+    if (screen !== 'newConsult') return;
+    if (locationSummary) return;
+    requestAndGetLocation()
+      .then((loc) => setLocationSummary(loc))
+      .catch(() => {});
+  }, [screen]);
 
   // ─── Triage: load first question on entry ──────────────────────────────
   useEffect(() => {
@@ -295,6 +302,17 @@ export function AppRouter() {
       Alert.alert(t('onboarding.invalidDobTitle'), t('onboarding.invalidDobBody'));
       return;
     }
+    const birthDate = new Date(dobIso + 'T00:00:00Z');
+    const today = new Date();
+    let age = today.getUTCFullYear() - birthDate.getUTCFullYear();
+    const notYetHadBirthday =
+      today.getUTCMonth() < birthDate.getUTCMonth() ||
+      (today.getUTCMonth() === birthDate.getUTCMonth() && today.getUTCDate() < birthDate.getUTCDate());
+    if (notYetHadBirthday) age -= 1;
+    if (age < 13) {
+      Alert.alert('Age requirement', 'Ogwu is only available to users aged 13 and over.');
+      return;
+    }
     if (!trimmedSex) {
       Alert.alert(t('onboarding.missingSexTitle'), t('onboarding.missingSexBody'));
       return;
@@ -409,7 +427,7 @@ export function AppRouter() {
       setKnownConditions('');
       resetTriage();
       setProfile(null);
-      setScreen('phone');
+      setScreen('landing');
     } catch (err: any) {
       Alert.alert(t('errors.logoutTitle'), err?.message ?? t('errors.logoutBody'));
     } finally {
@@ -449,7 +467,10 @@ export function AppRouter() {
   const goTab = (tab: TabKey) => setScreen(tab);
 
   // ─── Boot splash ─────────────────────────────────────────────────────────
-  if (isBooting) {
+  // Also keep the splash up if a session exists but the profile effect hasn't
+  // navigated away from 'landing' yet — prevents a returning user from seeing
+  // the landing page for even one frame.
+  if (isBooting || (user && screen === 'landing')) {
     return (
       <LinearGradient
         colors={['#080412', '#0f0620', '#080412']}
@@ -486,6 +507,10 @@ export function AppRouter() {
         ))}
       </View>
       <StatusBar style="light" />
+      {screen === 'landing' && (
+        <LandingScreen onGetStarted={() => setScreen('phone')} />
+      )}
+
       {screen === 'phone' && (
         <PhoneScreen busy={busy} phone={phone} setPhone={setPhone} onSendOtp={onSendOtp} />
       )}
@@ -599,8 +624,13 @@ export function AppRouter() {
               setActiveThreadId(threadId);
               setScreen('thread');
             }}
+            onUpload={() => setScreen('recordsUpload')}
           />
         </TabScaffold>
+      )}
+
+      {screen === 'recordsUpload' && (
+        <RecordsUploadScreen onDone={() => setScreen('records')} />
       )}
 
       {screen === 'inbox' && (

@@ -9,7 +9,7 @@ import { styles, colors, spacing, TAB_BAR_HEIGHT } from '../ui/styles';
 import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
 
-export function RecordsScreen({ busy, onOpenThread: _onOpenThread }: RecordsScreenProps) {
+export function RecordsScreen({ busy, onOpenThread: _onOpenThread, onUpload }: RecordsScreenProps) {
   const [exportLoading, setExportLoading] = useState(false);
 
   const handleExport = async () => {
@@ -49,7 +49,7 @@ export function RecordsScreen({ busy, onOpenThread: _onOpenThread }: RecordsScre
         {/* ── OgwuAI Document Upload ── */}
         <Text style={[styles.label, { marginBottom: 12 }]}>AI Document Analysis</Text>
 
-        <GlassCard borderRadius={16} innerStyle={{ padding: spacing.lg, alignItems: 'center' }}>
+        <GlassCard borderRadius={10} innerStyle={{ padding: spacing.lg, alignItems: 'center' }}>
           <View style={{
             width: 56,
             height: 56,
@@ -67,9 +67,13 @@ export function RecordsScreen({ busy, onOpenThread: _onOpenThread }: RecordsScre
           <Text style={{ fontSize: 13, color: colors.grey500, textAlign: 'center', lineHeight: 20, marginBottom: 20 }}>
             Upload lab results, prescriptions, or imaging reports. OgwuAI will analyse them and make them available to both you and your care team.
           </Text>
-          <View style={[styles.btnPrimary, styles.btnPrimaryDisabled, { width: '100%' }]}>
-            <Text style={styles.btnPrimaryText}>Upload document — coming soon</Text>
-          </View>
+          <TouchableOpacity
+            style={[styles.btnPrimary, { width: '100%' }]}
+            onPress={onUpload}
+            disabled={busy}
+          >
+            <Text style={styles.btnPrimaryText}>Upload document</Text>
+          </TouchableOpacity>
         </GlassCard>
       </ScrollView>
     </SafeAreaView>
