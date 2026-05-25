@@ -24,8 +24,6 @@ import { GlassCard } from '../ui/GlassCard';
 
 const ALLOWED_TYPES = [
   'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'image/jpeg',
   'image/png',
   'image/heic',
@@ -200,7 +198,7 @@ export function RecordsUploadScreen({ onDone }: RecordsUploadScreenProps) {
                     Upload file
                   </Text>
                   <Text style={{ fontSize: 12, color: colors.grey500, textAlign: 'center', lineHeight: 18 }}>
-                    PDF, Word,{'\n'}JPEG, PNG, HEIC
+                    PDF, JPEG,{'\n'}PNG, HEIC
                   </Text>
                 </GlassCard>
               </TouchableOpacity>
