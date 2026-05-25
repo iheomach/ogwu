@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { apiGet } from './api';
 
 export type ReportData = {
@@ -257,16 +258,23 @@ export function buildReportHtml(data: ReportData): string {
 
 export async function shareReportAsPdf(data: ReportData, patientName: string): Promise<void> {
   const html = buildReportHtml(data);
-  const { uri } = await Print.printToFileAsync({ html, base64: false });
+  const { uri: tmpUri } = await Print.printToFileAsync({ html, base64: false });
+
+  const dateSuffix = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const safeName = patientName.replace(/[^a-zA-Z0-9]/g, '_');
+  const fileName = `OgwuAI_Report_${safeName}_${dateSuffix}.pdf`;
+  const destUri = `${FileSystem.cacheDirectory}${fileName}`;
+
+  await FileSystem.copyAsync({ from: tmpUri, to: destUri });
 
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
-    await Sharing.shareAsync(uri, {
+    await Sharing.shareAsync(destUri, {
       mimeType: 'application/pdf',
       dialogTitle: `OgwuAI Report — ${patientName}`,
       UTI: 'com.adobe.pdf',
     });
   } else {
-    await Print.printAsync({ uri });
+    await Print.printAsync({ uri: destUri });
   }
 }
