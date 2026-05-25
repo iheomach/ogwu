@@ -176,21 +176,17 @@ export function buildReportHtml(data: ReportData): string {
   .demo-item label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.6px; color: #6b7280; display: block; margin-bottom: 2px; }
   .demo-item span { font-size: 12.5px; font-weight: 600; color: #111827; }
 
-  h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 14px; margin-top: 28px; break-after: avoid; page-break-after: avoid; }
-  .section { margin-bottom: 16px; break-inside: avoid; page-break-inside: avoid; }
+  h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 14px; margin-top: 28px; }
+  .section { margin-bottom: 16px; }
   .section-heading { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #4b5563; margin-bottom: 5px; }
   .body { font-size: 12px; line-height: 1.7; color: #1f2937; }
-
-  .demographics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 24px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px; margin-bottom: 28px; break-inside: avoid; page-break-inside: avoid; }
-  .urgency-banner { border-left: 4px solid ${uColor}; background: ${uColor}18; padding: 10px 14px; border-radius: 4px; margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid; }
 
   table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 4px; }
   thead tr { background: #f3f4f6; }
   th { text-align: left; padding: 7px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; font-weight: 600; border-bottom: 1px solid #e5e7eb; }
   td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; color: #374151; }
-  tr { break-inside: avoid; page-break-inside: avoid; }
 
-  .footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #111827; line-height: 1.6; break-inside: avoid; page-break-inside: avoid; }
+  .footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #111827; line-height: 1.6; }
   .footer strong { color: #111827; }
 </style>
 </head>
@@ -229,7 +225,7 @@ export function buildReportHtml(data: ReportData): string {
 
   ${intake && intake.answers.length > 0 ? `
   <!-- Raw Q&A -->
-  <h2>Health Check-In — Full Responses</h2>
+  <h2 style="page-break-before:always;">Health Check-In — Full Responses</h2>
   <table>
     <thead><tr><th>#</th><th>Question</th><th>Response</th></tr></thead>
     <tbody>
@@ -267,7 +263,7 @@ export async function shareReportAsPdf(data: ReportData, patientName: string): P
   const dateSuffix = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const safeName = patientName.replace(/[^a-zA-Z0-9]/g, '_');
   const fileName = `OgwuAI_Report_${safeName}_${dateSuffix}.pdf`;
-  const destUri = `${FileSystem.cacheDirectory}${fileName}`;
+  const destUri = `${FileSystem.cacheDirectory ?? ''}${fileName}`;
 
   await FileSystem.copyAsync({ from: tmpUri, to: destUri });
 
