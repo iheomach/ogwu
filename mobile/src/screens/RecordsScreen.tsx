@@ -47,7 +47,7 @@ export function RecordsScreen({ busy, onOpenThread: _onOpenThread, onUpload }: R
         </TouchableOpacity>
 
         <Text style={{ fontSize: 11, color: colors.grey500, lineHeight: 16, marginBottom: 24 }}>
-          Generated from patient-reported information only. Not a clinical assessment — always consult a qualified healthcare provider.
+          Generated from patient-reported information only. This is not a clinical assessment, always consult a qualified healthcare provider.
         </Text>
 
         {/* ── OgwuAI Document Upload ── */}
