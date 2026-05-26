@@ -17,6 +17,7 @@ const { SKILL_NAMES } = require('../lib/buildToolNodes');
 const { getCheckpointer } = require('../lib/checkpointer');
 const { parseAgentUrgency } = require('../lib/urgency');
 const { checkWithLlamaGuard, OUTPUT_SAFE_FALLBACK } = require('../lib/llamaGuard');
+const { retrieveDocumentChunks } = require('../lib/retrieveDocumentChunks');
 
 function safeText(s, maxLen) {
   const out = typeof s === 'string' ? s.trim() : '';
@@ -466,14 +467,17 @@ router.get('/session', authenticate, async (req, res) => {
 
 router.post('/chat', authenticate, async (req, res) => {
   try {
-    const [profile, triageIntake, lastHospital, fhirContext] = await Promise.all([
+    const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+    const lastUserQuery = extractText(messages.filter((m) => m.role === 'user').pop()?.content ?? '');
+
+    const [profile, triageIntake, lastHospital, fhirContext, documentChunks] = await Promise.all([
       loadPatientProfile(req.user.id),
       loadTriageIntake(req.user.id),
       loadLastHospital(req.user.id),
       loadFhirContext(req.user.id),
+      retrieveDocumentChunks(req.user.id, lastUserQuery),
     ]);
 
-    const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
     const liveLocation = safeText(req.body?.location, 100) || null;
     const patientLat = typeof req.body?.lat === 'number' ? req.body.lat : null;
     const patientLon = typeof req.body?.lon === 'number' ? req.body.lon : null;
@@ -494,7 +498,7 @@ router.post('/chat', authenticate, async (req, res) => {
     // On a fresh/cleared session messages contains only the new user message,
     // so injecting it there would make the agent volunteer the old hospital
     // unprompted — defeating the history clear.
-    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake, lastHospital: messages.length > 1 ? lastHospital : null, fhirContext });
+    const system = buildSystemPrompt({ ...profile, liveLocation, triageIntake, lastHospital: messages.length > 1 ? lastHospital : null, fhirContext, documentChunks });
     const checkpointer = await getCheckpointer();
     const agent = buildGraph(skillCtx, system, checkpointer);
     const langChainMessages = toLangChainMessages(messages);

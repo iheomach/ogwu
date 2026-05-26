@@ -72,6 +72,12 @@ function buildFhirSection(fhirContext) {
   return lines.join('\n');
 }
 
+function buildDocumentContext(chunks) {
+  if (!Array.isArray(chunks) || chunks.length === 0) return '';
+  const body = chunks.map((c, i) => `[${i + 1}] ${c}`).join('\n\n');
+  return `\n\nPatient uploaded health records (extracted from their uploaded documents — use this to answer questions about their test results, prescriptions, or medical history):\n${body}\nDo NOT ask the patient to repeat or re-upload any information already present above.`;
+}
+
 function buildSystemPrompt(profile) {
   const sex = csvish(profile?.biological_sex) || csvish(profile?.sex) || 'not provided';
   const age = profile?.age ?? computeAge(profile?.dob);
@@ -86,6 +92,7 @@ function buildSystemPrompt(profile) {
   const lastHospital = profile?.lastHospital ?? null;
   const lastHospitalSection = buildLastHospitalSection(lastHospital);
   const fhirSection = buildFhirSection(profile?.fhirContext);
+  const documentSection = buildDocumentContext(profile?.documentChunks);
 
   return `You are Ogwu, an AI health assistant for patients in Nigeria and emerging markets.
 
@@ -94,7 +101,7 @@ Patient profile (do NOT ask the patient to repeat any of this):
 - Age: ${age ?? 'not provided'}
 - Allergies: ${allergies}
 - Existing conditions: ${conditions}
-- Current location: ${locationLine}${liveLocation ? ' (from device GPS -- use this for hospital search)' : ''}${triageSection}${lastHospitalSection}${fhirSection}
+- Current location: ${locationLine}${liveLocation ? ' (from device GPS -- use this for hospital search)' : ''}${triageSection}${lastHospitalSection}${fhirSection}${documentSection}
 
 ## Your workflow
 
