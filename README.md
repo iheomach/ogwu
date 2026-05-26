@@ -8,15 +8,15 @@ Deployed on Railway. Database on Supabase Cloud. Distributed via TestFlight and 
 
 ## Screenshots
 
-| Triage | OgwuAI agent |
+| Triage | RAG-assisted OgwuAI agent |
 |---|---|
 | ![Triage](docs/screenshots/triage.png) | ![OgwuAI](docs/screenshots/agent.png) |
 
-| Booking confirmed | Inbox |
+| Agent Booking flow | Inbox |
 |---|---|
 | ![Booking](docs/screenshots/booking.png) | ![Inbox](docs/screenshots/inbox.png) |
 
-| Health records |
+| Health records and Document Upload |
 |---|
 | ![Records](docs/screenshots/records.png) |
 
