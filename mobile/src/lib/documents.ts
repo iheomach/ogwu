@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './api';
+import { apiDelete, apiGet, apiPost } from './api';
 
 export type DocumentStatus = 'pending' | 'extracting' | 'embedding' | 'complete' | 'failed';
 
@@ -22,6 +22,15 @@ export async function documentsInitUpload(
   mimeType: string,
 ): Promise<UploadInitResponse> {
   return apiPost('/api/documents/upload', { fileName, mimeType });
+}
+
+export async function documentsList(): Promise<DocumentRecord[]> {
+  const res = await apiGet<{ documents: DocumentRecord[] }>('/api/documents');
+  return res.documents ?? [];
+}
+
+export async function documentsDelete(documentId: string): Promise<void> {
+  await apiDelete(`/api/documents/${encodeURIComponent(documentId)}`);
 }
 
 export async function documentsGetStatus(documentId: string): Promise<DocumentRecord> {

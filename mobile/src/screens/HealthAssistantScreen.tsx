@@ -672,7 +672,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
   const handleClearHistory = () => {
     Alert.alert(
       'Clear agent history',
-      'This removes all conversation memory. The agent will have no recollection of previous sessions. Your profile and triage data are not affected.',
+      'This removes all conversation memory. The agent will have no recollection of previous sessions. Your profile, triage data, and uploaded documents are not affected.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
