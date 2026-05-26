@@ -3,7 +3,9 @@ const supabase = require('./supabase');
 
 const embedder = new OpenAIEmbeddings({ model: 'text-embedding-3-small' });
 
-const SIMILARITY_THRESHOLD = 0.60;
+// No similarity floor — always return the top K chunks from the patient's own records.
+// The chunks are long and contain boilerplate that dilutes embeddings; the LLM filters relevance.
+const SIMILARITY_THRESHOLD = 0.0;
 const TOP_K = 5;
 const MAX_CHARS = 6000; // ~1500 tokens at 4 chars/token
 
