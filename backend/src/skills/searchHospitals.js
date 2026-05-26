@@ -295,12 +295,46 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
             return (a.distance_km ?? 99999) - (b.distance_km ?? 99999);
           });
 
-          const top5 = withDistance.slice(0, 5);
+          let top5 = withDistance.slice(0, 5);
+
+          // Guarantee at least one onboarded hospital is shown
+          if (!top5.some((h) => h.is_onboarded)) {
+            const nearestOnboardedInPlaces = [...withDistance]
+              .filter((h) => h.is_onboarded)
+              .sort((a, b) => (a.distance_km ?? 99999) - (b.distance_km ?? 99999))[0];
+
+            if (nearestOnboardedInPlaces) {
+              top5 = [nearestOnboardedInPlaces, ...top5.slice(0, 4)];
+            } else {
+              // No onboarded hospital in Places results — fetch nearest from DB
+              const { data: dbOnboarded } = await supabase
+                .from('hospitals_directory')
+                .select('id, name, address, phone, is_onboarded, specialties, lat, lon')
+                .eq('is_onboarded', true)
+                .eq('is_active', true)
+                .limit(100);
+
+              if (dbOnboarded?.length) {
+                const nearest = dbOnboarded
+                  .map((h) => ({
+                    ...h,
+                    distance_km: h.lat != null && h.lon != null
+                      ? Math.round(_haversine(resolvedLat, resolvedLon, h.lat, h.lon) * 10) / 10
+                      : null,
+                  }))
+                  .sort((a, b) => (a.distance_km ?? 99999) - (b.distance_km ?? 99999))[0];
+
+                const { lat: _lat, lon: _lon, ...nearestClean } = nearest;
+                top5 = [{ _place: {}, _specialtyMatch: false, specialty: 'general', ...nearestClean }, ...top5.slice(0, 4)];
+              }
+            }
+          }
 
           // 6. Generate patient-specific standout phrases in parallel
           if (process.env.OPENAI_API_KEY) {
             await Promise.allSettled(
               top5.map(async (h) => {
+                if (!h._place?.displayName && !h._place?.reviews) return;
                 h.standout_phrase = await generateStandoutPhrase(
                   h._place,
                   h.specialty,
@@ -330,20 +364,37 @@ module.exports = function searchHospitalsSkill({ z, supabase, patientLat, patien
 
         let ranked;
         if (hasCoords) {
-          ranked = all
+          const withDist = all
             .map((h) => ({
               ...h,
               distance_km: (h.lat != null && h.lon != null)
                 ? Math.round(_haversine(resolvedLat, resolvedLon, h.lat, h.lon))
                 : 99999,
             }))
-            .sort((a, b) => a.distance_km - b.distance_km)
-            .slice(0, 3)
-            .map(({ lat: _lat, lon: _lon, ...rest }) => rest);
+            .sort((a, b) => a.distance_km - b.distance_km);
+
+          ranked = withDist.slice(0, 3).map(({ lat: _lat, lon: _lon, ...rest }) => rest);
+
+          if (!ranked.some((h) => h.is_onboarded)) {
+            const nearestOnboarded = withDist.find((h) => h.is_onboarded);
+            if (nearestOnboarded) {
+              const { lat: _lat, lon: _lon, ...rest } = nearestOnboarded;
+              ranked = [rest, ...ranked.slice(0, 2)];
+            }
+          }
         } else if (stateClean) {
           const matches = all.filter((h) => h.state?.toLowerCase().includes(stateClean.toLowerCase()));
           const pool = matches.length > 0 ? matches : all;
           ranked = pool.slice(0, 3).map(({ lat: _lat, lon: _lon, ...rest }) => rest);
+
+          if (!ranked.some((h) => h.is_onboarded)) {
+            const nearestOnboarded = pool.find((h) => h.is_onboarded);
+            if (nearestOnboarded) {
+              const { lat: _lat, lon: _lon, ...rest } = nearestOnboarded;
+              ranked = [rest, ...ranked.slice(0, 2)];
+            }
+          }
+
           if (matches.length === 0) {
             return { hospitals: ranked, note: `No hospitals found near "${stateClean}" — showing available hospitals in the network instead. Inform the patient.` };
           }
