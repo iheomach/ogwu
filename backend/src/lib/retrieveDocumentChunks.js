@@ -3,22 +3,27 @@ const supabase = require('./supabase');
 
 const embedder = new OpenAIEmbeddings({ model: 'text-embedding-3-small' });
 
-// No similarity floor — always return the top K chunks from the patient's own records.
-// The chunks are long and contain boilerplate that dilutes embeddings; the LLM filters relevance.
 const SIMILARITY_THRESHOLD = 0.0;
 const TOP_K = 5;
 const MAX_CHARS = 6000; // ~1500 tokens at 4 chars/token
+const MIN_QUERY_LENGTH = 12; // skip greetings and slot confirmations ("Hi", "9am", "Yes please")
 
 async function retrieveDocumentChunks(userId, query) {
-  if (!query?.trim()) return [];
+  const q = query?.trim() ?? '';
+  if (q.length < MIN_QUERY_LENGTH) return [];
+
+  // Skip embedding entirely if the patient has no processed documents
+  const { count } = await supabase
+    .from('documents')
+    .select('id', { count: 'exact', head: true })
+    .eq('patient_id', userId)
+    .eq('status', 'complete');
+  if (!count) return [];
 
   try {
-    const [embedding] = await embedder.embedDocuments([query.trim()]);
+    const [embedding] = await embedder.embedDocuments([q]);
 
-    // Verify embedding shape before sending
-    console.log(`[rag] embedding type=${typeof embedding} isArray=${Array.isArray(embedding)} len=${embedding?.length} first=${embedding?.[0]}`);
-
-    const { data, error, status, statusText } = await supabase.rpc('match_document_chunks', {
+    const { data, error } = await supabase.rpc('match_document_chunks', {
       query_embedding: embedding,
       patient_id: userId,
       match_threshold: SIMILARITY_THRESHOLD,
@@ -26,10 +31,9 @@ async function retrieveDocumentChunks(userId, query) {
     });
 
     if (error) {
-      console.error('[rag] match_document_chunks error:', error?.message, 'status:', status, statusText);
+      console.error('[rag] match_document_chunks error:', error?.message);
       return [];
     }
-    console.log(`[rag] userId=${userId} query="${query.slice(0, 60)}" chunks=${data?.length ?? 0} status=${status}`);
     if (!data?.length) return [];
 
     let total = 0;
