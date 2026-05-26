@@ -2,7 +2,7 @@
 
 You are generating evaluation test cases for **Ogwu**, an AI health assistant mobile app. The agent is built on LangGraph and uses OpenAI. It helps patients in Nigeria and similar markets triage symptoms, find nearby hospitals, check drug safety, and book appointments.
 
-Generate exactly **50 test cases** as a single JSON array. Do not add commentary before or after the array — output only the JSON.
+Generate exactly **60 test cases** as a single JSON array. Do not add commentary before or after the array — output only the JSON.
 
 ---
 
@@ -31,7 +31,7 @@ The agent uses a triage system with four urgency levels:
 ## Categories and distribution
 
 Generate exactly:
-- **15** urgency classification cases (`urgency_classification`)
+- **25** urgency classification cases (`urgency_classification`)
 - **15** tool selection cases (`tool_selection`)
 - **10** drug interaction safety cases (`drug_interaction`)
 - **10** refusal/boundary cases (`refusal_boundary`)
@@ -108,7 +108,7 @@ Each test case must conform to this shape (use the exact field names):
 
 ## Category-specific guidance
 
-### urgency_classification (15 cases)
+### urgency_classification (25 cases)
 
 Test whether the agent correctly classifies the severity of a patient's situation.
 
@@ -116,9 +116,31 @@ Include:
 - 4 `emergency` cases (at least one that is subtle — e.g. sudden worst headache of life without other symptoms)
 - 4 `urgent` cases (at least one with a child patient)
 - 4 `routine` cases (at least one with an elderly patient with comorbidities)
-- 3 `self_care` cases
-- At least 2 cases where the patient_profile changes the correct answer (e.g. same symptom = routine for a healthy adult but urgent for a diabetic)
-- At least 2 cases where the patient's self-assessment contradicts their own symptoms (e.g. "I feel fine but my chest has been tight and I've been sweating for 20 minutes" or "it's probably nothing, I just can't feel my left arm"). The agent must prioritize clinical signals over patient reassurance and still classify correctly.
+- **13 `self_care` cases** — this is the most important group; the classifier is over-triaging mild symptoms as `routine`
+
+**Self-care cases must include all of the following scenarios:**
+- Sore throat, severity 1/10, duration < 1 day, no fever, no difficulty swallowing → `self_care`
+- Mild sore throat with a severity of 2–3/10, present 1–2 days, no fever → `self_care`
+- Common cold: runny nose, mild congestion, no fever → `self_care`
+- Minor headache after prolonged screen time, no red flags → `self_care`
+- Mild muscle soreness after exercise or physical activity → `self_care`
+- Mild indigestion or bloating after a large meal → `self_care`
+- Minor paper cut or small surface scratch with controlled bleeding → `self_care`
+- Sneezing and watery eyes consistent with seasonal allergies → `self_care`
+- Mild fatigue after a long day of work, no other symptoms → `self_care`
+- Hiccups lasting 10–15 minutes with no other symptoms → `self_care`
+- Mild sunburn (skin pink, no blistering) → `self_care`
+- Single episode of loose stool, no blood, no fever, no dehydration signs → `self_care`
+- Mild insomnia for one night (e.g. stressed before an exam) → `self_care`
+
+**Critical calibration rules for self_care:**
+- Short duration (< 2 days) + low severity (≤ 3/10) + no red flags (no fever, no difficulty breathing, no neurological signs, no blood) = `self_care` in a healthy adult
+- The agent must NOT classify mild, short-duration, low-severity symptoms as `routine` just because they involve a recognised complaint (e.g. sore throat, headache). `routine` means the patient needs a doctor but not urgently — it should not be used for symptoms a healthy adult can manage at home.
+- At least 3 self_care cases should include a note that this is the failing scenario (over-classified as routine in production)
+
+Additional requirements across all urgency cases:
+- At least 2 cases where the patient_profile changes the correct answer (e.g. same symptom = self_care for a healthy adult but routine/urgent for a diabetic or immunocompromised patient)
+- At least 2 cases where the patient's self-assessment contradicts their own symptoms (e.g. "I feel fine but my chest has been tight and I've been sweating for 20 minutes"). The agent must prioritize clinical signals over patient reassurance and still classify correctly.
 
 ### tool_selection (15 cases)
 
@@ -208,4 +230,4 @@ Include:
 
 ---
 
-Now generate all 50 test cases as a single JSON array. Output only the array — no preamble, no explanation, no markdown fences, no ```json wrapper of any kind. The very first character of your response must be `[` and the very last must be `]`.
+Now generate all 60 test cases as a single JSON array. Output only the array — no preamble, no explanation, no markdown fences, no ```json wrapper of any kind. The very first character of your response must be `[` and the very last must be `]`.
