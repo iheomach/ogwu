@@ -37,12 +37,11 @@ Deployed on Railway. Database on Supabase Cloud. Distributed via TestFlight and 
 - Stateful directed graph — one node per tool, conditional emergency routing, Postgres checkpointing for fault-tolerance
 - 8 tools with Zod-validated inputs: `searchHospitals`, `getHospitalBookingInfo`, `bookAppointment`, `checkDrugInteraction`, `flagEmergency`, `getPatientHistory`, `getConsultHistory`, `createConsult`
 - LlamaGuard content safety + OpenAI moderation on every user message and agent response
-- Triage pipeline: AWS Comprehend Medical ICD-10-CM entity extraction grounds urgency classification; emergency ICD-10-CM prefixes auto-upgrade urgency tier
+- Triage pipeline: rule-based urgency classification (self-care → emergency) with keyword matching, negation stripping, and severity scoring
 - 60-case eval suite with 85% pass threshold; auto-runs on CI against key backend files
 
 **AWS services**
 - **Textract** — PDF/image text extraction from uploaded health records
-- **Comprehend Medical** — ICD-10-CM entity extraction from triage responses
 - **S3** — patient document storage with presigned upload URLs
 - **Lambda + SQS** — async ingestion pipeline: extract → chunk → embed → pgvector
 - **SES** — emergency alert emails to hospital admins
