@@ -15,7 +15,10 @@ async function retrieveDocumentChunks(userId, query) {
   try {
     const [embedding] = await embedder.embedDocuments([query.trim()]);
 
-    const { data, error } = await supabase.rpc('match_document_chunks', {
+    // Verify embedding shape before sending
+    console.log(`[rag] embedding type=${typeof embedding} isArray=${Array.isArray(embedding)} len=${embedding?.length} first=${embedding?.[0]}`);
+
+    const { data, error, status, statusText } = await supabase.rpc('match_document_chunks', {
       query_embedding: embedding,
       patient_id: userId,
       match_threshold: SIMILARITY_THRESHOLD,
@@ -23,10 +26,10 @@ async function retrieveDocumentChunks(userId, query) {
     });
 
     if (error) {
-      console.error('[rag] match_document_chunks error:', error?.message);
+      console.error('[rag] match_document_chunks error:', error?.message, 'status:', status, statusText);
       return [];
     }
-    console.log(`[rag] userId=${userId} query="${query.slice(0, 60)}" chunks=${data?.length ?? 0}`);
+    console.log(`[rag] userId=${userId} query="${query.slice(0, 60)}" chunks=${data?.length ?? 0} status=${status}`);
     if (!data?.length) return [];
 
     let total = 0;
