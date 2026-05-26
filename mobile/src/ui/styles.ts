@@ -178,6 +178,7 @@ export const styles = StyleSheet.create({
     paddingVertical: 13,
     fontSize: 16,
     color: colors.white,
+    letterSpacing: 0,
     marginBottom: spacing.md,
   },
   inputFocused: {
