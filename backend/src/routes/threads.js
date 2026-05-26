@@ -40,10 +40,10 @@ function safeText(s, maxLen) {
 function formatIntakeSummaryMessage(intake) {
   if (!intake) return null;
   const urgencyLabel = { emergency: 'Emergency', urgent: 'Urgent', soon: 'See soon', routine: 'Routine' }[intake.urgency] ?? intake.urgency;
-  const lines = [urgencyLabel];
+  const lines = [`Booking summary — ${urgencyLabel}`];
   if (intake.summary) lines.push('\n' + intake.summary);
   if (Array.isArray(intake.answers) && intake.answers.length > 0) {
-    lines.push('\nTriage responses:');
+    lines.push('\nThe patient reported:');
     for (const { q, a } of intake.answers) {
       if (q && a) lines.push(`• ${q}\n  → ${a}`);
     }
@@ -184,7 +184,7 @@ router.post('/', authenticate, async (req, res) => {
     if (summaryBody) {
       await supabase.from('consult_messages').insert({
         thread_id: data.id,
-        sender_role: 'patient',
+        sender_role: 'system',
         body: summaryBody,
       });
     }
