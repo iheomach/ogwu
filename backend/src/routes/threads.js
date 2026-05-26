@@ -42,7 +42,13 @@ function formatIntakeSummaryMessage(intake) {
   const urgencyLabel = { emergency: 'Emergency', urgent: 'Urgent', soon: 'See soon', routine: 'Routine' }[intake.urgency] ?? intake.urgency;
   const lines = [`Booking summary — ${urgencyLabel}`];
   if (intake.summary) lines.push('\n' + intake.summary);
-  return lines.join('\n') || null;
+  if (Array.isArray(intake.answers) && intake.answers.length > 0) {
+    lines.push('\nThe patient reported:');
+    for (const { q, a } of intake.answers) {
+      if (q && a) lines.push(`• ${q}\n  → ${a}`);
+    }
+  }
+  return lines.join('\n');
 }
 
 function pickProviderType({ doctor_id, hospital_id, external_provider }) {
