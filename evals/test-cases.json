@@ -175,9 +175,9 @@
       }
     },
     "expected_output": {
-      "urgency": "routine"
+      "urgency": "urgent"
     },
-    "eval_criteria": "Agent should account for elderly age and comorbidities while recognizing absence of emergency red flags."
+    "eval_criteria": "With COPD and heart failure, a 10-day cough with increasing fatigue warrants urgent care — the comorbidities rule should elevate urgency from routine to urgent even without emergency red flags."
   },
   {
     "id": "URG-012",
