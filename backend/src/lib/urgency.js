@@ -3,7 +3,7 @@
 const z = require('zod');
 
 // Triage flow: computeUrgency() + triage_intakes, consult_threads, encounters
-const TRIAGE_URGENCY = z.enum(['emergency', 'urgent', 'soon', 'routine']);
+const TRIAGE_URGENCY = z.enum(['emergency', 'urgent', 'soon', 'routine', 'self_care']);
 
 // Agent flow: createConsult tool + consults table
 const AGENT_URGENCY = z.enum(['emergency', 'urgent', 'routine', 'self_care']);

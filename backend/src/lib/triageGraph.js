@@ -81,6 +81,22 @@ function hasEmergencyKeywordFallback(text) {
   return EMERGENCY_KEYWORD_FALLBACKS.some((kw) => t.includes(kw));
 }
 
+// Remove "no X", "not X", "none X", "without X" phrases so negated symptoms
+// (e.g. "No fever, just sore throat") don't false-fire on soon-tier keywords.
+function stripNegatedPhrases(text) {
+  return text.replace(/\b(no|not|none|without)\s+\w+/gi, '');
+}
+
+// Parse the numeric severity from the dedicated severity answer (always answers[1]).
+function extractSeverityScore(answers) {
+  const raw = answers?.[1]?.a;
+  if (!raw) return null;
+  const m = String(raw).match(/\b(\d+)\b/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  return n >= 0 && n <= 10 ? n : null;
+}
+
 function computeUrgencyFromState(state) {
   // Scan answers only — questions often contain emergency keywords (e.g. "any confusion?")
   // that would falsely fire if question text were included.
@@ -89,8 +105,17 @@ function computeUrgencyFromState(state) {
   const t = normalizeText(text);
   if (URGENT_KEYWORD_FALLBACKS.some((kw) => t.includes(kw)) || state.urgent_signaled) return 'urgent';
   if (/\b(9|10)\s*\/\s*10\b/.test(t)) return 'urgent';
-  if (SOON_KEYWORD_FALLBACKS.some((kw) => t.includes(kw))) return 'soon';
+
+  // Strip negated phrases before checking soon-tier keywords so "No fever" does not
+  // match the "fever" keyword.
+  const tNoNeg = normalizeText(stripNegatedPhrases(text));
+  if (SOON_KEYWORD_FALLBACKS.some((kw) => tNoNeg.includes(kw))) return 'soon';
   if (/\b(6|7|8)\s*\/\s*10\b/.test(t)) return 'soon';
+
+  // self_care: severity 1–3 on the dedicated severity question, no higher-tier signals above.
+  const severity = extractSeverityScore(state.answers);
+  if (severity !== null && severity <= 3) return 'self_care';
+
   return 'routine';
 }
 

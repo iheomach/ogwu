@@ -13,7 +13,7 @@ export type Profile = {
   known_conditions: string | null;
 };
 
-export type UrgencyTier = 'routine' | 'soon' | 'urgent' | 'emergency';
+export type UrgencyTier = 'self_care' | 'routine' | 'soon' | 'urgent' | 'emergency';
 
 export type AppScreen =
   | 'landing'

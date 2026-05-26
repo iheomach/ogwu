@@ -110,7 +110,7 @@ export function ThreadScreen({ busy, threadId, onBack, onCancel }: ThreadScreenP
     if (messages.length > 0) return messages;
     const snap = thread?.intake_snapshot;
     if (!snap) return [];
-    const urgencyLabel = { emergency: 'Emergency', urgent: 'Urgent', soon: 'See soon', routine: 'Routine' }[snap.urgency ?? 'routine'] ?? 'Routine';
+    const urgencyLabel = { self_care: 'Self care', emergency: 'Emergency', urgent: 'Urgent', soon: 'See soon', routine: 'Routine' }[snap.urgency ?? 'routine'] ?? 'Routine';
     const lines: string[] = [urgencyLabel];
     if (snap.summary) lines.push('\n' + snap.summary);
     if (Array.isArray(snap.answers) && snap.answers.length > 0) {
