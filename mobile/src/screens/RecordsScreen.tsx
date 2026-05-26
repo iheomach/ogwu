@@ -73,11 +73,11 @@ function DocRow({
             {doc.file_name}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColor(doc.status) }} />
+            {/* <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColor(doc.status) }} />
             <Text style={{ fontSize: 12, color: statusColor(doc.status), fontWeight: '500' }}>
               {statusLabel(doc.status)}
-            </Text>
-            <Text style={{ fontSize: 12, color: colors.grey500 }}>·</Text>
+            </Text> */}
+            {/* <Text style={{ fontSize: 12, color: colors.grey500 }}>·</Text> */}
             <Text style={{ fontSize: 12, color: colors.grey500 }}>{formatDate(doc.created_at)}</Text>
           </View>
           {doc.status === 'failed' && doc.error ? (
@@ -189,15 +189,6 @@ export function RecordsScreen({ busy, onUpload }: RecordsScreenProps) {
         {/* ── OgwuAI Document Analysis ── */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <Text style={styles.label}>AI Document Analysis</Text>
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-            onPress={onUpload}
-            disabled={busy}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="add" size={16} color={colors.purple} />
-            <Text style={{ fontSize: 13, color: colors.purple, fontWeight: '600' }}>Upload</Text>
-          </TouchableOpacity>
         </View>
 
         {docsLoading ? (
