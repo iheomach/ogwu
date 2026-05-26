@@ -202,8 +202,13 @@ export function useAgentChat({ apiBase, location, lat, lon }: UseAgentChatOption
       },
       onToolResult: (toolCallId, result) => {
         const toolName = toolCallNames.get(toolCallId) ?? '';
+        // buildToolNodes wraps every result in { ok, data, error }; unwrap for UI checks
+        const envelope = result as any;
+        const output = (envelope && typeof envelope === 'object' && 'ok' in envelope && 'data' in envelope)
+          ? envelope.data
+          : result;
         const resultPart: ToolPart = {
-          type: 'tool-result', toolCallId, toolName, result, output: result, state: 'output-available',
+          type: 'tool-result', toolCallId, toolName, result, output, state: 'output-available',
         };
         setMessages((prev) => {
           const msgs = [...prev];
