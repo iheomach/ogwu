@@ -472,11 +472,11 @@
       }
     },
     "expected_output": {
-      "tools_that_must_be_called": ["searchHospitals", "getHospitalBookingInfo", "bookAppointment"],
-      "tools_that_must_not_be_called": [],
-      "call_order_matters": true
+      "tools_that_must_be_called": ["searchHospitals"],
+      "tools_that_must_not_be_called": ["bookAppointment"],
+      "call_order_matters": false
     },
-    "eval_criteria": "Correct flow is hospital search followed by slot lookup and booking."
+    "eval_criteria": "Agent must search for hospitals and wait for the patient to select one via the app UI before calling getHospitalBookingInfo. Chaining all three tools in one turn is wrong because hospital selection requires patient input between searchHospitals and getHospitalBookingInfo."
   },
   {
     "id": "TOOL-005",
@@ -635,11 +635,11 @@
       }
     },
     "expected_output": {
-      "tools_that_must_be_called": ["searchHospitals", "getHospitalBookingInfo"],
-      "tools_that_must_not_be_called": ["flagEmergency"],
-      "call_order_matters": true
+      "tools_that_must_be_called": ["searchHospitals"],
+      "tools_that_must_not_be_called": ["flagEmergency", "bookAppointment"],
+      "call_order_matters": false
     },
-    "eval_criteria": "Hospital search must happen before appointment lookup."
+    "eval_criteria": "Agent must call searchHospitals and stop — the patient has not selected a hospital yet so getHospitalBookingInfo cannot be called. The app renders hospital cards and the patient must tap one before the booking flow continues."
   },
   {
     "id": "TOOL-014",
