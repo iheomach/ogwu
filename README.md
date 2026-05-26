@@ -12,13 +12,13 @@ Deployed on Railway. Database on Supabase Cloud. Distributed via TestFlight and 
 |---|---|
 | ![Triage](docs/screenshots/triage.png) | ![OgwuAI](docs/screenshots/agent.png) |
 
-| Booking confirmed | Health records |
+| Booking confirmed | Inbox |
 |---|---|
-| ![Booking](docs/screenshots/booking.png) | ![Records](docs/screenshots/records.png) |
+| ![Booking](docs/screenshots/booking.png) | ![Inbox](docs/screenshots/inbox.png) |
 
-| Inbox thread |
+| Health records |
 |---|
-| ![Inbox](docs/screenshots/inbox.png) |
+| ![Records](docs/screenshots/records.png) |
 
 ---
 
