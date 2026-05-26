@@ -28,7 +28,7 @@ Deployed on Railway. Database on Supabase Cloud. Distributed via TestFlight and 
 - Phone OTP auth, onboarding, 6-language UI (English, Spanish, French, Igbo, Yoruba, Hausa)
 - AI triage — 5-question interview, urgency classification across 5 tiers (self-care → emergency), safety notes
 - OgwuAI health agent — hospital search ranked by GPS, Google Calendar slot availability, appointment booking with Google Meet link, drug interaction checks, emergency escalation, patient history and consult retrieval
-- Health record RAG — upload PDFs or images → AWS Bedrock Data Automation extracts text → chunks embedded via OpenAI → pgvector similarity search injects relevant content into every agent request
+- Health record RAG — upload PDFs or images → AWS Textract extracts text → chunks embedded via OpenAI → pgvector similarity search injects relevant content into every agent request
 - Document library — view and delete uploaded health records from the Records tab
 - Push notifications when a provider replies to a consult thread
 - Async consultation inbox — open and closed thread tabs, appointment date display, provider reply indicator, cancel-consult option
@@ -41,7 +41,7 @@ Deployed on Railway. Database on Supabase Cloud. Distributed via TestFlight and 
 - 60-case eval suite with 85% pass threshold; auto-runs on CI against key backend files
 
 **AWS services**
-- **Bedrock Data Automation** — PDF/image text extraction from uploaded health records
+- **Textract** — PDF/image text extraction from uploaded health records
 - **Comprehend Medical** — ICD-10-CM entity extraction from triage responses
 - **S3** — patient document storage with presigned upload URLs
 - **Lambda + SQS** — async ingestion pipeline: extract → chunk → embed → pgvector
