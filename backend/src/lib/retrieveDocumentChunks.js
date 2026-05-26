@@ -3,7 +3,7 @@ const supabase = require('./supabase');
 
 const embedder = new OpenAIEmbeddings({ model: 'text-embedding-3-small' });
 
-const SIMILARITY_THRESHOLD = 0.75;
+const SIMILARITY_THRESHOLD = 0.60;
 const TOP_K = 5;
 const MAX_CHARS = 6000; // ~1500 tokens at 4 chars/token
 
@@ -20,7 +20,12 @@ async function retrieveDocumentChunks(userId, query) {
       match_count: TOP_K,
     });
 
-    if (error || !data?.length) return [];
+    if (error) {
+      console.error('[rag] match_document_chunks error:', error?.message);
+      return [];
+    }
+    console.log(`[rag] userId=${userId} query="${query.slice(0, 60)}" chunks=${data?.length ?? 0}`);
+    if (!data?.length) return [];
 
     let total = 0;
     const chunks = [];
