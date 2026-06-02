@@ -54,6 +54,7 @@ export function AppRouter() {
   const [triageQuestion, setTriageQuestion] = useState('');
   const [triageAnswer, setTriageAnswer] = useState('');
   const [triageSuggestions, setTriageSuggestions] = useState<string[]>([]);
+  const [triageForwardStack, setTriageForwardStack] = useState<Array<{ q: string; a: string; suggestions: string[] }>>([]);
 
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -72,6 +73,7 @@ export function AppRouter() {
     setTriageQuestion('');
     setTriageAnswer('');
     setTriageSuggestions([]);
+    setTriageForwardStack([]);
   };
 
   const phoneLabel = useMemo(() => {
@@ -360,6 +362,19 @@ export function AppRouter() {
     }
   };
 
+  const onTriagePrev = () => {
+    if (triageQa.length === 0) {
+      setScreen('profile');
+      return;
+    }
+    setTriageForwardStack([{ q: triageQuestion, a: triageAnswer, suggestions: triageSuggestions }, ...triageForwardStack]);
+    const prev = triageQa[triageQa.length - 1];
+    setTriageQa(triageQa.slice(0, -1));
+    setTriageQuestion(prev.q);
+    setTriageAnswer(prev.a);
+    setTriageSuggestions([]);
+  };
+
   const onTriageNext = async () => {
     if (!user) return;
     const q = triageQuestion.trim();
@@ -370,6 +385,15 @@ export function AppRouter() {
     setTriageQa(nextQa);
     setTriageAnswer('');
     setTriageSuggestions([]);
+
+    if (triageForwardStack.length > 0) {
+      const [next, ...rest] = triageForwardStack;
+      setTriageForwardStack(rest);
+      setTriageQuestion(next.q);
+      setTriageAnswer(next.a);
+      setTriageSuggestions(next.suggestions);
+      return;
+    }
 
     try {
       setBusy(true);
@@ -549,12 +573,13 @@ export function AppRouter() {
 
       {screen === 'triage' && (
         <TriageScreen
+          key={triageQa.length}
           busy={busy}
           question={triageQuestion || t('triage.loadingQuestion')}
           questionIndex={triageQa.length}
           answer={triageAnswer}
           setAnswer={setTriageAnswer}
-          onBack={() => setScreen('profile')}
+          onBack={onTriagePrev}
           onNext={onTriageNext}
           suggestions={triageSuggestions}
         />

@@ -27,9 +27,16 @@ export function TriageScreen({
   suggestions = [],
 }: TriageScreenProps) {
   const [focused, setFocused] = useState(false);
-  const [sliderValue, setSliderValue] = useState(5);
   const isQ2 = questionIndex === 1;
   const canContinue = !busy && (isQ2 ? true : answer.trim().length > 0);
+
+  const [sliderValue, setSliderValue] = useState(() => {
+    if (questionIndex === 1 && answer) {
+      const parsed = parseInt(answer, 10);
+      return !isNaN(parsed) ? parsed : 5;
+    }
+    return 5;
+  });
 
   // Keep answer in sync with slider for Q2
   const onSliderChange = (val: number) => {
@@ -38,10 +45,13 @@ export function TriageScreen({
     setAnswer(String(rounded));
   };
 
-  // Initialize Q2 answer to '5' when we arrive at the severity question
+  // Set default slider value when arriving at Q2 with no prior answer
   useEffect(() => {
-    if (isQ2 && !answer) setAnswer('5');
-  }, [isQ2]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (isQ2 && !answer) {
+      setSliderValue(5);
+      setAnswer('5');
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <SafeAreaView style={styles.container}>
@@ -160,6 +170,20 @@ export function TriageScreen({
               {busy ? t('triage.loading') : t('triage.next')}
             </Text>
           </TouchableOpacity>
+
+          {questionIndex > 0 && (
+            <TouchableOpacity
+              onPress={onBack}
+              disabled={busy}
+              activeOpacity={0.7}
+              style={{ marginTop: 12, alignItems: 'center', paddingVertical: 10 }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <MaterialIcons name="arrow-back-ios" size={13} color={colors.purpleGlow} />
+                <Text style={{ fontSize: 14, color: colors.purpleGlow }}>Previous question</Text>
+              </View>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
