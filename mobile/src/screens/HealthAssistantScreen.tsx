@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import * as ExpoCalendar from 'expo-calendar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,10 +21,12 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 import { Calendar } from 'react-native-calendars';
 import { threadsCreate } from '../lib/threads';
-import type { ScreenPropsBase } from '../types';
+import type { Profile, ScreenPropsBase, TriageQA } from '../types';
+import type { SupportedLocale } from '../i18n/translations';
 import { colors, glassSurface, spacing, styles, TAB_BAR_HEIGHT } from '../ui/styles';
 import { t } from '../i18n';
-import { useAgentChat } from '../lib/useAgentChat';
+import { triageComplete, triageNext } from '../lib/triage';
+import { useAgentChat, type AgentMessage } from '../lib/useAgentChat';
 import { supabase } from '../../lib/supabase';
 
 function messageText(m: any): string {
@@ -597,7 +600,177 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
   );
 }
 
-export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospital, onOpenThread }: ScreenPropsBase & { onSendToHospital?: () => void; onOpenThread?: (threadId: string) => void }) {
+function makeLocalMessage(role: 'user' | 'assistant', content: string): AgentMessage {
+  return {
+    id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    role,
+    content,
+    parts: [],
+  };
+}
+
+function isRatingQuestion(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return (
+    /\b0\s*(?:to|-)\s*10\b/.test(normalized) ||
+    /\bscale\b.*\b10\b/.test(normalized) ||
+    /\brate\b.*\b10\b/.test(normalized) ||
+    /\bsever(e|ity)\b.*\b(symptom|pain|0|10)\b/.test(normalized)
+  );
+}
+
+function severityLabel(value: number): string {
+  if (value === 0) return 'No pain';
+  if (value <= 3) return 'Mild';
+  if (value <= 6) return 'Moderate';
+  if (value <= 8) return 'Severe';
+  return 'Extreme';
+}
+
+function formatUrgency(urgency: string | null | undefined): string | null {
+  if (!urgency) return null;
+  return urgency.replace(/_/g, ' ');
+}
+
+function buildCheckInCompleteMessage(saved: Awaited<ReturnType<typeof triageComplete>>): string {
+  const urgency = formatUrgency(saved.intake?.urgency);
+  const summary = saved.intake?.summary?.trim();
+  const safetyNote = (saved.safety_note ?? saved.intake?.safety_note ?? null)?.trim();
+  const parts = ['Thanks, I saved your check-in.'];
+
+  if (urgency) parts.push(`Urgency: ${urgency}.`);
+  if (summary) parts.push(summary);
+  if (safetyNote) parts.push(safetyNote);
+  parts.push('You can ask me what to do next, or I can help find care nearby.');
+
+  return parts.join('\n\n');
+}
+
+function CheckInQuickReplies({
+  suggestions,
+  disabled,
+  onSelect,
+}: {
+  suggestions: string[];
+  disabled: boolean;
+  onSelect: (answer: string) => void;
+}) {
+  if (suggestions.length === 0) return null;
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{ gap: 8, paddingBottom: spacing.sm }}
+      style={{ alignSelf: 'flex-start', maxWidth: '100%' }}
+    >
+      {suggestions.map((chip) => (
+        <TouchableOpacity
+          key={chip}
+          onPress={() => onSelect(chip)}
+          disabled={disabled}
+          activeOpacity={0.75}
+          style={{
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.22)',
+            backgroundColor: glassSurface.bg,
+            opacity: disabled ? 0.5 : 1,
+          }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '600', color: colors.grey700 }}>{chip}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+}
+
+function CheckInSeveritySlider({
+  disabled,
+  onSubmit,
+}: {
+  disabled: boolean;
+  onSubmit: (answer: string) => void;
+}) {
+  const [value, setValue] = useState(5);
+  const rounded = Math.round(value);
+
+  return (
+    <View
+      style={{
+        alignSelf: 'flex-start',
+        width: '88%',
+        backgroundColor: glassSurface.bgMid,
+        borderWidth: 1,
+        borderColor: glassSurface.border,
+        borderRadius: 16,
+        padding: spacing.md,
+        marginBottom: spacing.sm,
+      }}
+    >
+      <Text style={{ textAlign: 'center', fontSize: 44, fontWeight: '800', color: colors.white }}>
+        {rounded}
+      </Text>
+      <Text style={{ textAlign: 'center', fontSize: 12, color: colors.grey500, marginTop: 2, marginBottom: 16 }}>
+        {severityLabel(rounded)}
+      </Text>
+      <Slider
+        minimumValue={0}
+        maximumValue={10}
+        step={1}
+        value={rounded}
+        onValueChange={setValue}
+        disabled={disabled}
+        minimumTrackTintColor={colors.purple}
+        maximumTrackTintColor="rgba(255,255,255,0.16)"
+        thumbTintColor={colors.purpleGlow}
+        style={{ width: '100%', height: 40 }}
+      />
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+        <Text style={{ fontSize: 11, color: colors.grey500 }}>0</Text>
+        <Text style={{ fontSize: 11, color: colors.grey500 }}>10</Text>
+      </View>
+      <TouchableOpacity
+        onPress={() => onSubmit(`${rounded} / 10`)}
+        disabled={disabled}
+        activeOpacity={0.85}
+        style={{
+          marginTop: spacing.md,
+          backgroundColor: disabled ? colors.purpleLight : colors.purple,
+          borderRadius: 999,
+          paddingVertical: 12,
+          alignItems: 'center',
+        }}
+      >
+        <Text style={{ color: colors.white, fontSize: 14, fontWeight: '700' }}>Confirm rating</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+type HealthAssistantScreenProps = ScreenPropsBase & {
+  locale: SupportedLocale;
+  profile: Profile | null;
+  checkInRequestId?: number | null;
+  onCheckInRequestConsumed?: () => void;
+  onSendToHospital?: () => void;
+  onOpenThread?: (threadId: string) => void;
+};
+
+export function HealthAssistantScreen({
+  busy,
+  location,
+  lat,
+  lon,
+  locale,
+  profile,
+  checkInRequestId,
+  onCheckInRequestConsumed,
+  onOpenThread,
+}: HealthAssistantScreenProps) {
   const insets = useSafeAreaInsets();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   useEffect(() => {
@@ -624,13 +797,12 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
   const {
     messages,
     input,
-    handleSubmit,
+    handleSubmit: submitAgentMessage,
     append,
     isLoading,
     error,
     setInput,
     setMessages,
-    resetState,
     startNewSession,
     resumePreviousSession,
     contextSummary,
@@ -638,6 +810,168 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     hasPreviousSession,
     loadPastSession,
   } = useAgentChat({ apiBase, location, lat, lon });
+
+  const [checkInActive, setCheckInActive] = useState(false);
+  const [checkInLoading, setCheckInLoading] = useState(false);
+  const [checkInQa, setCheckInQa] = useState<TriageQA[]>([]);
+  const [checkInQuestion, setCheckInQuestion] = useState<string | null>(null);
+  const [checkInSuggestions, setCheckInSuggestions] = useState<string[]>([]);
+  const [checkInQuestionMessageId, setCheckInQuestionMessageId] = useState<string | null>(null);
+  const consumedCheckInRequestRef = useRef<number | null>(null);
+
+  const clearCheckInState = useCallback(() => {
+    setCheckInActive(false);
+    setCheckInLoading(false);
+    setCheckInQa([]);
+    setCheckInQuestion(null);
+    setCheckInSuggestions([]);
+    setCheckInQuestionMessageId(null);
+  }, []);
+
+  const beginCheckIn = useCallback(async () => {
+    setIsPastSession(false);
+    setPastSessionMessages([]);
+    setCheckInActive(true);
+    setCheckInLoading(true);
+    setCheckInQa([]);
+    setCheckInQuestion(null);
+    setCheckInSuggestions([]);
+    setCheckInQuestionMessageId(null);
+    startNewSession(false);
+
+    try {
+      await AsyncStorage.setItem('assistantMessages', '[]');
+    } catch {
+      // Non-fatal, the message persistence effect will catch up.
+    }
+
+    try {
+      const res = await triageNext({
+        locale,
+        profile: profile ?? {},
+        qa: [],
+        location,
+      });
+
+      if (res.done) {
+        const saved = await triageComplete({ locale, profile: profile ?? {}, qa: [], location });
+        const doneMessage = makeLocalMessage('assistant', buildCheckInCompleteMessage(saved));
+        setMessages([doneMessage]);
+        clearCheckInState();
+        return;
+      }
+
+      const question = res.question ?? t('triage.fallbackQuestion');
+      const questionMessage = makeLocalMessage('assistant', question);
+      setMessages([questionMessage]);
+      setCheckInQuestion(question);
+      setCheckInSuggestions(res.suggestions ?? []);
+      setCheckInQuestionMessageId(questionMessage.id);
+    } catch (err: any) {
+      const fallback = makeLocalMessage(
+        'assistant',
+        `I could not start your check-in right now. ${err?.message ?? t('common.tryAgain')}`
+      );
+      setMessages([fallback]);
+      clearCheckInState();
+    } finally {
+      setCheckInLoading(false);
+    }
+  }, [clearCheckInState, locale, location, profile, setMessages, startNewSession]);
+
+  const submitCheckInAnswer = useCallback(async (rawAnswer: string) => {
+    const answer = rawAnswer.trim();
+    if (!answer || checkInLoading || !checkInActive || !checkInQuestion) return;
+
+    const answeredQuestion = checkInQuestion;
+    const nextQa = [...checkInQa, { q: answeredQuestion, a: answer }];
+
+    setInput('');
+    setCheckInQa(nextQa);
+    setCheckInQuestion(null);
+    setCheckInSuggestions([]);
+    setCheckInQuestionMessageId(null);
+    setCheckInLoading(true);
+    setMessages((prev) => [...prev, makeLocalMessage('user', answer)]);
+
+    try {
+      const res = await triageNext({
+        locale,
+        profile: profile ?? {},
+        qa: nextQa,
+        location,
+      });
+
+      if (res.done) {
+        const saved = await triageComplete({
+          locale,
+          profile: profile ?? {},
+          qa: nextQa,
+          location,
+        });
+        setMessages((prev) => [...prev, makeLocalMessage('assistant', buildCheckInCompleteMessage(saved))]);
+        clearCheckInState();
+        return;
+      }
+
+      const question = res.question ?? t('triage.fallbackQuestion');
+      const questionMessage = makeLocalMessage('assistant', question);
+      setMessages((prev) => [...prev, questionMessage]);
+      setCheckInQuestion(question);
+      setCheckInSuggestions(res.suggestions ?? []);
+      setCheckInQuestionMessageId(questionMessage.id);
+    } catch (err: any) {
+      setMessages((prev) => [
+        ...prev,
+        makeLocalMessage(
+          'assistant',
+          `I could not save that check-in answer right now. ${err?.message ?? t('common.tryAgain')}`
+        ),
+      ]);
+      clearCheckInState();
+    } finally {
+      setCheckInLoading(false);
+    }
+  }, [
+    checkInActive,
+    checkInLoading,
+    checkInQa,
+    checkInQuestion,
+    clearCheckInState,
+    locale,
+    location,
+    profile,
+    setInput,
+    setMessages,
+  ]);
+
+  useEffect(() => {
+    if (!isInitialized || !checkInRequestId) return;
+    if (consumedCheckInRequestRef.current === checkInRequestId) return;
+
+    consumedCheckInRequestRef.current = checkInRequestId;
+    onCheckInRequestConsumed?.();
+    beginCheckIn();
+  }, [beginCheckIn, checkInRequestId, isInitialized, onCheckInRequestConsumed]);
+
+  const handleSubmit = useCallback(() => {
+    const text = input.trim();
+    if (!text || isLoading || checkInLoading) return;
+
+    if (checkInActive) {
+      submitCheckInAnswer(text);
+      return;
+    }
+
+    submitAgentMessage();
+  }, [
+    checkInActive,
+    checkInLoading,
+    input,
+    isLoading,
+    submitAgentMessage,
+    submitCheckInAnswer,
+  ]);
 
   const handleOpenPastSession = async () => {
     setPastSessionLoading(true);
@@ -661,6 +995,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
   };
 
   const handleClearChat = async () => {
+    clearCheckInState();
     startNewSession();
     try {
       await AsyncStorage.setItem('assistantMessages', '[]');
@@ -690,6 +1025,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                   headers: { Authorization: `Bearer ${token}` },
                 });
               }
+              clearCheckInState();
               startNewSession(false);
               await AsyncStorage.setItem('assistantMessages', '[]');
             } catch {
@@ -735,6 +1071,32 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
     const toolName = active.type?.replace('tool-', '') ?? '';
     return TOOL_LABELS[toolName] ?? 'Working on it...';
   }, [isLoading, messages]);
+
+  const activeThinkingLabel = checkInLoading
+    ? (checkInActive ? 'Preparing next question...' : 'Preparing your check-in...')
+    : thinkingLabel;
+
+  // Detect runTriage tool signal and begin a fresh check-in.
+  const runTriageRequested = useMemo(() => {
+    for (const m of messages) {
+      if ((m as any).role !== 'assistant') continue;
+      const parts: any[] = (m as any).parts ?? [];
+      for (const part of parts) {
+        const toolName = part.toolInvocation?.toolName ?? part.toolName ?? (part.type ?? '').replace('tool-', '');
+        const state = part.state ?? part.toolInvocation?.state ?? '';
+        if (toolName === 'runTriage' && (state === 'output-available' || state === 'result')) {
+          const output = part.output ?? part.result ?? part.toolInvocation?.result ?? part.toolInvocation?.output;
+          if (output?.triggered) return true;
+        }
+      }
+    }
+    return false;
+  }, [messages]);
+
+  useEffect(() => {
+    if (!runTriageRequested || checkInActive || checkInLoading) return;
+    beginCheckIn();
+  }, [runTriageRequested, checkInActive, checkInLoading, beginCheckIn]);
 
   // Show send-summary button as soon as bookAppointment succeeds.
   const endConversationData = useMemo(() => {
@@ -814,8 +1176,8 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <TouchableOpacity
                 onPress={handleClearHistory}
-                disabled={isLoading || clearingHistory}
-                style={[styles.toolbarIconBtn, { opacity: (isLoading || clearingHistory) ? 0.35 : 1 }]}
+                disabled={isLoading || checkInLoading || clearingHistory}
+                style={[styles.toolbarIconBtn, { opacity: (isLoading || checkInLoading || clearingHistory) ? 0.35 : 1 }]}
                 accessibilityRole="button"
                 accessibilityLabel="Clear agent history"
                 activeOpacity={0.7}
@@ -824,8 +1186,8 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleClearChat}
-                disabled={isLoading || messages.length === 0}
-                style={[styles.toolbarIconBtn, { opacity: messages.length === 0 ? 0.35 : 1 }]}
+                disabled={isLoading || checkInLoading || messages.length === 0}
+                style={[styles.toolbarIconBtn, { opacity: (isLoading || checkInLoading || messages.length === 0) ? 0.35 : 1 }]}
                 accessibilityRole="button"
                 accessibilityLabel="Clear chat"
                 activeOpacity={0.7}
@@ -1138,6 +1500,22 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                   .trim();
               }
 
+              const isActiveCheckInQuestion =
+                checkInActive &&
+                role === 'assistant' &&
+                (m as any)?.id === checkInQuestionMessageId;
+              const showRatingSlider = isActiveCheckInQuestion && isRatingQuestion(checkInQuestion ?? text);
+              const showQuickReplies =
+                isActiveCheckInQuestion &&
+                !showRatingSlider &&
+                checkInSuggestions.length > 0;
+              const showAgentRatingSlider =
+                !checkInActive &&
+                role === 'assistant' &&
+                idx === messages.length - 1 &&
+                toolParts.length === 0 &&
+                isRatingQuestion(text);
+
               return (
                 <View key={(m as any)?.id || `${role}-${idx}`}>
                   {(displayText || calendarData) && !isHospitalSelection && !isSlotSelection && (
@@ -1163,6 +1541,25 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                         />
                       )}
                     </View>
+                  )}
+                  {showRatingSlider && (
+                    <CheckInSeveritySlider
+                      disabled={checkInLoading}
+                      onSubmit={submitCheckInAnswer}
+                    />
+                  )}
+                  {showQuickReplies && (
+                    <CheckInQuickReplies
+                      suggestions={checkInSuggestions}
+                      disabled={checkInLoading}
+                      onSelect={submitCheckInAnswer}
+                    />
+                  )}
+                  {showAgentRatingSlider && (
+                    <CheckInSeveritySlider
+                      disabled={isLoading || checkInLoading || !apiBase}
+                      onSubmit={(answer) => append({ role: 'user', content: answer })}
+                    />
                   )}
                   {toolParts.map((part: any) => {
                     // Detect searchHospitals result across SDK format variants
@@ -1193,7 +1590,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                             key={`hospitals-${part.toolCallId ?? partType}`}
                             hospitals={hospitals}
                             onSelect={handleSelectHospital}
-                            disabled={isLoading}
+                            disabled={isLoading || checkInLoading}
                           />
                         );
                       }
@@ -1213,7 +1610,7 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                             hospitalName={output.hospital_name ?? 'Hospital'}
                             hospitalId={output.hospital_id ?? ''}
                             onSelect={handleSelectSlot}
-                            disabled={isLoading}
+                            disabled={isLoading || checkInLoading}
                           />
                         );
                       }
@@ -1226,17 +1623,19 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
 
                     if (isBookingResult) return null; // rendered inside bubble above
 
+                    if (toolName === 'runTriage') return null; // handled via useEffect
+
                     return renderToolInvocation(part);
                   })}
                 </View>
               );
             })}
 
-            {isLoading && thinkingLabel && (
+            {(isLoading || checkInLoading) && activeThinkingLabel && (
               <View style={[styles.assistantBubble, { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }]}>
                 <ActivityIndicator color={colors.purple} size="small" />
                 <Text style={{ color: colors.grey500, fontSize: 13, fontStyle: 'italic' }}>
-                  {thinkingLabel}
+                  {activeThinkingLabel}
                 </Text>
               </View>
             )}
@@ -1289,22 +1688,23 @@ export function HealthAssistantScreen({ busy, location, lat, lon, onSendToHospit
                 <TextInput
                   value={input}
                   onChangeText={(text) => setInput(text)}
-                  placeholder={t('assistant.placeholder')}
+                  placeholder={checkInActive ? t('triage.placeholder') : t('assistant.placeholder')}
                   placeholderTextColor="rgba(255,255,255,0.35)"
                   style={styles.chatTextInput}
                   multiline
+                  editable={!busy && !isLoading && !checkInLoading && !!apiBase}
                 />
                 <TouchableOpacity
                   style={[
                     styles.chatSendButton,
-                    { backgroundColor: (busy || isLoading || !apiBase) ? 'rgba(123,77,217,0.35)' : colors.purple },
+                    { backgroundColor: (busy || isLoading || checkInLoading || !apiBase) ? 'rgba(123,77,217,0.35)' : colors.purple },
                   ]}
                   onPress={() => handleSubmit()}
-                  disabled={busy || isLoading || !apiBase}
+                  disabled={busy || isLoading || checkInLoading || !apiBase}
                   accessibilityRole="button"
                   activeOpacity={0.8}
                 >
-                  {isLoading
+                  {isLoading || checkInLoading
                     ? <ActivityIndicator color={colors.white} size="small" />
                     : <MaterialIcons name="arrow-forward" size={22} color={colors.white} />
                   }

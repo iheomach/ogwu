@@ -150,3 +150,6 @@ mobile/web-build/
 
 # EAS
 .eas/
+
+# Markdown docs
+*.md

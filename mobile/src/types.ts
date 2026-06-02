@@ -20,7 +20,6 @@ export type AppScreen =
   | 'phone'
   | 'otp'
   | 'onboarding'
-  | 'triage'
   | 'triageResults'
   | 'home'
   | 'newConsult'
@@ -210,14 +209,4 @@ export type ProfileLoadParams = {
 export type TriageQA = {
   q: string;
   a: string;
-};
-
-export type TriageScreenProps = ScreenPropsBase & {
-  question: string;
-  questionIndex: number;
-  answer: string;
-  setAnswer: (value: string) => void;
-  onBack: () => void;
-  onNext: () => void;
-  suggestions?: string[];
 };

@@ -21,7 +21,6 @@ import { PhoneScreen } from './screens/PhoneScreen';
 import { OtpScreen } from './screens/OtpScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { HomeScreen } from './screens/HomeScreen';
-import { TriageScreen } from './screens/TriageScreen';
 import { TriageResultsScreen } from './screens/TriageResultsScreen';
 import { HealthAssistantScreen } from './screens/HealthAssistantScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
@@ -32,8 +31,7 @@ import { ThreadScreen } from './screens/ThreadScreen';
 import { SendToHospitalScreen } from './screens/SendToHospitalScreen';
 import { initI18n, setLocale as persistLocale, t } from './i18n';
 import type { SupportedLocale } from './i18n/translations';
-import type { TriageQA } from './types';
-import { triageComplete, triageNext, triageStatus } from './lib/triage';
+import { triageStatus } from './lib/triage';
 import { apiDelete } from './lib/api';
 import { TabScaffold, type TabKey } from './ui/TabScaffold';
 import { requestAndGetLocation, formatLocation, type LocationSummary } from './lib/location';
@@ -49,12 +47,7 @@ export function AppRouter() {
   const [locale, setLocale] = useState<SupportedLocale>('en');
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [openThreadCount, setOpenThreadCount] = useState(0);
-
-  const [triageQa, setTriageQa] = useState<TriageQA[]>([]);
-  const [triageQuestion, setTriageQuestion] = useState('');
-  const [triageAnswer, setTriageAnswer] = useState('');
-  const [triageSuggestions, setTriageSuggestions] = useState<string[]>([]);
-  const [triageForwardStack, setTriageForwardStack] = useState<Array<{ q: string; a: string; suggestions: string[] }>>([]);
+  const [assistantCheckInRequestId, setAssistantCheckInRequestId] = useState<number | null>(null);
 
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -68,12 +61,9 @@ export function AppRouter() {
 
   const user = session?.user ?? null;
 
-  const resetTriage = () => {
-    setTriageQa([]);
-    setTriageQuestion('');
-    setTriageAnswer('');
-    setTriageSuggestions([]);
-    setTriageForwardStack([]);
+  const startAssistantCheckIn = () => {
+    setAssistantCheckInRequestId(Date.now());
+    setScreen('newConsult');
   };
 
   const phoneLabel = useMemo(() => {
@@ -122,7 +112,6 @@ export function AppRouter() {
       if (!user) {
         setProfile(null);
         setScreen('landing');
-        resetTriage();
         return;
       }
 
@@ -143,8 +132,7 @@ export function AppRouter() {
             if (status.completed) {
               setScreen('home');
             } else {
-              resetTriage();
-              setScreen('triage');
+              startAssistantCheckIn();
             }
           } catch {
             // Fail open: if triage status can't be loaded, don't block the app.
@@ -186,57 +174,6 @@ export function AppRouter() {
       .then((loc) => setLocationSummary(loc))
       .catch(() => {});
   }, [screen]);
-
-  // ─── Triage: load first question on entry ──────────────────────────────
-  useEffect(() => {
-    let isMounted = true;
-
-    (async () => {
-      if (screen !== 'triage') return;
-      if (!user) return;
-      if (triageQuestion.trim().length > 0) return;
-
-      try {
-        setBusy(true);
-        const res = await triageNext({
-          locale,
-          profile: profile ?? {},
-          qa: triageQa,
-          location: formatLocation(locationSummary),
-        });
-
-        if (!isMounted) return;
-
-        if (res.done) {
-          // Nothing to ask; still record completion so we don't prompt again.
-          try {
-            const saved = await triageComplete({ locale, profile: profile ?? {}, qa: triageQa, location: formatLocation(locationSummary) });
-            if (!isMounted) return;
-            if (saved.safety_note) {
-              Alert.alert(t('triage.safetyTitle'), saved.safety_note);
-            }
-          } catch {
-            // Non-fatal
-          }
-          if (!isMounted) return;
-          setScreen('triageResults');
-          return;
-        }
-
-        setTriageQuestion(res.question ?? t('triage.fallbackQuestion'));
-        setTriageSuggestions(res.suggestions ?? []);
-      } catch (err: any) {
-        Alert.alert(t('errors.triageTitle'), err?.message ?? t('errors.triageBody'));
-        setScreen('home');
-      } finally {
-        if (isMounted) setBusy(false);
-      }
-    })();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [screen, user?.id]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────
   const onSendOtp = async () => {
@@ -350,76 +287,12 @@ export function AppRouter() {
       setProfile(data);
 
       if (isProfileComplete(data)) {
-        resetTriage();
-        setScreen('triage');
+        startAssistantCheckIn();
       } else {
         setScreen('onboarding');
       }
     } catch (err: any) {
       Alert.alert(t('errors.saveTitle'), err?.message ?? t('errors.saveBody'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onTriagePrev = () => {
-    if (triageQa.length === 0) {
-      setScreen('profile');
-      return;
-    }
-    setTriageForwardStack([{ q: triageQuestion, a: triageAnswer, suggestions: triageSuggestions }, ...triageForwardStack]);
-    const prev = triageQa[triageQa.length - 1];
-    setTriageQa(triageQa.slice(0, -1));
-    setTriageQuestion(prev.q);
-    setTriageAnswer(prev.a);
-    setTriageSuggestions([]);
-  };
-
-  const onTriageNext = async () => {
-    if (!user) return;
-    const q = triageQuestion.trim();
-    const a = triageAnswer.trim();
-    if (!q || !a) return;
-
-    const nextQa = [...triageQa, { q, a }];
-    setTriageQa(nextQa);
-    setTriageAnswer('');
-    setTriageSuggestions([]);
-
-    if (triageForwardStack.length > 0) {
-      const [next, ...rest] = triageForwardStack;
-      setTriageForwardStack(rest);
-      setTriageQuestion(next.q);
-      setTriageAnswer(next.a);
-      setTriageSuggestions(next.suggestions);
-      return;
-    }
-
-    try {
-      setBusy(true);
-      const res = await triageNext({
-        locale,
-        profile: profile ?? {},
-        qa: nextQa,
-        location: formatLocation(locationSummary),
-      });
-
-      if (res.done) {
-        const saved = await triageComplete({ locale, profile: profile ?? {}, qa: nextQa, location: formatLocation(locationSummary) });
-        if (saved.safety_note) {
-          Alert.alert(t('triage.safetyTitle'), saved.safety_note);
-        }
-        resetTriage();
-        setScreen('triageResults');
-        return;
-      }
-
-      setTriageQuestion(res.question ?? t('triage.fallbackQuestion'));
-      setTriageSuggestions(res.suggestions ?? []);
-    } catch (err: any) {
-      Alert.alert(t('errors.triageTitle'), err?.message ?? t('errors.triageBody'));
-      resetTriage();
-      setScreen('home');
     } finally {
       setBusy(false);
     }
@@ -449,7 +322,6 @@ export function AppRouter() {
       setBiologicalSex('');
       setAllergies('');
       setKnownConditions('');
-      resetTriage();
       setProfile(null);
       setScreen('landing');
     } catch (err: any) {
@@ -571,20 +443,6 @@ export function AppRouter() {
         />
       )}
 
-      {screen === 'triage' && (
-        <TriageScreen
-          key={triageQa.length}
-          busy={busy}
-          question={triageQuestion || t('triage.loadingQuestion')}
-          questionIndex={triageQa.length}
-          answer={triageAnswer}
-          setAnswer={setTriageAnswer}
-          onBack={onTriagePrev}
-          onNext={onTriageNext}
-          suggestions={triageSuggestions}
-        />
-      )}
-
       {screen === 'triageResults' && (
         <TriageResultsScreen
           busy={busy}
@@ -601,7 +459,7 @@ export function AppRouter() {
             onGoNewConsult={() => setScreen('newConsult')}
             onGoRecords={() => setScreen('records')}
             onGoProfile={() => setScreen('profile')}
-            onRunTriage={() => { resetTriage(); setScreen('triage'); }}
+            onRunTriage={startAssistantCheckIn}
           />
         </TabScaffold>
       )}
@@ -613,6 +471,10 @@ export function AppRouter() {
             location={formatLocation(locationSummary)}
             lat={locationSummary?.lat ?? null}
             lon={locationSummary?.lon ?? null}
+            locale={locale}
+            profile={profile}
+            checkInRequestId={assistantCheckInRequestId}
+            onCheckInRequestConsumed={() => setAssistantCheckInRequestId(null)}
             onOpenThread={(threadId) => {
               setActiveThreadId(threadId);
               setScreen('thread');
@@ -680,10 +542,7 @@ export function AppRouter() {
             profile={profile}
             locale={locale}
             onChangeLocale={onChangeLocale}
-            onRunTriage={() => {
-              resetTriage();
-              setScreen('triage');
-            }}
+            onRunTriage={startAssistantCheckIn}
             onViewTriageResults={() => setScreen('triageResults')}
             onSaveProfile={onSaveProfile}
             onLogout={onLogout}

@@ -26,6 +26,9 @@ const DESCRIPTIONS = {
 
   getPatientHistory:
     "Retrieve the patient's recent consult history. Use this when context from prior sessions is relevant to the current complaint.",
+
+  runTriage:
+    'Trigger a fresh structured health check-in in the app. Call this when the patient explicitly asks to run (or re-run) the health check-in, triage, or symptom assessment. The app will immediately begin a new check-in conversation -- you do not need to ask any questions yourself.',
 };
 
 function loadSkills(tool, ctx) {
