@@ -30,6 +30,7 @@ import { triageComplete, triageNext } from '../lib/triage';
 import { useAgentChat, type AgentMessage } from '../lib/useAgentChat';
 import { supabase } from '../../lib/supabase';
 import { ThinkingIndicator } from '../ui/ThinkingIndicator';
+import { GlassCard } from '../ui/GlassCard';
 
 function messageText(m: any): string {
   const c = (m as any)?.content;
