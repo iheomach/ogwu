@@ -765,6 +765,8 @@ type HealthAssistantScreenProps = ScreenPropsBase & {
   profile: Profile | null;
   checkInRequestId?: number | null;
   onCheckInRequestConsumed?: () => void;
+  initialMessageRequest?: { id: number; message: string } | null;
+  onInitialMessageConsumed?: () => void;
   onSendToHospital?: () => void;
   onOpenThread?: (threadId: string) => void;
 };
@@ -778,6 +780,8 @@ export function HealthAssistantScreen({
   profile,
   checkInRequestId,
   onCheckInRequestConsumed,
+  initialMessageRequest,
+  onInitialMessageConsumed,
   onOpenThread,
 }: HealthAssistantScreenProps) {
   const insets = useSafeAreaInsets();
@@ -962,6 +966,18 @@ export function HealthAssistantScreen({
     onCheckInRequestConsumed?.();
     beginCheckIn();
   }, [beginCheckIn, checkInRequestId, isInitialized, onCheckInRequestConsumed]);
+
+  const consumedInitialMessageRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isInitialized || !initialMessageRequest) return;
+    if (consumedInitialMessageRef.current === initialMessageRequest.id) return;
+    consumedInitialMessageRef.current = initialMessageRequest.id;
+    onInitialMessageConsumed?.();
+    setIsPastSession(false);
+    setPastSessionMessages([]);
+    startNewSession(false);
+    append({ role: 'user', content: initialMessageRequest.message });
+  }, [initialMessageRequest, isInitialized, append, startNewSession, onInitialMessageConsumed]);
 
   const handleSubmit = useCallback(() => {
     const text = input.trim();

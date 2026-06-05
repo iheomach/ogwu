@@ -435,6 +435,28 @@ export const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.52)',
     marginTop: 2,
   },
+  drugInput: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#FFFFFF' as const,
+    fontSize: 14,
+  },
+  drugCheckBtn: {
+    backgroundColor: colors.purple,
+    borderRadius: 10,
+    paddingVertical: 13,
+    alignItems: 'center' as const,
+    marginTop: 16,
+  },
+  drugCheckBtnText: {
+    color: '#FFFFFF' as const,
+    fontSize: 14,
+    fontWeight: '700' as const,
+  },
 
   // ─── Home — health status card ───────────────────────────────────────────
   healthStatusCard: {

@@ -73,9 +73,11 @@ export type HomeScreenProps = ScreenPropsBase & {
   phoneLabel: string;
   profile: Profile | null;
   onGoNewConsult: () => void;
+  onGoNewConsultWithMessage: (message: string) => void;
   onGoRecords: () => void;
   onGoProfile: () => void;
   onRunTriage: () => void;
+  onSendSummaryToHospital: (hospitalId: string, hospitalName: string) => Promise<void>;
   onOpenThread: (threadId: string) => void;
 };
 

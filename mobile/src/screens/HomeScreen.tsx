@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
+  KeyboardAvoidingView,
   Linking,
+  Modal,
+  Platform,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -157,7 +162,7 @@ function QuickActionCard({
           </View>
           <View>
             <Text style={styles.quickActionLabel}>{label}</Text>
-            <Text style={styles.quickActionSubtitle}>{subtitle}</Text>
+            <Text style={styles.quickActionSubtitle} numberOfLines={2}>{subtitle}</Text>
           </View>
         </GlassCard>
       </TouchableOpacity>
@@ -262,8 +267,10 @@ export function HomeScreen({
   busy,
   profile,
   onGoNewConsult,
+  onGoNewConsultWithMessage,
   onGoRecords,
   onRunTriage,
+  onSendSummaryToHospital,
   onOpenThread,
 }: HomeScreenProps) {
   const displayName = profile?.first_name?.trim() || '';
@@ -278,6 +285,11 @@ export function HomeScreen({
     const h = e.nativeEvent.layout.height;
     setCardH(prev => Math.max(prev, h));
   }, []);
+
+  const [drugModalVisible, setDrugModalVisible] = useState(false);
+  const [drugA, setDrugA] = useState('');
+  const [drugB, setDrugB] = useState('');
+  const [sendingSummary, setSendingSummary] = useState(false);
 
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
@@ -342,6 +354,47 @@ export function HomeScreen({
   const intakeStale = hasIntake && intake?.updated_at ? isStale(intake.updated_at) : false;
   const tags = useMemo(() => deriveSituationTags(intake), [intake]);
 
+  const lastHospital = useMemo(() => {
+    const t = threads
+      .filter(th => th.hospital_id && th.hospital_name)
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0];
+    return t ? { id: t.hospital_id!, name: t.hospital_name! } : null;
+  }, [threads]);
+
+  const handleDrugCheck = useCallback(() => {
+    const a = drugA.trim();
+    const b = drugB.trim();
+    if (!a || !b) return;
+    setDrugModalVisible(false);
+    setDrugA('');
+    setDrugB('');
+    onGoNewConsultWithMessage(`Is it safe to take ${a} with ${b}?`);
+  }, [drugA, drugB, onGoNewConsultWithMessage]);
+
+  const handleSendSummary = useCallback(() => {
+    if (!lastHospital || sendingSummary) return;
+    Alert.alert(
+      'Send health summary',
+      `Send your current health summary to ${lastHospital.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send',
+          onPress: async () => {
+            setSendingSummary(true);
+            try {
+              await onSendSummaryToHospital(lastHospital.id, lastHospital.name);
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'Could not send summary');
+            } finally {
+              setSendingSummary(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [lastHospital, sendingSummary, onSendSummaryToHospital]);
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
       <StatusBar style="light" />
@@ -393,37 +446,122 @@ export function HomeScreen({
             <Text style={[styles.sectionLabel, { marginTop: 24, marginBottom: 12 }]}>Quick actions</Text>
             <View style={styles.quickActionsRow}>
               <QuickActionCard
-                icon="add-circle-outline"
-                label="OgwuAI"
-                subtitle="Talk to your AI health assistant"
-                onPress={onGoNewConsult}
+                icon="location-on"
+                label="Find hospitals"
+                subtitle="See hospitals near you now"
+                onPress={() => onGoNewConsultWithMessage('Find hospitals near me')}
                 accent={colors.purple}
                 onLayout={onCardLayout}
                 cardHeight={cardH}
               />
               <QuickActionCard
-                icon="description"
-                label="My records"
-                subtitle="Past visits & history"
-                onPress={onGoRecords}
+                icon="medication"
+                label="Drug safety"
+                subtitle="Check if two meds are safe together"
+                onPress={() => setDrugModalVisible(true)}
                 accent="#2563EB"
                 onLayout={onCardLayout}
                 cardHeight={cardH}
               />
             </View>
-
-            {/* Start intake — shown below the 2-col grid only when no intake exists */}
-            {!loading && !hasIntake && (
-              <View style={{ marginTop: 10 }}>
+            <View style={[styles.quickActionsRow, { marginTop: 10 }]}>
+              {lastHospital ? (
                 <QuickActionCard
-                  icon="assignment"
-                  label="Start intake"
-                  subtitle="Complete your health check-in to get personalised insights"
-                  onPress={onRunTriage}
-                  accent={colors.purple}
+                  icon="send"
+                  label="Send summary"
+                  subtitle={`Send to ${lastHospital.name}`}
+                  onPress={handleSendSummary}
+                  accent="#059669"
+                  onLayout={onCardLayout}
+                  cardHeight={cardH}
                 />
-              </View>
-            )}
+              ) : (
+                <QuickActionCard
+                  icon="upload-file"
+                  label="Upload record"
+                  subtitle="Add documents to your file"
+                  onPress={onGoRecords}
+                  accent="#059669"
+                  onLayout={onCardLayout}
+                  cardHeight={cardH}
+                />
+              )}
+              {lastHospital ? (
+                <QuickActionCard
+                  icon="event-available"
+                  label="Book again"
+                  subtitle={`At ${lastHospital.name}`}
+                  onPress={() => onGoNewConsultWithMessage(`Book an appointment at ${lastHospital.name}`)}
+                  accent="#D97706"
+                  onLayout={onCardLayout}
+                  cardHeight={cardH}
+                />
+              ) : (
+                <QuickActionCard
+                  icon={hasIntake ? 'refresh' : 'assignment'}
+                  label={hasIntake ? 'Update check-in' : 'Start check-in'}
+                  subtitle={hasIntake ? 'Refresh your health status' : 'Complete your first check-in'}
+                  onPress={onRunTriage}
+                  accent="#D97706"
+                  onLayout={onCardLayout}
+                  cardHeight={cardH}
+                />
+              )}
+            </View>
+
+            {/* Drug safety modal */}
+            <Modal
+              transparent
+              animationType="fade"
+              visible={drugModalVisible}
+              onRequestClose={() => setDrugModalVisible(false)}
+            >
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+              >
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', padding: 24 }}
+                  activeOpacity={1}
+                  onPress={() => setDrugModalVisible(false)}
+                >
+                  <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+                    <GlassCard borderRadius={16} innerStyle={{ padding: 24 }}>
+                      <Text style={[styles.sectionLabel, { marginBottom: 16 }]}>Check drug safety</Text>
+                      <TextInput
+                        placeholder="First medication..."
+                        placeholderTextColor="rgba(255,255,255,0.35)"
+                        value={drugA}
+                        onChangeText={setDrugA}
+                        style={styles.drugInput}
+                        autoFocus
+                        returnKeyType="next"
+                      />
+                      <TextInput
+                        placeholder="Second medication..."
+                        placeholderTextColor="rgba(255,255,255,0.35)"
+                        value={drugB}
+                        onChangeText={setDrugB}
+                        style={[styles.drugInput, { marginTop: 10 }]}
+                        returnKeyType="done"
+                        onSubmitEditing={handleDrugCheck}
+                      />
+                      <TouchableOpacity
+                        onPress={handleDrugCheck}
+                        disabled={!drugA.trim() || !drugB.trim()}
+                        style={[
+                          styles.drugCheckBtn,
+                          { opacity: drugA.trim() && drugB.trim() ? 1 : 0.4 },
+                        ]}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.drugCheckBtnText}>Check</Text>
+                      </TouchableOpacity>
+                    </GlassCard>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              </KeyboardAvoidingView>
+            </Modal>
 
             {/* ── Health status (only when intake exists) ── */}
             {!loading && hasIntake && intake && (

@@ -32,6 +32,7 @@ import { SendToHospitalScreen } from './screens/SendToHospitalScreen';
 import { initI18n, setLocale as persistLocale, t } from './i18n';
 import type { SupportedLocale } from './i18n/translations';
 import { triageStatus } from './lib/triage';
+import { threadsCreate } from './lib/threads';
 import { apiDelete } from './lib/api';
 import { TabScaffold, type TabKey } from './ui/TabScaffold';
 import { CheckInIntroOverlay } from './ui/CheckInIntroOverlay';
@@ -49,6 +50,7 @@ export function AppRouter() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [openThreadCount, setOpenThreadCount] = useState(0);
   const [assistantCheckInRequestId, setAssistantCheckInRequestId] = useState<number | null>(null);
+  const [assistantInitialMessageRequest, setAssistantInitialMessageRequest] = useState<{ id: number; message: string } | null>(null);
   const [showCheckInIntro, setShowCheckInIntro] = useState(false);
 
   const [phone, setPhone] = useState('');
@@ -67,6 +69,20 @@ export function AppRouter() {
     setAssistantCheckInRequestId(Date.now());
     setShowCheckInIntro(true);
     setScreen('newConsult');
+  };
+
+  const startAssistantWithMessage = (message: string) => {
+    setAssistantInitialMessageRequest({ id: Date.now(), message });
+    setScreen('newConsult');
+  };
+
+  const handleSendSummaryToHospital = async (hospitalId: string, hospitalName: string) => {
+    const res = await threadsCreate({ hospital_id: hospitalId });
+    const threadId = res?.thread?.id;
+    if (threadId) {
+      setActiveThreadId(threadId);
+      setScreen('thread');
+    }
   };
 
   const phoneLabel = useMemo(() => {
@@ -460,9 +476,11 @@ export function AppRouter() {
             phoneLabel={phoneLabel}
             profile={profile}
             onGoNewConsult={() => setScreen('newConsult')}
+            onGoNewConsultWithMessage={startAssistantWithMessage}
             onGoRecords={() => setScreen('records')}
             onGoProfile={() => setScreen('profile')}
             onRunTriage={startAssistantCheckIn}
+            onSendSummaryToHospital={handleSendSummaryToHospital}
             onOpenThread={(threadId) => {
               setActiveThreadId(threadId);
               setScreen('thread');
@@ -482,6 +500,8 @@ export function AppRouter() {
             profile={profile}
             checkInRequestId={assistantCheckInRequestId}
             onCheckInRequestConsumed={() => setAssistantCheckInRequestId(null)}
+            initialMessageRequest={assistantInitialMessageRequest}
+            onInitialMessageConsumed={() => setAssistantInitialMessageRequest(null)}
             onOpenThread={(threadId) => {
               setActiveThreadId(threadId);
               setScreen('thread');
