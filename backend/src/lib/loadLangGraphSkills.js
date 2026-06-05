@@ -16,9 +16,6 @@ const DESCRIPTIONS = {
   flagEmergency:
     'Flag a patient emergency. Call this immediately when symptoms suggest a life-threatening situation — before any other tool.',
 
-  checkDrugInteraction:
-    "Check whether a medication is safe given the patient's known allergies. Basic check only — always advise the patient to confirm with a pharmacist or clinician.",
-
   createConsult:
     'Save a structured consult record once the conversation is complete. Call this only as the very last action — after the patient has acknowledged the booking or phone script. Never call it mid-flow.',
 

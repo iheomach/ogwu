@@ -58,20 +58,6 @@ const OUTPUT_SCHEMAS = {
     message:  z.string(),
   }),
 
-  checkDrugInteraction: z.object({
-    medications:   z.array(z.string()),
-    allergy_risks: z.array(z.string()),
-    interactions:  z.array(z.object({
-      drugs: z.array(z.string()),
-      risk:  z.string(),
-      note:  z.string(),
-    })),
-    overall_risk: z.string(),
-    flagged:      z.boolean(),
-    safe:         z.boolean(),
-    note:         z.string(),
-  }),
-
   createConsult: z.object({
     success:    z.boolean(),
     consult_id: z.string().nullable().optional(),
@@ -93,20 +79,17 @@ const SKILL_NAMES = [
   'getHospitalBookingInfo',
   'bookAppointment',
   'flagEmergency',
-  'checkDrugInteraction',
   'createConsult',
   'endConversation',
   'getPatientHistory',
 ];
 
 // Each skill only receives the context keys it needs.
-// bookAppointment cannot see checkDrugInteraction data, and vice versa.
 const SKILL_CONTEXT_KEYS = {
   searchHospitals:        ['z', 'supabase', 'patientLat', 'patientLon', 'haversineKm', 'triageContext', 'profile', 'conversationContext'],
   getHospitalBookingInfo: ['z', 'profile', 'supabase', 'fetchAvailableSlots'],
   bookAppointment:        ['z', 'supabase', 'profile', 'getClinicCalendarAuth', 'safeText'],
   flagEmergency:          ['z', 'safeText'],
-  checkDrugInteraction:   ['z', 'profile', 'safeText'],
   createConsult:          ['z', 'profile', 'healthlake', 'safeText', 'normalizeUrgency'],
   endConversation:        ['z'],
   getPatientHistory:      ['z', 'profile', 'healthlake'],
