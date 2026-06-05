@@ -185,9 +185,10 @@ export function AppRouter() {
   }, [user?.id]);
 
   // ─── Location: request on-demand when user opens the health assistant ───
-  // Deferred from boot so the OS permission dialog has clear context.
+  // Prefetch on home so GPS is ready before any shortcut auto-submits a message.
+  // Falls back to newConsult entry for users who navigate there directly.
   useEffect(() => {
-    if (screen !== 'newConsult') return;
+    if (screen !== 'home' && screen !== 'newConsult') return;
     if (locationSummary) return;
     requestAndGetLocation()
       .then((loc) => setLocationSummary(loc))
