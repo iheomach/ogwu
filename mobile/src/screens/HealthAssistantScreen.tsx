@@ -1205,7 +1205,7 @@ export function HealthAssistantScreen({
       {/* ── AI consent modal — shown once, required before any message is sent ── */}
       <Modal visible={consentGiven === false} transparent animationType="fade" onRequestClose={() => {}}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', padding: 28 }}>
-          <View style={{ backgroundColor: '#1c0d38', borderRadius: 18, padding: 26, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+          <GlassCard borderRadius={18} innerStyle={{ padding: 26 }}>
             <MaterialIcons name="psychology" size={32} color={colors.purple} style={{ marginBottom: 14 }} />
             <Text style={{ fontSize: 18, fontWeight: '700', color: colors.white, marginBottom: 10 }}>
               Before you continue
@@ -1234,7 +1234,7 @@ export function HealthAssistantScreen({
             >
               <Text style={{ color: colors.white, fontSize: 15, fontWeight: '700' }}>I Agree &amp; Continue</Text>
             </TouchableOpacity>
-          </View>
+          </GlassCard>
         </View>
       </Modal>
 
@@ -1607,7 +1607,7 @@ export function HealthAssistantScreen({
                           activeOpacity={0.6}
                           style={{ alignSelf: 'flex-end', marginTop: 6 }}
                         >
-                          <Text style={{ fontSize: 10, color: 'rgba(0,0,0,0.32)' }}>Report response</Text>
+                          <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Report response</Text>
                         </TouchableOpacity>
                       )}
                       {calendarData && calendarData.meetingUrl && (
