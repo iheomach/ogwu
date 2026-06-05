@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   ScrollView,
   Text,
@@ -15,6 +14,7 @@ import { hospitalsList, type Hospital } from '../lib/hospitals';
 import { triageGetIntake, type TriageIntake } from '../lib/triage';
 import { threadsCreate } from '../lib/threads';
 import { colors, styles, spacing } from '../ui/styles';
+import { ThinkingIndicator } from '../ui/ThinkingIndicator';
 import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
 
@@ -149,7 +149,7 @@ export function SendToHospitalScreen({ busy, onBack, onSent }: SendToHospitalScr
         {/* Hospital list */}
         {hospitalsLoading ? (
           <View style={[styles.row, { paddingVertical: 16 }]}>
-            <ActivityIndicator color={colors.purple} />
+            <ThinkingIndicator />
             <Text style={[styles.helper, { marginLeft: 10, marginBottom: 0 }]}>{t('triage.loading')}</Text>
           </View>
         ) : filtered.length === 0 ? (
@@ -177,7 +177,7 @@ export function SendToHospitalScreen({ busy, onBack, onSent }: SendToHospitalScr
                     )}
                   </View>
                   {sending === h.id ? (
-                    <ActivityIndicator color={colors.purple} />
+                    <ThinkingIndicator />
                   ) : (
                     <View style={[styles.pill, { backgroundColor: colors.purpleLight }]}>
                       <Text style={[styles.pillText, { color: colors.purple }]}>Send</Text>

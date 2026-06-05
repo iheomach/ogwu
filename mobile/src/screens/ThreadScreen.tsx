@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
-  ActivityIndicator,
   Alert,
   Platform,
   ScrollView,
@@ -14,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 import type { ConsultMessage, ConsultThread, ScreenPropsBase } from '../types';
 import { styles, colors, glassSurface, spacing } from '../ui/styles';
+import { ThinkingIndicator } from '../ui/ThinkingIndicator';
 import { t } from '../i18n';
 import { threadMessagesList, threadsList, threadsClose } from '../lib/threads';
 
@@ -167,7 +167,7 @@ export function ThreadScreen({ busy, threadId, onBack, onCancel }: ThreadScreenP
 
         {loading ? (
           <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-            <ActivityIndicator color={colors.purple} />
+            <ThinkingIndicator />
           </View>
         ) : (
           <>

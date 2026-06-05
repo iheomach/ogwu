@@ -14,6 +14,7 @@ import type { RecordsScreenProps } from '../types';
 import { documentsList, documentsDelete, type DocumentRecord } from '../lib/documents';
 import { fetchReport, shareReportAsPdf } from '../lib/report';
 import { styles, colors, spacing, glassSurface, TAB_BAR_HEIGHT } from '../ui/styles';
+import { ThinkingIndicator } from '../ui/ThinkingIndicator';
 import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
 
@@ -193,7 +194,7 @@ export function RecordsScreen({ busy, onUpload }: RecordsScreenProps) {
 
         {docsLoading ? (
           <View style={{ alignItems: 'center', paddingVertical: 24 }}>
-            <ActivityIndicator color={colors.purple} />
+            <ThinkingIndicator />
           </View>
         ) : docs.length === 0 ? (
           <GlassCard borderRadius={14} innerStyle={{ padding: spacing.lg, alignItems: 'center' }}>

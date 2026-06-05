@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -9,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ThinkingIndicator } from './ui/ThinkingIndicator';
 import { StatusBar } from 'expo-status-bar';
 import type { Session } from '@supabase/supabase-js';
 
@@ -383,7 +383,7 @@ export function AppRouter() {
           style={styles.bootSplashLogo}
           resizeMode="contain"
         />
-        <ActivityIndicator color={colors.purpleGlow} />
+        <ThinkingIndicator />
       </LinearGradient>
     );
   }

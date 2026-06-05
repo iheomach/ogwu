@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Linking,
   ScrollView,
@@ -19,6 +18,7 @@ import { fetchAppointments, nextFutureAppointment } from '../lib/appointments';
 import { threadsList } from '../lib/threads';
 import { triageGetIntake, triageHomeSummary } from '../lib/triage';
 import { colors, glassSurface, styles, spacing } from '../ui/styles';
+import { ThinkingIndicator } from '../ui/ThinkingIndicator';
 import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
 
@@ -363,7 +363,9 @@ export function HomeScreen({
 
             {/* ── Open threads widget ── */}
             {loading ? (
-              <ActivityIndicator color={colors.purple} style={{ alignSelf: 'flex-start', marginBottom: 20 }} />
+              <View style={{ alignSelf: 'flex-start', marginBottom: 20 }}>
+                <ThinkingIndicator />
+              </View>
             ) : recentThreads.length > 0 ? (
               <>
                 <Text style={[styles.sectionLabel, { marginBottom: 10 }]}>Messages</Text>

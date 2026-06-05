@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -8,6 +8,7 @@ import { threadsList } from '../lib/threads';
 import { apiGet } from '../lib/api';
 import type { AppointmentRow } from '../lib/appointments';
 import { colors, glassSurface, styles, spacing } from '../ui/styles';
+import { ThinkingIndicator } from '../ui/ThinkingIndicator';
 import { GlassCard } from '../ui/GlassCard';
 
 
@@ -312,7 +313,7 @@ export function InboxScreen({ busy, onOpenThread, onOpenAssistant, onThreadCount
 
         {loading && (
           <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-            <ActivityIndicator color={colors.purple} />
+            <ThinkingIndicator />
           </View>
         )}
 

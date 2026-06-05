@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -9,6 +8,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TriageIntake, TriageResultsScreenProps } from '../types';
 import { styles, colors, spacing } from '../ui/styles';
+import { ThinkingIndicator } from '../ui/ThinkingIndicator';
 import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
 import { triageGetIntake } from '../lib/triage';
@@ -68,7 +68,7 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
 
         {loading && (
           <View style={[styles.center, { paddingHorizontal: 0, paddingVertical: 24, marginTop: 16 }]}>
-            <ActivityIndicator color={colors.purple} />
+            <ThinkingIndicator />
           </View>
         )}
 

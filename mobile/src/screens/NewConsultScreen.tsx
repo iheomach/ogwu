@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Platform,
   Linking,
@@ -20,6 +19,7 @@ import { providersLookup } from '../lib/providers';
 import { threadsCreate } from '../lib/threads';
 import { triageGetIntake, type TriageIntake } from '../lib/triage';
 import { colors, styles, spacing } from '../ui/styles';
+import { ThinkingIndicator } from '../ui/ThinkingIndicator';
 import { GlassCard } from '../ui/GlassCard';
 import { t } from '../i18n';
 
@@ -285,7 +285,7 @@ export function NewConsultScreen({ busy, onViewIntake, onOpenThread }: NewConsul
                   <Text style={styles.value}>{t('triageResults.urgency')}</Text>
                   {intakeLoading ? (
                     <View style={[styles.row, { marginTop: 6 }]}>
-                      <ActivityIndicator color={colors.purple} />
+                      <ThinkingIndicator />
                       <Text style={[styles.helper, { marginBottom: 0, marginLeft: 10 }]}>{t('triage.loading')}</Text>
                     </View>
                   ) : (
@@ -340,8 +340,8 @@ export function NewConsultScreen({ busy, onViewIntake, onOpenThread }: NewConsul
             <Text style={[styles.label, { marginBottom: 12 }]}>{t('consult.doctors')}</Text>
 
             {doctorsLoading && (
-              <View style={[styles.row, { marginTop: 6, marginBottom: 10 }]}> 
-                <ActivityIndicator color={colors.purple} />
+              <View style={[styles.row, { marginTop: 6, marginBottom: 10 }]}>
+                <ThinkingIndicator />
                 <Text style={[styles.helper, { marginBottom: 0, marginLeft: 10 }]}>{t('triage.loading')}</Text>
               </View>
             )}

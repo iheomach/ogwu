@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Animated,
   Text,
@@ -20,6 +19,7 @@ import {
   type DocumentStatus,
 } from '../lib/documents';
 import { colors, glassSurface, spacing, styles } from '../ui/styles';
+import { ThinkingIndicator } from '../ui/ThinkingIndicator';
 import { GlassCard } from '../ui/GlassCard';
 
 const ALLOWED_TYPES = [
@@ -45,7 +45,7 @@ function StageIcon({ stage }: { stage: Stage }) {
     return <MaterialIcons name="check-circle" size={40} color={colors.success} />;
   if (stage === 'failed')
     return <MaterialIcons name="error" size={40} color={colors.error} />;
-  return <ActivityIndicator size="large" color={colors.purple} />;
+  return <ThinkingIndicator />;
 }
 
 function stageLabel(stage: Stage, uploadPct: number): string {
