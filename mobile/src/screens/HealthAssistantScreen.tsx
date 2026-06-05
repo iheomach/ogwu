@@ -1251,14 +1251,6 @@ export function HealthAssistantScreen({
           {/* Toolbar */}
           <View style={styles.assistantToolbar}>
             <Text style={styles.assistantToolbarTitle}>{t('assistant.title')}</Text>
-            {__DEV__ && (
-              <TouchableOpacity
-                onPress={async () => { await AsyncStorage.removeItem('ogwu_ai_consent_v1'); setConsentGiven(false); }}
-                style={{ backgroundColor: 'rgba(239,68,68,0.2)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}
-              >
-                <Text style={{ fontSize: 10, color: '#EF4444', fontWeight: '700' }}>Reset consent</Text>
-              </TouchableOpacity>
-            )}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <TouchableOpacity
                 onPress={handleClearHistory}
