@@ -67,14 +67,15 @@ const sheet = StyleSheet.create({
   },
 });
 
-function AssistantFab({ active, onPress }: { active: boolean; onPress: () => void }) {
+function AssistantFab({ active, onPress, hidden }: { active: boolean; onPress: () => void; hidden?: boolean }) {
   return (
     <TouchableOpacity
-      style={styles.assistantFab}
+      style={[styles.assistantFab, hidden && { opacity: 0 }]}
       onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"
       accessibilityLabel={t('tabs.newConsult')}
+      disabled={hidden}
     >
       <View style={[styles.assistantFabInner, active && styles.assistantFabInnerActive]}>
         <Image
@@ -93,12 +94,14 @@ export function TabScaffold({
   children,
   locale: _locale,
   openThreadCount = 0,
+  hideFab = false,
 }: {
   activeTab: TabKey;
   onNavigate: (tab: TabKey) => void;
   children: React.ReactNode;
   locale?: string;
   openThreadCount?: number;
+  hideFab?: boolean;
 }) {
   return (
     <View style={{ flex: 1 }}>
@@ -126,6 +129,7 @@ export function TabScaffold({
           <AssistantFab
             active={activeTab === 'newConsult'}
             onPress={() => onNavigate('newConsult')}
+            hidden={hideFab}
           />
           <TabButton
             label="Inbox"

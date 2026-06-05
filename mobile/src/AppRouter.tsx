@@ -34,6 +34,7 @@ import type { SupportedLocale } from './i18n/translations';
 import { triageStatus } from './lib/triage';
 import { apiDelete } from './lib/api';
 import { TabScaffold, type TabKey } from './ui/TabScaffold';
+import { CheckInIntroOverlay } from './ui/CheckInIntroOverlay';
 import { requestAndGetLocation, formatLocation, type LocationSummary } from './lib/location';
 import { registerForPushNotifications } from './lib/notifications';
 
@@ -48,6 +49,7 @@ export function AppRouter() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [openThreadCount, setOpenThreadCount] = useState(0);
   const [assistantCheckInRequestId, setAssistantCheckInRequestId] = useState<number | null>(null);
+  const [showCheckInIntro, setShowCheckInIntro] = useState(false);
 
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -63,6 +65,7 @@ export function AppRouter() {
 
   const startAssistantCheckIn = () => {
     setAssistantCheckInRequestId(Date.now());
+    setShowCheckInIntro(true);
     setScreen('newConsult');
   };
 
@@ -460,12 +463,16 @@ export function AppRouter() {
             onGoRecords={() => setScreen('records')}
             onGoProfile={() => setScreen('profile')}
             onRunTriage={startAssistantCheckIn}
+            onOpenThread={(threadId) => {
+              setActiveThreadId(threadId);
+              setScreen('thread');
+            }}
           />
         </TabScaffold>
       )}
 
       {screen === 'newConsult' && (
-        <TabScaffold activeTab="newConsult" onNavigate={goTab} locale={locale} openThreadCount={openThreadCount}>
+        <TabScaffold activeTab="newConsult" onNavigate={goTab} locale={locale} openThreadCount={openThreadCount} hideFab={showCheckInIntro}>
           <HealthAssistantScreen
             busy={busy}
             location={formatLocation(locationSummary)}
@@ -549,6 +556,9 @@ export function AppRouter() {
             onDeleteAccount={onDeleteAccount}
           />
         </TabScaffold>
+      )}
+      {showCheckInIntro && (
+        <CheckInIntroOverlay onDone={() => setShowCheckInIntro(false)} />
       )}
     </LinearGradient>
   );

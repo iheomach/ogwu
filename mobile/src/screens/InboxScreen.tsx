@@ -6,16 +6,10 @@ import { MaterialIcons } from '@expo/vector-icons';
 import type { ConsultThread } from '../types';
 import { threadsList } from '../lib/threads';
 import { apiGet } from '../lib/api';
+import type { AppointmentRow } from '../lib/appointments';
 import { colors, glassSurface, styles, spacing } from '../ui/styles';
 import { GlassCard } from '../ui/GlassCard';
 
-type AppointmentRow = {
-  id: string;
-  hospital_id: string | null;
-  starts_at: string;
-  created_at: string;
-  status: string;
-};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

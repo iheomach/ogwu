@@ -28,6 +28,7 @@ import { t } from '../i18n';
 import { triageComplete, triageNext } from '../lib/triage';
 import { useAgentChat, type AgentMessage } from '../lib/useAgentChat';
 import { supabase } from '../../lib/supabase';
+import { ThinkingIndicator } from '../ui/ThinkingIndicator';
 
 function messageText(m: any): string {
   const c = (m as any)?.content;
@@ -1632,11 +1633,8 @@ export function HealthAssistantScreen({
             })}
 
             {(isLoading || checkInLoading) && activeThinkingLabel && (
-              <View style={[styles.assistantBubble, { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 }]}>
-                <ActivityIndicator color={colors.purple} size="small" />
-                <Text style={{ color: colors.grey500, fontSize: 13, fontStyle: 'italic' }}>
-                  {activeThinkingLabel}
-                </Text>
+              <View style={{ alignSelf: 'flex-start', paddingLeft: 4, paddingVertical: 4 }}>
+                <ThinkingIndicator />
               </View>
             )}
 
