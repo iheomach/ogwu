@@ -1206,6 +1206,7 @@ export function HealthAssistantScreen({
       {/* ── AI consent modal — shown once, required before any message is sent ── */}
       <Modal visible={consentGiven === false} transparent animationType="fade" onRequestClose={() => {}}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', padding: 28 }}>
+          <View style={{ backgroundColor: colors.bg, borderRadius: 18 }}>
           <GlassCard borderRadius={18} innerStyle={{ padding: 26 }}>
             <MaterialIcons name="psychology" size={32} color={colors.purple} style={{ marginBottom: 14 }} />
             <Text style={{ fontSize: 18, fontWeight: '700', color: colors.white, marginBottom: 10 }}>
@@ -1236,6 +1237,7 @@ export function HealthAssistantScreen({
               <Text style={{ color: colors.white, fontSize: 15, fontWeight: '700' }}>I Agree &amp; Continue</Text>
             </TouchableOpacity>
           </GlassCard>
+          </View>
         </View>
       </Modal>
 
@@ -1249,6 +1251,14 @@ export function HealthAssistantScreen({
           {/* Toolbar */}
           <View style={styles.assistantToolbar}>
             <Text style={styles.assistantToolbarTitle}>{t('assistant.title')}</Text>
+            {__DEV__ && (
+              <TouchableOpacity
+                onPress={async () => { await AsyncStorage.removeItem('ogwu_ai_consent_v1'); setConsentGiven(false); }}
+                style={{ backgroundColor: 'rgba(239,68,68,0.2)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}
+              >
+                <Text style={{ fontSize: 10, color: '#EF4444', fontWeight: '700' }}>Reset consent</Text>
+              </TouchableOpacity>
+            )}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <TouchableOpacity
                 onPress={handleClearHistory}
