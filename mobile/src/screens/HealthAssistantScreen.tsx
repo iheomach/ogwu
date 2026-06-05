@@ -6,6 +6,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   ScrollView,
   Text,
@@ -587,6 +588,12 @@ function HospitalCards({ hospitals, onSelect, disabled }: {
 
   return (
     <View style={{ marginBottom: spacing.sm }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginBottom: 8, paddingHorizontal: 2 }}>
+        <MaterialIcons name="info-outline" size={12} color={colors.grey500} style={{ marginTop: 1 }} />
+        <Text style={{ fontSize: 11, color: colors.grey500, flex: 1, lineHeight: 15 }}>
+          For life-threatening emergencies, call 112 or your local emergency number immediately. These results are for finding care, not emergency dispatch.
+        </Text>
+      </View>
       {hospitals.map((h: any, idx: number) => (
         <Animated.View
           key={h.id ?? h.place_id ?? h.name ?? idx}
@@ -795,6 +802,12 @@ export function HealthAssistantScreen({
   const chatBarBottom = keyboardVisible ? 12 : insets.bottom + 72;
 
   const [isInitialized, setIsInitialized] = useState(false);
+  const [consentGiven, setConsentGiven] = useState<boolean | null>(null);
+  useEffect(() => {
+    AsyncStorage.getItem('ogwu_ai_consent_v1').then((val) => {
+      setConsentGiven(val === 'true');
+    });
+  }, []);
   const [sendingToHospital, setSendingToHospital] = useState(false);
   const [clearingHistory, setClearingHistory] = useState(false);
   const apiBase = useMemo(() => {
@@ -969,7 +982,7 @@ export function HealthAssistantScreen({
 
   const consumedInitialMessageRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!isInitialized || !initialMessageRequest) return;
+    if (!isInitialized || !initialMessageRequest || consentGiven !== true) return;
     if (consumedInitialMessageRef.current === initialMessageRequest.id) return;
     consumedInitialMessageRef.current = initialMessageRequest.id;
     onInitialMessageConsumed?.();
@@ -977,7 +990,7 @@ export function HealthAssistantScreen({
     setPastSessionMessages([]);
     startNewSession(false);
     append({ role: 'user', content: initialMessageRequest.message });
-  }, [initialMessageRequest, isInitialized, append, startNewSession, onInitialMessageConsumed]);
+  }, [initialMessageRequest, isInitialized, consentGiven, append, startNewSession, onInitialMessageConsumed]);
 
   const handleSubmit = useCallback(() => {
     const text = input.trim();
@@ -1188,6 +1201,43 @@ export function HealthAssistantScreen({
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
+
+      {/* ── AI consent modal — shown once, required before any message is sent ── */}
+      <Modal visible={consentGiven === false} transparent animationType="fade" onRequestClose={() => {}}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', padding: 28 }}>
+          <View style={{ backgroundColor: '#1c0d38', borderRadius: 18, padding: 26, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+            <MaterialIcons name="psychology" size={32} color={colors.purple} style={{ marginBottom: 14 }} />
+            <Text style={{ fontSize: 18, fontWeight: '700', color: colors.white, marginBottom: 10 }}>
+              Before you continue
+            </Text>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', lineHeight: 20, marginBottom: 8 }}>
+              Ogwu uses OpenAI to generate responses to your health queries. Your messages are sent to OpenAI's API for processing.
+            </Text>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', lineHeight: 20, marginBottom: 8 }}>
+              This assistant does not provide medical diagnoses. Always consult a qualified healthcare provider for medical decisions.
+            </Text>
+            <TouchableOpacity
+              onPress={() => Linking.openURL('https://openai.com/policies/api-data-usage-policies')}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 12, color: colors.purpleGlow, marginBottom: 20, textDecorationLine: 'underline' }}>
+                View OpenAI API data usage policy
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={async () => {
+                await AsyncStorage.setItem('ogwu_ai_consent_v1', 'true');
+                setConsentGiven(true);
+              }}
+              activeOpacity={0.85}
+              style={{ backgroundColor: colors.purple, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+            >
+              <Text style={{ color: colors.white, fontSize: 15, fontWeight: '700' }}>I Agree &amp; Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -1550,6 +1600,15 @@ export function HealthAssistantScreen({
                           text={displayText}
                           color={role === 'user' ? colors.white : colors.grey900}
                         />
+                      )}
+                      {role === 'assistant' && !!displayText && (
+                        <TouchableOpacity
+                          onPress={() => Linking.openURL('mailto:support@ogwu.app?subject=Report%20AI%20response')}
+                          activeOpacity={0.6}
+                          style={{ alignSelf: 'flex-end', marginTop: 6 }}
+                        >
+                          <Text style={{ fontSize: 10, color: 'rgba(0,0,0,0.32)' }}>Report response</Text>
+                        </TouchableOpacity>
                       )}
                       {calendarData && calendarData.meetingUrl && (
                         <AddToCalendarButton

@@ -96,6 +96,9 @@ export function TriageResultsScreen({ busy, onBack }: TriageResultsScreenProps) 
                 </Text>
               </View>
             </GlassCard>
+            <Text style={{ fontSize: 11, color: colors.grey500, marginTop: 8, lineHeight: 16, paddingHorizontal: 2 }}>
+              This is not a medical assessment. Always consult a qualified healthcare provider for clinical guidance.
+            </Text>
             <View style={styles.mt16} />
 
             {intake.summary && (
