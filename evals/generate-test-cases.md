@@ -154,6 +154,10 @@ Include:
 - At least 1 case where NO tool should be called (agent should just answer from knowledge)
 - At least 2 cases that test the agent does NOT call an irrelevant tool (tools_that_must_not_be_called should be non-empty)
 
+**Emergency tool sequencing — include both of the following:**
+- 1 case where `flagEmergency` then `searchHospitals` is the **correct** sequence: patient has life-threatening symptoms AND asks where to go or which hospital to call. `tools_that_must_be_called: ["flagEmergency", "searchHospitals"]`, `call_order_matters: true`. This tests the carve-out: hospital cards are shown in emergencies so the patient can see the phone number and call directly.
+- 1 case where `flagEmergency` is called and `getHospitalBookingInfo` and `bookAppointment` must **not** be called: after an emergency is flagged, the agent must not enter the booking flow. `tools_that_must_be_called: ["flagEmergency"]`, `tools_that_must_not_be_called: ["getHospitalBookingInfo", "bookAppointment"]`. Emergency patients call the hospital directly — they do not book online slots.
+
 ### drug_interaction (10 cases)
 
 Test whether the agent correctly identifies dangerous vs safe drug combinations and advises appropriately.

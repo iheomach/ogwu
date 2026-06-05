@@ -458,6 +458,8 @@ function HospitalCard({ h, selected, onPress, disabled }: {
   onPress: () => void;
   disabled: boolean;
 }) {
+  const phone: string | null = typeof h.phone === 'string' && h.phone.startsWith('tel:') ? null : (h.phone || null);
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -486,6 +488,12 @@ function HospitalCard({ h, selected, onPress, disabled }: {
           {h.specialties.slice(0, 3).join(' · ')}
         </Text>
       )}
+      {/* Phone number — tappable tel: link */}
+      {phone ? (
+        <TouchableOpacity onPress={() => Linking.openURL(`tel:${phone}`)} activeOpacity={0.7}>
+          <Text style={styles.hospitalCardPhone}>{phone}</Text>
+        </TouchableOpacity>
+      ) : null}
       {/* Patient-specific standout phrase (Places results) */}
       {typeof h.standout_phrase === 'string' && h.standout_phrase ? (
         <Text style={styles.hospitalCardStandout} numberOfLines={2}>{h.standout_phrase}</Text>

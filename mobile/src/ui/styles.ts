@@ -884,6 +884,13 @@ export const styles = StyleSheet.create({
     color: colors.grey500,
     marginTop: 3,
   },
+  hospitalCardPhone: {
+    fontSize: 12,
+    color: colors.purpleGlow,
+    marginTop: 4,
+    fontWeight: '500' as const,
+    textDecorationLine: 'underline' as const,
+  },
   hospitalCardStandout: {
     fontSize: 12,
     color: colors.purpleGlow,
