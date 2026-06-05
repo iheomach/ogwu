@@ -809,6 +809,38 @@ export function HealthAssistantScreen({
       setConsentGiven(val === 'true');
     });
   }, []);
+
+  const [reportTarget, setReportTarget] = useState<{ text: string } | null>(null);
+  const [reportReason, setReportReason] = useState<string | null>(null);
+  const [reportNote, setReportNote] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportDone, setReportDone] = useState(false);
+
+  const handleReportSubmit = useCallback(async () => {
+    if (!reportReason || reportSubmitting) return;
+    setReportSubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      await supabase.from('ai_reports').insert({
+        user_id: session?.user?.id ?? null,
+        message_content: reportTarget?.text ?? '',
+        reason: reportReason,
+        description: reportNote.trim() || null,
+      });
+    } catch (_) {
+      // Fail silently — report is best-effort
+    } finally {
+      setReportSubmitting(false);
+      setReportDone(true);
+    }
+  }, [reportReason, reportNote, reportTarget, reportSubmitting]);
+
+  const closeReportModal = useCallback(() => {
+    setReportTarget(null);
+    setReportReason(null);
+    setReportNote('');
+    setReportDone(false);
+  }, []);
   const [sendingToHospital, setSendingToHospital] = useState(false);
   const [clearingHistory, setClearingHistory] = useState(false);
   const apiBase = useMemo(() => {
@@ -1241,6 +1273,101 @@ export function HealthAssistantScreen({
         </View>
       </Modal>
 
+      {/* ── Report response modal ── */}
+      <Modal visible={!!reportTarget} transparent animationType="fade" onRequestClose={closeReportModal}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'center', padding: 28 }}
+          activeOpacity={1}
+          onPress={closeReportModal}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View style={{ backgroundColor: colors.bg, borderRadius: 16 }}>
+              <GlassCard borderRadius={16} innerStyle={{ padding: 22 }}>
+                {reportDone ? (
+                  <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+                    <MaterialIcons name="check-circle" size={36} color={colors.purple} style={{ marginBottom: 12 }} />
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: colors.white, marginBottom: 6 }}>Report received</Text>
+                    <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textAlign: 'center', lineHeight: 19 }}>
+                      Thank you. We review all reports to improve the assistant.
+                    </Text>
+                    <TouchableOpacity
+                      onPress={closeReportModal}
+                      style={{ marginTop: 20, backgroundColor: colors.purple, borderRadius: 10, paddingVertical: 11, paddingHorizontal: 32 }}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={{ color: colors.white, fontWeight: '700', fontSize: 14 }}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: colors.white, marginBottom: 4 }}>Report this response</Text>
+                    <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>What's the issue?</Text>
+                    {(['Inaccurate information', 'Inappropriate content', 'Unhelpful response', 'Other'] as const).map((reason) => (
+                      <TouchableOpacity
+                        key={reason}
+                        onPress={() => setReportReason(reason)}
+                        activeOpacity={0.75}
+                        style={{
+                          flexDirection: 'row', alignItems: 'center', gap: 10,
+                          paddingVertical: 11, paddingHorizontal: 14, borderRadius: 10, marginBottom: 8,
+                          backgroundColor: reportReason === reason ? 'rgba(123,77,217,0.25)' : 'rgba(255,255,255,0.07)',
+                          borderWidth: 1, borderColor: reportReason === reason ? colors.purple : 'rgba(255,255,255,0.1)',
+                        }}
+                      >
+                        <View style={{
+                          width: 16, height: 16, borderRadius: 8, borderWidth: 2,
+                          borderColor: reportReason === reason ? colors.purple : 'rgba(255,255,255,0.35)',
+                          alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          {reportReason === reason && (
+                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.purple }} />
+                          )}
+                        </View>
+                        <Text style={{ fontSize: 13, color: colors.white, flex: 1 }}>{reason}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TextInput
+                      placeholder="Add more detail (optional)"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      value={reportNote}
+                      onChangeText={setReportNote}
+                      multiline
+                      numberOfLines={3}
+                      style={{
+                        color: colors.white, fontSize: 13, marginTop: 4, marginBottom: 16,
+                        backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 10,
+                        padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+                        minHeight: 72, textAlignVertical: 'top',
+                      }}
+                    />
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <TouchableOpacity
+                        onPress={closeReportModal}
+                        activeOpacity={0.75}
+                        style={{ flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)' }}
+                      >
+                        <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '600', fontSize: 14 }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleReportSubmit}
+                        disabled={!reportReason || reportSubmitting}
+                        activeOpacity={0.85}
+                        style={{ flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: !reportReason ? 'rgba(123,77,217,0.3)' : colors.purple }}
+                      >
+                        {reportSubmitting
+                          ? <ActivityIndicator color={colors.white} size="small" />
+                          : <Text style={{ color: colors.white, fontWeight: '700', fontSize: 14 }}>Submit</Text>
+                        }
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </GlassCard>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -1606,7 +1733,7 @@ export function HealthAssistantScreen({
                       )}
                       {role === 'assistant' && !!displayText && (
                         <TouchableOpacity
-                          onPress={() => Linking.openURL('mailto:support@ogwu.app?subject=Report%20AI%20response')}
+                          onPress={() => setReportTarget({ text: displayText })}
                           activeOpacity={0.6}
                           style={{ alignSelf: 'flex-end', marginTop: 6 }}
                         >
