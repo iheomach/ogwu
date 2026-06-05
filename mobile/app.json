@@ -12,16 +12,20 @@
       "backgroundColor": "#1A0530"
     },
     "ios": {
+      "bundleIdentifier": "app.ogwu.patient",
+      "buildNumber": "1",
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Ogwu uses your location to find hospitals and care providers near you.",
         "NSCameraUsageDescription": "Ogwu uses your camera to capture documents, lab results, and prescriptions.",
         "NSPhotoLibraryUsageDescription": "Ogwu accesses your photo library to upload documents and medical images.",
         "NSCalendarsUsageDescription": "Ogwu adds your appointments to Apple Calendar so you don't miss them.",
-        "NSUserNotificationsUsageDescription": "Ogwu sends you a notification when a provider replies to your consult."
+        "NSUserNotificationUsageDescription": "Ogwu sends you a notification when a provider replies to your consult."
       }
     },
     "android": {
+      "package": "app.ogwu.patient",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#1A0530",
         "foregroundImage": "./assets/android-icon-foreground.png"
@@ -30,7 +34,8 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_CALENDAR",
-        "android.permission.WRITE_CALENDAR"
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.READ_MEDIA_IMAGES"
       ]
     },
     "web": {
